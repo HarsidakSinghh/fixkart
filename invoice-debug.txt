@@ -1,0 +1,8 @@
+Debug Report:
+Latest Order ID: cmkmioako0001igx0q3t8xy1j
+Updated At: Tue Jan 20 2026 18:53:30 GMT+0530 (India Standard Time)
+Invoice URL: https://res.cloudinary.com/dkxfkwbpd/image/upload/v1768915396/fixkart/invoices/bcrwqlasw4s9vahhto24.pdf
+HTTP Status: 401 Unauthorized
+Content-Type: text/html
+Content-Length: 0
+❌ URL is NOT accessible.

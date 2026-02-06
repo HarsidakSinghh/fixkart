@@ -1,0 +1,21 @@
+Checking asset with public_id: fixkart/invoices/invoice-cmkmnc0ou000510f39n1r9rhp.pdf
+Not found as image or error: undefined
+Found as RAW:
+{
+  "asset_id": "8c853bc1722c3ed4dcfaf9f25e8a8fd0",
+  "public_id": "fixkart/invoices/invoice-cmkmnc0ou000510f39n1r9rhp.pdf",
+  "version": 1768916734,
+  "resource_type": "raw",
+  "type": "upload",
+  "created_at": "2026-01-20T13:45:34Z",
+  "bytes": 13464,
+  "asset_folder": "fixkart/invoices",
+  "display_name": "invoice-cmkmnc0ou000510f39n1r9rhp.pdf",
+  "url": "http://res.cloudinary.com/dkxfkwbpd/raw/upload/v1768916734/fixkart/invoices/invoice-cmkmnc0ou000510f39n1r9rhp.pdf",
+  "secure_url": "https://res.cloudinary.com/dkxfkwbpd/raw/upload/v1768916734/fixkart/invoices/invoice-cmkmnc0ou000510f39n1r9rhp.pdf",
+  "next_cursor": "81f815a9d3bf63052806e480cd4923427a77f62bde51c9b83a0d1daf70f967c1",
+  "derived": [],
+  "rate_limit_allowed": 500,
+  "rate_limit_reset_at": "2026-01-20T14:00:00.000Z",
+  "rate_limit_remaining": 497
+}

@@ -1,0 +1,29 @@
+import { API_CONFIG } from '../config';
+import { getCache, setCache } from '../services/cache';
+
+const BASE_URL = API_CONFIG.baseUrl;
+
+export async function getStoreProducts({ query = '', category = '' } = {}) {
+  const cacheKey = `store:products:${query}:${category}`;
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+  const params = new URLSearchParams();
+  if (query) params.set('query', query);
+  if (category) params.set('category', category);
+
+  const res = await fetch(`${BASE_URL}/api/mobile/store/products?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  const data = await res.json();
+  setCache(cacheKey, data, 45000);
+  return data;
+}
+
+export async function getStoreProduct(id) {
+  const res = await fetch(`${BASE_URL}/api/mobile/store/products/${id}`);
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  return res.json();
+}

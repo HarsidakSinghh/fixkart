@@ -1,0 +1,11 @@
+Checking environment files...
+
+Found .env:
+  ✅ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME is present
+  ✅ CLOUDINARY_API_KEY is present
+  ✅ CLOUDINARY_API_SECRET is present
+
+Found .env.local:
+  ✅ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME is present
+  ✅ CLOUDINARY_API_KEY is present
+  ✅ CLOUDINARY_API_SECRET is present

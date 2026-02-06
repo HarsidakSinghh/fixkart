@@ -1,0 +1,374 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. PRODUCT & INVENTORY
+// ==========================================
+
+model Product {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // --- OWNER TRACKING ---
+  vendorId       String   // Clerk User ID of the Seller
+  
+  // --- IDENTIFICATION ---
+  name           String   // Internal ID (e.g. "anchor-m6")
+  title          String?  // Display Title
+  slug           String   @unique
+  description    String?  
+  status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
+
+  // --- HIERARCHY ---
+  category       String 
+  subCategory    String? 
+  subSubCategory String? 
+
+  // --- IMAGES ---
+  image          String 
+  imagePath      String? 
+  gallery        String[] 
+  
+  // --- PRICE & INVENTORY ---
+  price          Float    @default(0.0)
+  quantity       Int      @default(10)
+  sku            String?  @unique
+  
+  // --- SPECS ---
+  specs          Json?    
+  brand          String?
+  
+  // --- STATUS ---
+  isPublished    Boolean  @default(true)
+  isFeatured     Boolean  @default(false)
+
+  // --- RELATIONS ---
+  variants       Variant[]
+  orderItems     OrderItem[] 
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Variant {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String 
+  price     Float
+  stock     Int      @default(0)
+  sku       String?
+  
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String   @db.ObjectId
+}
+
+// ==========================================
+// 2. VENDOR PROFILE
+// ==========================================
+
+model VendorProfile {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @unique // Clerk User ID
+
+  status         String   @default("PENDING")
+
+  // --- BASIC INFO ---
+  fullName       String
+  companyName    String?
+  gstNumber      String?
+  phone          String
+  email          String
+  address        String
+  city           String
+  state          String
+  postalCode     String
+
+  // --- BUSINESS DETAILS ---
+  category       String? 
+  businessType   String? 
+  yearsInBusiness String?
+  
+  // -- DOCS --
+  gstCertificateUrl  String?
+  msmeCertificateUrl String?
+  panCardUrl         String?
+  ownerPhotoUrl      String?
+  aadharCardUrl      String?
+
+  // --- KYC ---
+  idProofType    String? 
+  idProofNumber  String?
+  idProofUrl     String? 
+
+  // --- BANKING ---
+  bankName           String?
+  accountHolder      String?
+  accountNumber      String?
+  ifscCode           String?
+  cancelledChequeUrl String?
+
+  // --- EXTRA ---
+  tradeLicense       String?
+  contactPerson      String?
+  alternateContact   String?
+  
+  // --- BACKUP CONTACTS ---
+  backup1Name        String?
+  backup1Phone       String?
+  backup1IdUrl       String?
+
+  backup2Name        String?
+  backup2Phone       String?
+  backup2IdUrl       String?
+  
+  // --- LOCATION ---
+  gpsLat             Float?
+  gpsLng             Float?
+  locationPhotoUrl   String?
+
+  // --- RELATIONS ---
+  orderItems      OrderItem[] // Tracks items sold by this vendor
+  purchaseOrders  PurchaseOrder[] // [NEW] POs for this vendor
+  vendorInvoices  VendorInvoice[] // [NEW] Invoices from this vendor
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// 3. CUSTOMER PROFILE (B2B)
+// ==========================================
+
+model CustomerProfile {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique // Clerk User ID
+  status          String   @default("PENDING")
+  
+  // --- BASIC INFO ---
+  fullName        String
+  companyName     String
+  phone           String
+  email           String
+  address         String
+  city            String
+  state           String
+  postalCode      String
+
+  // --- BUSINESS DETAILS ---
+  category        String?  // Retailer, Wholesaler, etc.
+  businessType    String?  // Proprietorship, etc.
+  yearsInBusiness String?
+  gstNumber       String?
+  tradeLicense    String?
+  panNumber       String?
+
+  // --- DOCS ---
+  businessProofUrl    String?
+  idProofUrl          String?
+  gstCertificateUrl   String?
+  msmeCertificateUrl  String?
+  panCardUrl          String?
+  aadharCardUrl       String?
+  ownerPhotoUrl       String?
+
+  // --- BANKING ---
+  bankName            String?
+  accountHolder       String?
+  accountNumber       String?
+  ifscCode            String?
+  cancelledChequeUrl  String?
+
+  // --- BACKUP CONTACTS ---
+  backup1Name         String?
+  backup1Phone        String?
+  backup1IdUrl        String?
+
+  backup2Name         String?
+  backup2Phone        String?
+  backup2IdUrl        String?
+
+  // --- LOCATION ---
+  gpsLat              Float?
+  gpsLng              Float?
+  locationPhotoUrl    String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ==========================================
+// 4. ORDER MANAGEMENT
+// ==========================================
+
+model Order {
+  id             String      @id @default(cuid()) @map("_id")
+  customerId     String      // Clerk User ID of customer
+  customerName   String?      
+  customerEmail  String?
+  customerPhone  String?
+  paymentMethod  String?
+  billingAddress String?
+
+  totalAmount    Float
+  status         String      @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  
+  // Optional: Used by Admin to track delivery dates (Admin Specific Field)
+  expectedDelivery DateTime? 
+
+  invoiceUrl     String?     // URL to generated PDF invoice
+  customerPoUrl  String?     // [NEW] URL to generated Customer PO (Customer -> Fixkart)
+
+  purchaseOrders PurchaseOrder[] // [NEW] Relation to Purchase Orders (One per vendor)
+  vendorInvoices VendorInvoice[] // [NEW] Relation to Vendor Invoices (One per vendor)
+
+  items          OrderItem[] 
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model PurchaseOrder {
+  id        String   @id @default(cuid()) @map("_id")
+  
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  
+  vendorId  String   // Clerk User ID of Vendor
+  vendor    VendorProfile @relation(fields: [vendorId], references: [userId])
+  
+  url       String   // Path to generated PDF
+  poNumber  String   // e.g. PO-ORDERID-VENDORSUFFIX
+  
+  createdAt DateTime @default(now())
+}
+
+model VendorInvoice {
+  id        String   @id @default(cuid()) @map("_id")
+  
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  
+  vendorId  String   // Clerk User ID of Vendor
+  vendor    VendorProfile @relation(fields: [vendorId], references: [userId])
+  
+  url       String   // Path to generated PDF
+  invoiceNumber String 
+  
+  createdAt DateTime @default(now())
+}
+
+model OrderItem {
+  id             String   @id @default(cuid()) @map("_id")
+  
+  // Link to Order
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id])
+  
+  // Link to Product
+  productId      String   @db.ObjectId
+  product        Product  @relation(fields: [productId], references: [id])
+  
+  // Link to Vendor
+  vendorId       String   
+  vendor         VendorProfile @relation(fields: [vendorId], references: [userId])
+
+  quantity       Int
+  price          Float    // Snapshot of price at purchase
+  productName    String?  // Snapshot of name (Optional backup)
+  image          String?  // Snapshot of image (Optional backup)
+  
+  transportSlipUrl String?
+  billUrl          String?
+
+  status         String   @default("PENDING") 
+
+  dispatchCode   String?
+
+  createdAt      DateTime @default(now())
+  
+  refundRequest  RefundRequest?
+}
+
+// ==========================================
+// 5. RETURNS & COMPLAINTS
+// ==========================================
+
+model RefundRequest {
+  id          String    @id @default(cuid()) @map("_id")
+  
+  // Link to Item
+  orderItemId String    @unique
+  item        OrderItem? @relation(fields: [orderItemId], references: [id])
+
+  vendorId    String
+  customerId  String
+  reason      String
+  status      String    @default("PENDING") 
+  
+  proofImages String[]
+  
+  // --- DISPUTE INFO ---
+  vendorRejectionReason String?
+  vendorRejectionProof  String[]
+
+  messages    RefundChat[]
+  createdAt   DateTime  @default(now())
+}
+
+model RefundChat {
+  id              String        @id @default(cuid()) @map("_id")
+  refundRequestId String
+  refundRequest   RefundRequest @relation(fields: [refundRequestId], references: [id])
+  
+  senderId        String        // User ID of Sender (Admin, Vendor, etc.)
+  senderRole      String        // "ADMIN" | "VENDOR"
+  message         String
+  
+  createdAt       DateTime      @default(now())
+}
+
+// ==========================================
+// 6. SALESMAN & TRACKING
+// ==========================================
+
+model Salesman {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId     String?
+  name         String?
+  phone        String?
+  code         String?
+  status       String?  @default("ACTIVE")
+  currentLat   Float?
+  currentLng   Float?
+  lastUpdated  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model TrackingLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  salesmanId  String
+  event       String
+  note        String?
+  customerId  String?
+  lat         Float?
+  lng         Float?
+  createdAt   DateTime @default(now())
+}
+
+model Complaint {
+  id             String   @id @default(cuid()) @map("_id")
+  orderId        String
+  vendorId       String
+  customerId     String
+  message        String
+  status         String   @default("OPEN") 
+  
+  createdAt      DateTime @default(now())
+}

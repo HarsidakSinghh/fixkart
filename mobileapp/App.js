@@ -1,0 +1,309 @@
+import React, { useMemo, useState } from "react";
+import { View, StyleSheet, ActivityIndicator, Text } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { colors } from "./src/theme";
+import { customerColors } from "./src/customer/CustomerTheme";
+import BottomNav from "./src/components/BottomNav";
+import DashboardScreen from "./src/screens/DashboardScreen";
+import OrdersScreen from "./src/screens/OrdersScreen";
+import OrdersHistoryScreen from "./src/screens/OrdersHistoryScreen";
+import UsersScreen from "./src/screens/UsersScreen";
+import ProductsScreen from "./src/screens/ProductsScreen";
+import InventoryScreen from "./src/screens/InventoryScreen";
+import InventoryApprovalsScreen from "./src/screens/InventoryApprovalsScreen";
+import VendorsScreen from "./src/screens/VendorsScreen";
+import OnboardedVendorsScreen from "./src/screens/OnboardedVendorsScreen";
+import CustomerApprovalsScreen from "./src/screens/CustomerApprovalsScreen";
+import OnboardedCustomersScreen from "./src/screens/OnboardedCustomersScreen";
+import ComplaintsScreen from "./src/screens/ComplaintsScreen";
+import RefundsScreen from "./src/screens/RefundsScreen";
+import MoreScreen from "./src/screens/MoreScreen";
+import ApprovalsScreen from "./src/screens/ApprovalsScreen";
+import LoginScreen from "./src/screens/LoginScreen";
+import { AuthProvider, useAuth } from "./src/context/AuthContext";
+import useTokenRefresh from "./src/hooks/useTokenRefresh";
+import { CartProvider } from "./src/context/CartContext";
+import CustomerPortal from "./src/customer/CustomerPortal";
+import VendorPortal from "./src/vendor/VendorPortal";
+import SalesmanPortal from "./src/salesman/SalesmanPortal";
+import SalesmenScreen from "./src/screens/SalesmenScreen";
+import VendorRegisterScreen from "./src/vendor/VendorRegisterScreen";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+
+function LoadingScreen() {
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={styles.loadingText}>Loading FixKart...</Text>
+    </View>
+  );
+}
+
+function AdminAppContent() {
+  const [active, setActive] = useState("dashboard");
+
+  const routes = useMemo(
+    () => ({
+      dashboard: {
+        key: "dashboard",
+        label: "Dashboard",
+        subtitle: "KPI overview",
+        component: DashboardScreen,
+      },
+      approvals: {
+        key: "approvals",
+        label: "Approvals",
+        subtitle: "Pending actions",
+        component: ApprovalsScreen,
+      },
+      orders: {
+        key: "orders",
+        label: "Orders",
+        subtitle: "Live pipeline",
+        component: OrdersScreen,
+      },
+      ordersHistory: {
+        key: "ordersHistory",
+        label: "Orders History",
+        subtitle: "Archived orders",
+        component: OrdersHistoryScreen,
+      },
+      users: {
+        key: "users",
+        label: "Users",
+        subtitle: "Admin access",
+        component: UsersScreen,
+      },
+      products: {
+        key: "products",
+        label: "Products",
+        subtitle: "Catalog control",
+        component: ProductsScreen,
+      },
+      inventory: {
+        key: "inventory",
+        label: "Inventory",
+        subtitle: "Warehouse stock",
+        component: InventoryScreen,
+      },
+      inventoryApprovals: {
+        key: "inventoryApprovals",
+        label: "Inventory Approvals",
+        subtitle: "Pending listings",
+        component: InventoryApprovalsScreen,
+      },
+      vendors: {
+        key: "vendors",
+        label: "Vendors",
+        subtitle: "Partner management",
+        component: VendorsScreen,
+      },
+      onboardedVendors: {
+        key: "onboardedVendors",
+        label: "Onboarded Vendors",
+        subtitle: "Approved partners",
+        component: OnboardedVendorsScreen,
+      },
+      customerApprovals: {
+        key: "customerApprovals",
+        label: "Customer Approvals",
+        subtitle: "Pending access",
+        component: CustomerApprovalsScreen,
+      },
+      onboardedCustomers: {
+        key: "onboardedCustomers",
+        label: "Onboarded Customers",
+        subtitle: "Verified accounts",
+        component: OnboardedCustomersScreen,
+      },
+      complaints: {
+        key: "complaints",
+        label: "Complaints",
+        subtitle: "Escalations",
+        component: ComplaintsScreen,
+      },
+      refunds: {
+        key: "refunds",
+        label: "Refunds",
+        subtitle: "Finance desk",
+        component: RefundsScreen,
+      },
+      salesmen: {
+        key: "salesmen",
+        label: "Salesmen",
+        subtitle: "Field team",
+        component: SalesmenScreen,
+      },
+      more: {
+        key: "more",
+        label: "More",
+        subtitle: "All sections",
+        component: MoreScreen,
+      },
+    }),
+    []
+  );
+
+  const bottomTabs = [routes.dashboard, routes.approvals, routes.orders, routes.more];
+  const moreRoutes = [
+    routes.ordersHistory,
+    routes.products,
+    routes.inventory,
+    routes.salesmen,
+    routes.vendors,
+    routes.onboardedVendors,
+    routes.onboardedCustomers,
+    routes.complaints,
+    routes.refunds,
+    routes.users,
+  ];
+
+  const ActiveComponent = routes[active]?.component || DashboardScreen;
+
+  return (
+    <View style={styles.root}>
+      <StatusBar style="light" />
+      <View style={styles.content}>
+        {active === "more" ? (
+          <MoreScreen routes={moreRoutes} onNavigate={setActive} />
+        ) : (
+          <ActiveComponent />
+        )}
+      </View>
+      <BottomNav tabs={bottomTabs} activeKey={active} onChange={setActive} />
+    </View>
+  );
+}
+
+function AppGate() {
+  const { isLoading, isAuthenticated, isAdmin, isVendor, isSalesmanAuthenticated } = useAuth();
+  const [portal, setPortal] = useState('customer');
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginMode, setLoginMode] = useState('customer');
+  const [showVendorRegister, setShowVendorRegister] = useState(false);
+
+  useTokenRefresh();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  let content = null;
+  let safeBg = colors.bg;
+
+  if (showVendorRegister) {
+    safeBg = colors.bg;
+    content = <VendorRegisterScreen onClose={() => setShowVendorRegister(false)} />;
+  } else if (showLogin) {
+    safeBg = loginMode === 'customer' ? customerColors.primary : colors.bg;
+    content = (
+      <LoginScreen
+        mode={loginMode}
+        onModeChange={setLoginMode}
+        onClose={() => setShowLogin(false)}
+        onRegisterVendor={() => {
+          setShowLogin(false);
+          setShowVendorRegister(true);
+        }}
+        onLoginSuccess={(selectedRole) => {
+          setShowLogin(false);
+          setPortal(selectedRole || loginMode || 'customer');
+        }}
+      />
+    );
+  } else if (portal === 'admin') {
+    safeBg = colors.bg;
+    if (!isAuthenticated || !isAdmin) {
+      content = (
+        <LoginScreen
+          mode="admin"
+          onModeChange={setLoginMode}
+          onClose={() => setPortal('customer')}
+          onLoginSuccess={() => setPortal('admin')}
+        />
+      );
+    } else {
+      content = <AdminAppContent />;
+    }
+  } else if (portal === 'vendor') {
+    safeBg = colors.bg;
+    if (!isAuthenticated || !isVendor) {
+      content = (
+        <LoginScreen
+          mode="vendor"
+          onModeChange={setLoginMode}
+          onClose={() => setPortal('customer')}
+          onLoginSuccess={() => setPortal('vendor')}
+        />
+      );
+    } else {
+      content = <VendorPortal />;
+    }
+  } else if (portal === 'salesman') {
+    safeBg = colors.bg;
+    if (!isSalesmanAuthenticated) {
+      content = (
+        <LoginScreen
+          mode="salesman"
+          onModeChange={setLoginMode}
+          onClose={() => setPortal('customer')}
+          onLoginSuccess={() => setPortal('salesman')}
+        />
+      );
+    } else {
+      content = <SalesmanPortal />;
+    }
+  } else {
+    safeBg = customerColors.primary;
+    content = (
+      <CustomerPortal
+        onOpenLogin={() => {
+          setLoginMode('customer');
+          setShowLogin(true);
+        }}
+      />
+    );
+  }
+
+  return (
+    <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: safeBg }]}>
+      {content}
+    </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <CartProvider>
+          <AppGate />
+        </CartProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  safe: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: colors.muted,
+    fontSize: 16,
+    marginTop: 16,
+  },
+});
