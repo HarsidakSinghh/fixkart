@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-guard";
 import { getMongoDb } from "@/lib/mongo";
+import { ObjectId } from "mongodb";
 
 export async function GET(req: Request) {
   const guard = await requireAdmin(req);
@@ -15,7 +16,13 @@ export async function GET(req: Request) {
   }
 
   const db = await getMongoDb();
-  const salesman = await db.collection("Salesman").findOne({ _id: id });
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(id);
+  } catch {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+  const salesman = await db.collection("Salesman").findOne({ _id: objectId });
   if (!salesman) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
