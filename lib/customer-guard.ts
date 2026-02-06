@@ -1,4 +1,5 @@
 import { auth, clerkClient, getAuth, verifyToken } from "@clerk/nextjs/server";
+import type { NextRequest } from "next/server";
 
 function getBearerToken(req?: Request) {
   if (!req) return null;
@@ -12,7 +13,7 @@ function getBearerToken(req?: Request) {
 export async function requireCustomer(req?: Request) {
   let userId: string | null | undefined;
 
-  if (req) {
+  if (req && isNextRequest(req)) {
     const authData = getAuth(req);
     userId = authData.userId;
   } else {
@@ -48,4 +49,8 @@ export async function requireCustomer(req?: Request) {
   )?.emailAddress;
 
   return { ok: true as const, userId, email: primaryEmail };
+}
+
+function isNextRequest(req: Request): req is NextRequest {
+  return "cookies" in req && "nextUrl" in req;
 }

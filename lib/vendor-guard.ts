@@ -1,4 +1,5 @@
 import { auth, clerkClient, getAuth, verifyToken } from "@clerk/nextjs/server";
+import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 function getBearerToken(req?: Request) {
@@ -13,7 +14,7 @@ function getBearerToken(req?: Request) {
 export async function requireVendor(req?: Request) {
   let userId: string | null | undefined;
 
-  if (req) {
+  if (req && isNextRequest(req)) {
     const authData = getAuth(req);
     userId = authData.userId;
   } else {
@@ -54,4 +55,8 @@ export async function requireVendor(req?: Request) {
   )?.emailAddress;
 
   return { ok: true as const, userId, email: primaryEmail, vendor };
+}
+
+function isNextRequest(req: Request): req is NextRequest {
+  return "cookies" in req && "nextUrl" in req;
 }
