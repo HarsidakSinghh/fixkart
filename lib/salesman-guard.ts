@@ -1,4 +1,5 @@
 import { getMongoDb } from "@/lib/mongo";
+import { ObjectId } from "mongodb";
 
 export async function requireSalesman(req: Request) {
   const id = req.headers.get("x-salesman-id") || req.headers.get("X-Salesman-Id");
@@ -7,7 +8,13 @@ export async function requireSalesman(req: Request) {
   }
 
   const db = await getMongoDb();
-  const salesman = await db.collection("Salesman").findOne({ _id: id });
+  let objectId: ObjectId;
+  try {
+    objectId = new ObjectId(id);
+  } catch {
+    return { ok: false as const, status: 400, error: "Invalid Salesman ID" };
+  }
+  const salesman = await db.collection("Salesman").findOne({ _id: objectId });
 
   if (!salesman || salesman.status !== "ACTIVE") {
     return { ok: false as const, status: 403, error: "Salesman not active" };
