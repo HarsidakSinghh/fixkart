@@ -47,3 +47,16 @@ export async function getStoreTypes(category = '') {
   }
   return res.json();
 }
+
+export async function getTypeListings(subCategory) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
+  const params = new URLSearchParams();
+  params.set('subCategory', subCategory);
+  const res = await fetch(`${BASE_URL}/api/mobile/store/type-listings?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  return res.json();
+}

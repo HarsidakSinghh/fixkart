@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
-import { getStoreProducts } from './storeApi';
-import ProductCard from './ProductCard';
+import { getTypeListings } from './storeApi';
 
 export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenProduct }) {
   const [items, setItems] = useState([]);
@@ -11,8 +10,8 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getStoreProducts({ subCategory: typeLabel });
-      setItems(data.products || []);
+      const data = await getTypeListings(typeLabel);
+      setItems(data.listings || []);
     } catch (error) {
       console.error('Failed to load type listings', error);
     } finally {
@@ -43,11 +42,18 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.gridRow}
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
-            <ProductCard product={item} onPress={() => onOpenProduct(item)} />
+            <TouchableOpacity style={styles.listingCard} onPress={() => onOpenProduct(item)}>
+              <View style={styles.cardTop}>
+                <View>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
+                  <Text style={styles.cardVendor} numberOfLines={1}>{item.vendorName}</Text>
+                </View>
+                <Text style={styles.cardPrice}>₹{Math.round(item.price || 0)}</Text>
+              </View>
+              <Text style={styles.cardMeta}>Qty: {item.quantity ?? 0}</Text>
+            </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
@@ -70,9 +76,21 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: customerColors.text, marginTop: 8 },
   subtitle: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
   grid: { paddingHorizontal: customerSpacing.lg, paddingBottom: 160, paddingTop: customerSpacing.md },
-  gridRow: { justifyContent: 'space-between' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: customerColors.muted },
   emptyWrap: { alignItems: 'center', paddingVertical: customerSpacing.xl },
   emptyText: { color: customerColors.muted },
+  listingCard: {
+    backgroundColor: customerColors.card,
+    borderRadius: 16,
+    padding: customerSpacing.md,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    marginBottom: customerSpacing.sm,
+  },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  cardTitle: { color: customerColors.text, fontWeight: '700', flex: 1 },
+  cardVendor: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
+  cardPrice: { color: customerColors.primary, fontWeight: '800' },
+  cardMeta: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
 });

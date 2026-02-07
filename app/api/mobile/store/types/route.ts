@@ -24,14 +24,13 @@ export async function GET(req: Request) {
     take: 500,
     select: {
       subCategory: true,
-      subSubCategory: true,
       image: true,
     },
   });
 
   const map = new Map<string, { label: string; image: string | null; count: number }>();
   for (const p of products) {
-    const label = p.subCategory || p.subSubCategory || "Others";
+    const label = p.subCategory || "Others";
     if (!map.has(label)) {
       map.set(label, { label, image: p.image || null, count: 1 });
     } else {
