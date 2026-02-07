@@ -11,11 +11,8 @@ export async function GET(req: Request) {
   };
 
   if (category) {
-    whereClause.OR = [
-      { category: { contains: category, mode: "insensitive" } },
-      { subCategory: { contains: category, mode: "insensitive" } },
-      { subSubCategory: { contains: category, mode: "insensitive" } },
-    ];
+    // When a top-level category is selected, only return types within it.
+    whereClause.category = { contains: category, mode: "insensitive" };
   }
 
   const products = await prisma.product.findMany({
@@ -23,14 +20,42 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     take: 500,
     select: {
+      category: true,
       subCategory: true,
+      subSubCategory: true,
+      name: true,
+      title: true,
       image: true,
     },
   });
 
+  const toTitle = (value: string) =>
+    value
+      .trim()
+      .split(/\s+/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+
+  const deriveType = (name?: string | null, title?: string | null) => {
+    if (name) {
+      const token = name.split("-")[0]?.replace(/_/g, " ").trim();
+      if (token) return toTitle(token);
+    }
+    if (title) {
+      const token = title.split(/\s+/)[0]?.trim();
+      if (token) return toTitle(token);
+    }
+    return null;
+  };
+
   const map = new Map<string, { label: string; image: string | null; count: number }>();
   for (const p of products) {
-    const label = p.subCategory || "Others";
+    const label =
+      p.subSubCategory ||
+      (p.subCategory && p.subCategory !== p.category ? p.subCategory : null) ||
+      deriveType(p.name, p.title) ||
+      p.category ||
+      "Others";
     if (!map.has(label)) {
       map.set(label, { label, image: p.image || null, count: 1 });
     } else {

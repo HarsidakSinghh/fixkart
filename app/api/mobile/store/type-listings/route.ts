@@ -13,7 +13,12 @@ export async function GET(req: Request) {
     where: {
       isPublished: true,
       status: "APPROVED",
-      subCategory: { contains: subCategory, mode: "insensitive" },
+      OR: [
+        { subSubCategory: { contains: subCategory, mode: "insensitive" } },
+        { subCategory: { contains: subCategory, mode: "insensitive" } },
+        { name: { contains: subCategory, mode: "insensitive" } },
+        { title: { contains: subCategory, mode: "insensitive" } },
+      ],
     },
     orderBy: { createdAt: "desc" },
     take: 100,
