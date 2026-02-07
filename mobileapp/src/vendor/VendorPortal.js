@@ -10,6 +10,7 @@ import VendorOrdersScreen from './VendorOrdersScreen';
 import VendorComplaintsScreen from './VendorComplaintsScreen';
 import VendorNotificationsScreen from './VendorNotificationsScreen';
 import NotificationDebugScreen from '../screens/NotificationDebugScreen';
+import VendorSalesmenScreen from './VendorSalesmenScreen';
 import { getVendorProfile, getVendorOrders } from './vendorApi';
 
 const TABS = [
@@ -17,6 +18,7 @@ const TABS = [
   { key: 'inventory', label: 'Inventory', icon: 'box' },
   { key: 'orders', label: 'Orders', icon: 'shopping-bag' },
   { key: 'complaints', label: 'Support', icon: 'help-circle' },
+  { key: 'salesmen', label: 'Salesmen', icon: 'users' },
   { key: 'profile', label: 'Profile', icon: 'user' },
 ];
 
@@ -71,6 +73,8 @@ export default function VendorPortal() {
     content = <VendorOrdersScreen />;
   } else if (active === 'complaints') {
     content = <VendorComplaintsScreen />;
+  } else if (active === 'salesmen') {
+    content = <VendorSalesmenScreen />;
   } else {
     content = (
       <VendorProfileScreen

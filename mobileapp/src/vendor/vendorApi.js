@@ -169,3 +169,15 @@ export async function registerVendorWithToken(token, payload) {
 
   return res.json();
 }
+
+export async function getVendorSalesmen() {
+  const data = await authFetch('/api/mobile/vendor/salesmen');
+  return data.salesmen || [];
+}
+
+export async function createVendorSalesman(payload) {
+  return authFetch('/api/mobile/vendor/salesmen', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
