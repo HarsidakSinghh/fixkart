@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { customerColors, customerSpacing } from './CustomerTheme';
 
 export default function CustomerHeader({
@@ -36,6 +37,7 @@ export default function CustomerHeader({
         </View>
       </View>
       <View style={styles.searchWrap}>
+        <Feather name="search" size={16} color={customerColors.muted} />
         <TextInput
           placeholder="Search products..."
           placeholderTextColor={customerColors.muted}
@@ -117,8 +119,11 @@ const styles = StyleSheet.create({
   searchWrap: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
-    paddingHorizontal: 6,
+    paddingHorizontal: 12,
     paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   search: {
     paddingHorizontal: customerSpacing.md,

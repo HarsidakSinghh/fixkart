@@ -13,12 +13,15 @@ async function getSalesmanToken() {
 }
 
 async function authFetch(path, options = {}) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
   const token = await getSalesmanToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'X-Salesman-Id': token } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -32,6 +35,9 @@ async function authFetch(path, options = {}) {
 }
 
 export async function salesmanLogin(phone, code) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
   const res = await fetch(`${BASE_URL}/api/mobile/salesman/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

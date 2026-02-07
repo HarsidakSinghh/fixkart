@@ -365,10 +365,22 @@ model TrackingLog {
 model Complaint {
   id             String   @id @default(cuid()) @map("_id")
   orderId        String
+  orderItemId    String?
   vendorId       String
   customerId     String
   message        String
+  imageUrl       String?
   status         String   @default("OPEN") 
   
   createdAt      DateTime @default(now())
+}
+
+model PushToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  role      String
+  token     String   @unique
+  platform  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

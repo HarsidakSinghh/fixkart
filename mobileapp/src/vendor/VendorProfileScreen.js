@@ -2,10 +2,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Image, ScrollView } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getVendorProfile } from './vendorApi';
+import * as SecureStore from 'expo-secure-store';
+import StatusPill from '../components/StatusPill';
 
-export default function VendorProfileScreen({ onStatusLoaded }) {
+export default function VendorProfileScreen({ onStatusLoaded, onOpenNotifications }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -13,6 +16,12 @@ export default function VendorProfileScreen({ onStatusLoaded }) {
       const data = await getVendorProfile();
       setProfile(data.vendor || null);
       onStatusLoaded?.(data.vendor?.status || 'PENDING');
+      try {
+        const notifRaw = await SecureStore.getItemAsync('vendor_notifications');
+        if (notifRaw) setNotifications(JSON.parse(notifRaw));
+      } catch (_) {
+        // ignore
+      }
     } catch (error) {
       console.error('Failed to load vendor profile', error);
     } finally {
@@ -47,9 +56,12 @@ export default function VendorProfileScreen({ onStatusLoaded }) {
         <Text style={styles.title}>{profile.companyName || profile.fullName}</Text>
         <Text style={styles.subtitle}>{profile.email}</Text>
         <Text style={styles.subtitle}>{profile.phone}</Text>
-        <View style={[styles.statusPill, statusStyle(profile.status)]}>
-          <Text style={styles.statusText}>{profile.status}</Text>
-        </View>
+        <StatusPill label={profile.status} tone={statusTone(profile.status)} />
+        {onOpenNotifications ? (
+          <TouchableOpacity style={styles.notifyBtn} onPress={onOpenNotifications}>
+            <Text style={styles.notifyText}>Notifications</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <InfoSection title="Contact">
@@ -85,15 +97,28 @@ export default function VendorProfileScreen({ onStatusLoaded }) {
         <DocRow label="ID Proof" uri={profile.idProofUrl} />
         <DocRow label="Location Photo" uri={profile.locationPhotoUrl} />
       </InfoSection>
+
+      <InfoSection title="Notifications">
+        {notifications.length === 0 ? (
+          <Text style={styles.noticeText}>No recent notifications.</Text>
+        ) : (
+          notifications.map((n) => (
+            <View key={n.id} style={styles.noteRow}>
+              <Text style={styles.noteTitle}>{n.title}</Text>
+              <Text style={styles.noteMessage}>{n.message}</Text>
+            </View>
+          ))
+        )}
+      </InfoSection>
       <View style={{ height: 120 }} />
     </ScrollView>
   );
 
-  function statusStyle(status) {
-    if (status === 'APPROVED') return styles.statusLive;
-    if (status === 'PENDING') return styles.statusPending;
-    if (status === 'REJECTED') return styles.statusAction;
-    return styles.statusPending;
+  function statusTone(status) {
+    if (status === 'APPROVED') return 'success';
+    if (status === 'PENDING') return 'warning';
+    if (status === 'REJECTED') return 'danger';
+    return 'warning';
   }
 }
 
@@ -173,17 +198,17 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: '800', color: vendorColors.text },
   subtitle: { color: vendorColors.muted, marginTop: 6, fontSize: 12 },
-  statusPill: {
+  notifyBtn: {
     marginTop: vendorSpacing.sm,
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+    backgroundColor: vendorColors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
   },
-  statusText: { color: '#FFFFFF', fontWeight: '700', fontSize: 10 },
-  statusLive: { backgroundColor: vendorColors.primary },
-  statusPending: { backgroundColor: vendorColors.accent },
-  statusAction: { backgroundColor: '#D9534F' },
+  notifyText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
   card: {
     backgroundColor: vendorColors.card,
     borderRadius: 18,
@@ -220,4 +245,12 @@ const styles = StyleSheet.create({
   docAction: { color: vendorColors.primary, fontSize: 12, marginTop: 4 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: vendorColors.muted },
+  noticeText: { color: vendorColors.muted, fontSize: 12 },
+  noteRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: vendorColors.border,
+  },
+  noteTitle: { color: vendorColors.text, fontWeight: '700', fontSize: 12 },
+  noteMessage: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
 });

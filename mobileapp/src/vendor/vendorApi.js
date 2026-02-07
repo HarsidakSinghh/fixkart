@@ -113,6 +113,24 @@ export async function getVendorOrders() {
   return data;
 }
 
+export async function getVendorComplaints() {
+  const cacheKey = 'vendor:complaints';
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+  const data = await authFetch('/api/mobile/vendor/complaints');
+  setCache(cacheKey, data, 15000);
+  return data;
+}
+
+export async function getVendorRefunds() {
+  const cacheKey = 'vendor:refunds';
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+  const data = await authFetch('/api/mobile/vendor/refunds');
+  setCache(cacheKey, data, 15000);
+  return data;
+}
+
 export async function markVendorOrderReady(itemId) {
   return authFetch(`/api/mobile/vendor/orders/${itemId}/dispatch`, {
     method: 'PATCH',

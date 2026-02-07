@@ -4,6 +4,7 @@ import { ScreenTitle, SectionHeader, RowCard, Badge } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getOrdersHistory } from "../services/api";
 import { Text } from "react-native";
+import { ErrorState } from "../components/StateViews";
 
 export default function OrdersHistoryScreen() {
   const fetchHistory = useCallback(async () => {
@@ -11,12 +12,13 @@ export default function OrdersHistoryScreen() {
     return data.orders;
   }, []);
 
-  const { items } = useAsyncList(fetchHistory, []);
+  const { items, error, refresh } = useAsyncList(fetchHistory, []);
 
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Orders History" subtitle="Past activity" />
       <SectionHeader title="Archived Orders" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((order) => (
         <RowCard
           key={order.id}

@@ -1,11 +1,14 @@
 import React, { useCallback } from "react";
 import { View, StyleSheet, Text } from "react-native";
 import AdminScreenLayout from "../components/AdminScreenLayout";
-import { ScreenTitle, SectionHeader, RowCard, Badge, StatCard } from "../components/Ui";
+import { ScreenTitle, SectionHeader, RowCard, StatCard } from "../components/Ui";
 import { colors, spacing } from "../theme";
 import { useAsyncList } from "../services/useAsyncList";
-import { getOrders, getDashboard } from "../services/api";
+import { ErrorState } from "../components/StateViews";
+import { getOrders, getDashboard, updateOrderStatus } from "../services/api";
+import { ActionRow } from "../components/Ui";
 import SkeletonCard from "../components/SkeletonCard";
+import StatusPill from "../components/StatusPill";
 
 export default function OrdersScreen() {
   const [stats, setStats] = React.useState({
@@ -19,7 +22,7 @@ export default function OrdersScreen() {
     return data.orders;
   }, []);
 
-  const { items, setItems } = useAsyncList(fetchOrders, []);
+  const { items, setItems, error, refresh } = useAsyncList(fetchOrders, []);
 
   React.useEffect(() => {
     let mounted = true;
@@ -49,7 +52,9 @@ export default function OrdersScreen() {
       </View>
 
       <SectionHeader title="Latest Orders" actionLabel="Filter" />
-      {items.length === 0 ? (
+      {error && items.length === 0 ? (
+        <ErrorState message={error} onRetry={refresh} />
+      ) : items.length === 0 ? (
         <>
           <SkeletonCard height={120} />
           <SkeletonCard height={120} />
@@ -63,12 +68,24 @@ export default function OrdersScreen() {
             right={
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={styles.amount}>₹{order.amount}</Text>
-                <Badge text={order.status} tone={statusTone(order.status)} />
+                <StatusPill label={order.status} tone={statusTone(order.status)} />
               </View>
             }
             meta={
               <View>
                 <Text style={styles.placed}>Placed {order.placedAt}</Text>
+                <ActionRow
+                  secondaryLabel="Mark Shipped"
+                  primaryLabel="Mark Delivered"
+                  onSecondary={async () => {
+                    await updateOrderStatus(order.id, "SHIPPED");
+                    refresh();
+                  }}
+                  onPrimary={async () => {
+                    await updateOrderStatus(order.id, "DELIVERED");
+                    refresh();
+                  }}
+                />
               </View>
             }
           />

@@ -5,6 +5,7 @@ import { useAsyncList } from "../services/useAsyncList";
 import { getVendors, updateVendorStatus, getVendorDetail } from "../services/api";
 import { View, Text, StyleSheet, Image, TouchableOpacity, Linking } from "react-native";
 import { colors, spacing } from "../theme";
+import { ErrorState } from "../components/StateViews";
 
 export default function VendorsScreen() {
   const fetchVendors = useCallback(async () => {
@@ -12,7 +13,7 @@ export default function VendorsScreen() {
     return data.vendors;
   }, []);
 
-  const { items, setItems } = useAsyncList(fetchVendors, []);
+  const { items, setItems, error, refresh } = useAsyncList(fetchVendors, []);
   const [detail, setDetail] = React.useState(null);
 
   async function updateStatus(id, status) {
@@ -29,6 +30,7 @@ export default function VendorsScreen() {
     <AdminScreenLayout>
       <ScreenTitle title="Vendors" subtitle="Partner management" />
       <SectionHeader title="Pending & Active" actionLabel="Invite" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((vendor) => (
         <RowCard
           key={vendor.id}

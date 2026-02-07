@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
 import { sendNotification } from "@/lib/notifications";
+import { sendPushToUsers } from "@/lib/push";
 
 // --- VENDOR ACTIONS ---
 export async function updateVendorStatus(vendorId: string, newStatus: "APPROVED" | "SUSPENDED" | "REJECTED" | "PENDING") {
@@ -238,6 +239,21 @@ export async function updateOrderStatus(
             data: { status: newStatus }
         });
 
+        // 2.1 Push notifications to customer + vendors
+        try {
+            const items = await prisma.orderItem.findMany({
+                where: { orderId },
+                select: { vendorId: true },
+            });
+            const vendorIds = Array.from(new Set(items.map((i) => i.vendorId)));
+            const targets = [updatedOrder.customerId, ...vendorIds].filter(Boolean) as string[];
+            const title = "Order Update";
+            const body = `Order #${orderId.slice(-6).toUpperCase()} is now ${newStatus}`;
+            await sendPushToUsers(targets, title, body, { orderId, status: newStatus });
+        } catch (err) {
+            console.error("[push] failed to send order status", err);
+        }
+
         // 3. AUTO-GENERATE PURCHASE ORDER (If Approved)
         if (newStatus === "APPROVED") {
             const { generatePurchaseOrders } = await import("@/lib/services/purchase-order-generator");
@@ -467,9 +483,11 @@ export async function getComplaints() {
             return {
                 id: id,
                 orderId: raw.orderId || "",
+                orderItemId: raw.orderItemId || "",
                 vendorId: raw.vendorId || "",
                 customerId: raw.customerId || "",
                 message: raw.message || "",
+                imageUrl: raw.imageUrl || "",
                 status: raw.status || "OPEN",
                 createdAt: createdAt
             };

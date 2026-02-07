@@ -3,6 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getVendors } from "../services/api";
+import { ErrorState } from "../components/StateViews";
 
 export default function OnboardedVendorsScreen() {
   const fetchVendors = useCallback(async () => {
@@ -10,12 +11,13 @@ export default function OnboardedVendorsScreen() {
     return data.vendors;
   }, []);
 
-  const { items } = useAsyncList(fetchVendors, []);
+  const { items, error, refresh } = useAsyncList(fetchVendors, []);
 
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Onboarded Vendors" subtitle="Approved partners" />
       <SectionHeader title="Active Vendors" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((vendor) => (
         <RowCard
           key={vendor.id}

@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { View, StyleSheet, ActivityIndicator, Text } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { colors } from "./src/theme";
 import { customerColors } from "./src/customer/CustomerTheme";
+import * as SecureStore from "expo-secure-store";
 import BottomNav from "./src/components/BottomNav";
 import DashboardScreen from "./src/screens/DashboardScreen";
 import OrdersScreen from "./src/screens/OrdersScreen";
@@ -20,9 +21,12 @@ import RefundsScreen from "./src/screens/RefundsScreen";
 import MoreScreen from "./src/screens/MoreScreen";
 import ApprovalsScreen from "./src/screens/ApprovalsScreen";
 import LoginScreen from "./src/screens/LoginScreen";
+import WelcomeScreen from "./src/screens/WelcomeScreen";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import useTokenRefresh from "./src/hooks/useTokenRefresh";
 import { CartProvider } from "./src/context/CartContext";
+import { ToastProvider } from "./src/components/Toast";
+import { usePushNotifications } from "./src/hooks/usePushNotifications";
 import CustomerPortal from "./src/customer/CustomerPortal";
 import VendorPortal from "./src/vendor/VendorPortal";
 import SalesmanPortal from "./src/salesman/SalesmanPortal";
@@ -144,7 +148,12 @@ function AdminAppContent() {
     []
   );
 
-  const bottomTabs = [routes.dashboard, routes.approvals, routes.orders, routes.more];
+  const bottomTabs = [
+    { ...routes.dashboard, icon: "grid" },
+    { ...routes.approvals, icon: "check-circle" },
+    { ...routes.orders, icon: "shopping-bag" },
+    { ...routes.more, icon: "menu" },
+  ];
   const moreRoutes = [
     routes.ordersHistory,
     routes.products,
@@ -178,19 +187,78 @@ function AdminAppContent() {
 function AppGate() {
   const { isLoading, isAuthenticated, isAdmin, isVendor, isSalesmanAuthenticated } = useAuth();
   const [portal, setPortal] = useState('customer');
+  const [portalReady, setPortalReady] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [loginMode, setLoginMode] = useState('customer');
   const [showVendorRegister, setShowVendorRegister] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   useTokenRefresh();
+  usePushNotifications({
+    enabled: isAuthenticated,
+    role: isAdmin ? "ADMIN" : isVendor ? "VENDOR" : "CUSTOMER",
+  });
 
-  if (isLoading) {
+  const setPortalPersist = useCallback((next) => {
+    setPortal(next);
+    SecureStore.setItemAsync("last_portal", next);
+  }, []);
+
+  useEffect(() => {
+    async function loadPortal() {
+      try {
+        const stored = await SecureStore.getItemAsync("last_portal");
+        if (stored) setPortal(stored);
+      } finally {
+        setPortalReady(true);
+      }
+    }
+    loadPortal();
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated || isSalesmanAuthenticated) {
+      setShowWelcome(false);
+    }
+  }, [isAuthenticated, isSalesmanAuthenticated]);
+
+  if (isLoading || !portalReady) {
     return <LoadingScreen />;
   }
 
   let content = null;
   let safeBg = colors.bg;
 
+  if (showSplash) {
+    safeBg = colors.bg;
+    content = (
+      <View style={styles.splash}>
+        <Text style={styles.splashBrand}>FIXKART</Text>
+        <Text style={styles.splashTag}>Industrial Supply, Simplified.</Text>
+      </View>
+    );
+  } else if (showWelcome && !isAuthenticated && !isSalesmanAuthenticated && !showLogin && !showVendorRegister) {
+    safeBg = colors.bg;
+    content = (
+      <WelcomeScreen
+        onLogin={() => {
+          setLoginMode("customer");
+          setShowLogin(true);
+          setShowWelcome(false);
+        }}
+        onContinue={() => {
+          setShowWelcome(false);
+          setPortalPersist("customer");
+        }}
+      />
+    );
+  } else
   if (showVendorRegister) {
     safeBg = colors.bg;
     content = <VendorRegisterScreen onClose={() => setShowVendorRegister(false)} />;
@@ -207,7 +275,7 @@ function AppGate() {
         }}
         onLoginSuccess={(selectedRole) => {
           setShowLogin(false);
-          setPortal(selectedRole || loginMode || 'customer');
+          setPortalPersist(selectedRole || loginMode || 'customer');
         }}
       />
     );
@@ -218,8 +286,8 @@ function AppGate() {
         <LoginScreen
           mode="admin"
           onModeChange={setLoginMode}
-          onClose={() => setPortal('customer')}
-          onLoginSuccess={() => setPortal('admin')}
+          onClose={() => setPortalPersist('customer')}
+          onLoginSuccess={() => setPortalPersist('admin')}
         />
       );
     } else {
@@ -232,8 +300,8 @@ function AppGate() {
         <LoginScreen
           mode="vendor"
           onModeChange={setLoginMode}
-          onClose={() => setPortal('customer')}
-          onLoginSuccess={() => setPortal('vendor')}
+          onClose={() => setPortalPersist('customer')}
+          onLoginSuccess={() => setPortalPersist('vendor')}
         />
       );
     } else {
@@ -246,8 +314,8 @@ function AppGate() {
         <LoginScreen
           mode="salesman"
           onModeChange={setLoginMode}
-          onClose={() => setPortal('customer')}
-          onLoginSuccess={() => setPortal('salesman')}
+          onClose={() => setPortalPersist('customer')}
+          onLoginSuccess={() => setPortalPersist('salesman')}
         />
       );
     } else {
@@ -266,7 +334,7 @@ function AppGate() {
   }
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: safeBg }]}>
+    <SafeAreaView edges={["top"]} style={[styles.safe, { backgroundColor: safeBg }]}>
       {content}
     </SafeAreaView>
   );
@@ -275,11 +343,13 @@ function AppGate() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <CartProvider>
-          <AppGate />
-        </CartProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <CartProvider>
+            <AppGate />
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 }
@@ -305,5 +375,23 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 16,
     marginTop: 16,
+  },
+  splash: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  splashBrand: {
+    color: colors.primary,
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: 4,
+  },
+  splashTag: {
+    marginTop: 10,
+    color: colors.muted,
+    fontSize: 12,
+    letterSpacing: 1,
   },
 });

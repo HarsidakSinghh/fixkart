@@ -17,6 +17,7 @@ import { colors, spacing } from '../theme';
 import ScreenLayout from '../components/ScreenLayout';
 import { verifyVendorAccess, verifyVendorAccessWithToken } from '../vendor/vendorApi';
 import { salesmanLogin } from '../salesman/salesmanApi';
+import { getSessionRole } from '../services/authApi';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -34,43 +35,47 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
   const [isLoading, setIsLoading] = useState(false);
   const [phone, setPhone] = useState('');
   const [salesCode, setSalesCode] = useState('');
+  const [restoring, setRestoring] = useState(false);
 
   const jwtTemplate = process.env.EXPO_PUBLIC_CLERK_JWT_TEMPLATE || 'mobile';
   const isSalesmanMode = mode === 'salesman';
   const isAdminMode = false;
   const isVendorMode = false;
 
-  useEffect(() => {
-    async function syncExistingSession() {
-      if (!isSignedIn || isAuthenticated) return;
-      const primaryEmail = user?.primaryEmailAddress?.emailAddress;
-      const isAdmin = await checkAdminStatus(primaryEmail);
-
+  const syncExistingSession = useCallback(async () => {
+    if (!isSignedIn || isAuthenticated) return;
+    setRestoring(true);
+    try {
       const token = await getToken({ template: jwtTemplate });
       if (!token) return;
 
-      let isVendor = false;
-      if (!isAdmin) {
-        try {
-          await verifyVendorAccessWithToken(token);
-          isVendor = true;
-        } catch (error) {
-          isVendor = false;
-        }
+      let role = 'customer';
+      let email = user?.primaryEmailAddress?.emailAddress;
+      try {
+        const session = await getSessionRole(token);
+        role = session.role || 'customer';
+        email = session.email || email;
+      } catch (error) {
+        const isAdmin = await checkAdminStatus(email);
+        if (isAdmin) role = 'admin';
       }
 
       const userInfo = {
         id: user?.id,
-        email: primaryEmail,
-        isAdmin: isAdmin,
+        email: email,
+        isAdmin: role === 'admin',
       };
 
-      await saveSession(userInfo, token, isAdmin, isVendor);
-      onLoginSuccess(isAdmin ? 'admin' : isVendor ? 'vendor' : 'customer');
+      await saveSession(userInfo, token, role === 'admin', role === 'vendor');
+      onLoginSuccess(role);
+    } finally {
+      setRestoring(false);
     }
+  }, [isSignedIn, isAuthenticated, user, checkAdminStatus, getToken, saveSession, onLoginSuccess, jwtTemplate]);
 
+  useEffect(() => {
     syncExistingSession();
-  }, [isSignedIn, isAuthenticated, user, checkAdminStatus, getToken, saveSession, onLoginSuccess, signOut, clearSession, jwtTemplate, isAdminMode]);
+  }, [syncExistingSession]);
 
   const handleSendCode = useCallback(async () => {
     if (!signInLoaded || !email) {
@@ -127,8 +132,6 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
       });
 
       if (result.status === 'complete') {
-        const isAdmin = await checkAdminStatus(email);
-
         await setActive({ session: result.createdSessionId });
         const token = await getToken({ template: jwtTemplate });
 
@@ -137,25 +140,24 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
           return;
         }
 
-        let isVendor = false;
-        if (!isAdmin) {
-          try {
-            await verifyVendorAccessWithToken(token);
-            isVendor = true;
-          } catch (error) {
-            isVendor = false;
-          }
+        let role = 'customer';
+        try {
+          const session = await getSessionRole(token);
+          role = session.role || 'customer';
+        } catch (error) {
+          const isAdmin = await checkAdminStatus(email);
+          if (isAdmin) role = 'admin';
         }
 
         const userInfo = {
           id: result.userId,
           email: email,
-          isAdmin,
+          isAdmin: role === 'admin',
         };
 
-        await saveSession(userInfo, token, isAdmin, isVendor);
+        await saveSession(userInfo, token, role === 'admin', role === 'vendor');
         Alert.alert('Success', 'Welcome to FixKart!');
-        onLoginSuccess(isAdmin ? 'admin' : isVendor ? 'vendor' : 'customer');
+        onLoginSuccess(role);
       } else {
         Alert.alert('Error', 'Verification failed. Please try again.');
       }
@@ -220,10 +222,14 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
 
           {isSignedIn && !isAuthenticated ? (
             <View style={styles.noticeAlt}>
-              <Text style={styles.noticeText}>You are already signed in.</Text>
-              <TouchableOpacity style={styles.button} onPress={() => onLoginSuccess()}>
-                <Text style={styles.buttonText}>Continue</Text>
-              </TouchableOpacity>
+              <Text style={styles.noticeText}>Restoring your session…</Text>
+              {restoring ? (
+                <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.sm }} />
+              ) : (
+                <TouchableOpacity style={styles.button} onPress={syncExistingSession}>
+                  <Text style={styles.buttonText}>Continue</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.toggleButton}
                 onPress={async () => {

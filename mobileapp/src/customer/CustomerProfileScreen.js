@@ -3,12 +3,16 @@ import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TextInput, Touch
 import * as SecureStore from 'expo-secure-store';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerProfile, updateCustomerProfile } from './customerApi';
+import { useAuth } from '../context/AuthContext';
 
-export default function CustomerProfileScreen() {
+export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications }) {
+  const { isAuthenticated } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [savedBilling, setSavedBilling] = useState(null);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -21,6 +25,18 @@ export default function CustomerProfileScreen() {
       } catch (_) {
         // ignore
       }
+      try {
+        const notifRaw = await SecureStore.getItemAsync('customer_notifications');
+        if (notifRaw) setNotifications(JSON.parse(notifRaw));
+      } catch (_) {
+        // ignore
+      }
+      try {
+        const saved = await SecureStore.getItemAsync('customer_billing_pref');
+        if (saved) setSavedBilling(JSON.parse(saved));
+      } catch (_) {
+        // ignore
+      }
     } catch (error) {
       console.error('Failed to load profile', error);
     } finally {
@@ -29,14 +45,26 @@ export default function CustomerProfileScreen() {
   }, []);
 
   useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+    if (isAuthenticated) {
+      loadProfile();
+    } else {
+      setLoading(false);
+    }
+  }, [loadProfile, isAuthenticated]);
 
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
         <ActivityIndicator color={customerColors.primary} />
         <Text style={styles.loadingText}>Loading profile…</Text>
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.loadingWrap}>
+        <Text style={styles.loadingText}>Sign in to view your profile.</Text>
       </View>
     );
   }
@@ -55,9 +83,21 @@ export default function CustomerProfileScreen() {
         <Text style={styles.title}>{profile.fullName || 'Customer'}</Text>
         <Text style={styles.subtitle}>{profile.email || ''}</Text>
         <Text style={styles.subtitle}>{profile.phone || ''}</Text>
-        <TouchableOpacity style={styles.editBtn} onPress={() => setEditing((prev) => !prev)}>
-          <Text style={styles.editText}>{editing ? 'Cancel' : 'Update Profile'}</Text>
-        </TouchableOpacity>
+        <View style={styles.heroActions}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => setEditing((prev) => !prev)}>
+            <Text style={styles.editText}>{editing ? 'Cancel' : 'Update Profile'}</Text>
+          </TouchableOpacity>
+          {onOpenSupportHistory ? (
+            <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenSupportHistory}>
+              <Text style={styles.secondaryText}>Complaints & Refunds</Text>
+            </TouchableOpacity>
+          ) : null}
+          {onOpenNotifications ? (
+            <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenNotifications}>
+              <Text style={styles.secondaryText}>Notifications</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       {editing ? (
@@ -121,6 +161,31 @@ export default function CustomerProfileScreen() {
             <InfoRow label="Account Number" value={profile.accountNumber} />
             <InfoRow label="IFSC" value={profile.ifscCode} />
           </InfoSection>
+
+          <InfoSection title="Saved Checkout Preferences">
+            {savedBilling ? (
+              <>
+                <InfoRow label="Name" value={savedBilling.fullName} />
+                <InfoRow label="Phone" value={savedBilling.phone} />
+                <InfoRow label="Address" value={formatAddress(savedBilling)} />
+              </>
+            ) : (
+              <Text style={styles.noticeText}>No saved preferences yet.</Text>
+            )}
+          </InfoSection>
+
+          <InfoSection title="Notifications">
+            {notifications.length === 0 ? (
+              <Text style={styles.noticeText}>No recent notifications.</Text>
+            ) : (
+              notifications.slice(0, 3).map((n) => (
+                <View key={n.id} style={styles.noteRow}>
+                  <Text style={styles.noteTitle}>{n.title}</Text>
+                  <Text style={styles.noteMessage}>{n.message}</Text>
+                </View>
+              ))
+            )}
+          </InfoSection>
         </>
       )}
       <View style={{ height: 120 }} />
@@ -183,6 +248,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: '800', color: customerColors.text },
   subtitle: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
+  heroActions: { flexDirection: 'row', gap: 10, marginTop: customerSpacing.md, flexWrap: 'wrap' },
   editBtn: {
     marginTop: customerSpacing.md,
     alignSelf: 'flex-start',
@@ -194,6 +260,15 @@ const styles = StyleSheet.create({
     borderColor: customerColors.border,
   },
   editText: { color: customerColors.primary, fontWeight: '700', fontSize: 12 },
+  secondaryBtn: {
+    marginTop: customerSpacing.md,
+    alignSelf: 'flex-start',
+    backgroundColor: customerColors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  secondaryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
   card: {
     backgroundColor: customerColors.card,
     borderRadius: 18,
@@ -229,4 +304,12 @@ const styles = StyleSheet.create({
   rowValue: { color: customerColors.text, fontSize: 12, fontWeight: '600', flex: 1, textAlign: 'right' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: customerColors.muted },
+  noticeText: { color: customerColors.muted, fontSize: 12 },
+  noteRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: customerColors.border,
+  },
+  noteTitle: { color: customerColors.text, fontWeight: '700', fontSize: 12 },
+  noteMessage: { color: customerColors.muted, marginTop: 4, fontSize: 11 },
 });

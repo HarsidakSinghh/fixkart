@@ -4,6 +4,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
 import { colors, spacing } from "../theme";
 import { useAsyncList } from "../services/useAsyncList";
+import { ErrorState } from "../components/StateViews";
 import {
   getVendors,
   updateVendorStatus,
@@ -75,6 +76,20 @@ export default function ApprovalsScreen() {
       ? customersList.items
       : inventoryList.items;
 
+  const activeError =
+    activeTab === "vendors"
+      ? vendorsList.error
+      : activeTab === "customers"
+      ? customersList.error
+      : inventoryList.error;
+
+  const activeRefresh =
+    activeTab === "vendors"
+      ? vendorsList.refresh
+      : activeTab === "customers"
+      ? customersList.refresh
+      : inventoryList.refresh;
+
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Approvals" subtitle="Everything pending in one view" />
@@ -106,7 +121,9 @@ export default function ApprovalsScreen() {
         }
       />
 
-      {activeItems.length === 0 ? (
+      {activeError && activeItems.length === 0 ? (
+        <ErrorState message={activeError} onRetry={activeRefresh} />
+      ) : activeItems.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>No pending approvals</Text>
           <Text style={styles.emptySubtitle}>Everything is cleared for now.</Text>

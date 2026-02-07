@@ -1,16 +1,39 @@
 import { getMongoDb } from "@/lib/mongo";
 import { ObjectId } from "mongodb";
+import { jwtVerify } from "jose";
+import { TextEncoder } from "util";
 
 export async function requireSalesman(req: Request) {
-  const id = req.headers.get("x-salesman-id") || req.headers.get("X-Salesman-Id");
-  if (!id) {
-    return { ok: false as const, status: 401, error: "Missing Salesman ID" };
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+  if (!authHeader) {
+    return { ok: false as const, status: 401, error: "Missing Authorization" };
+  }
+  const [type, token] = authHeader.split(" ");
+  if (type !== "Bearer" || !token) {
+    return { ok: false as const, status: 401, error: "Invalid Authorization" };
   }
 
   const db = await getMongoDb();
+  const secret = process.env.SALESMAN_JWT_SECRET;
+  if (!secret) {
+    return { ok: false as const, status: 500, error: "Server misconfigured" };
+  }
+
+  let subject: string | null = null;
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    subject = payload?.sub ? String(payload.sub) : null;
+  } catch {
+    return { ok: false as const, status: 401, error: "Invalid token" };
+  }
+
+  if (!subject) {
+    return { ok: false as const, status: 401, error: "Invalid token" };
+  }
+
   let objectId: ObjectId;
   try {
-    objectId = new ObjectId(id);
+    objectId = new ObjectId(subject);
   } catch {
     return { ok: false as const, status: 400, error: "Invalid Salesman ID" };
   }

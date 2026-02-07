@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView, TextInput } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getVendorListings, updateVendorListing } from './vendorApi';
+import StatusPill from '../components/StatusPill';
 
 const STATUS_FILTERS = [
   { key: 'ALL', label: 'All' },
@@ -13,6 +14,7 @@ const STATUS_FILTERS = [
 export default function VendorInventoryScreen() {
   const [listings, setListings] = useState([]);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [drafts, setDrafts] = useState({});
 
@@ -30,11 +32,20 @@ export default function VendorInventoryScreen() {
   }, [loadListings]);
 
   const filteredListings = useMemo(() => {
-    if (statusFilter === 'ALL') return listings;
-    if (statusFilter === 'LIVE') return listings.filter((p) => p.status === 'APPROVED' && p.isPublished);
-    if (statusFilter === 'PENDING') return listings.filter((p) => p.status === 'PENDING');
-    return listings.filter((p) => p.status === 'REJECTED');
-  }, [listings, statusFilter]);
+    let filtered = listings;
+    if (statusFilter === 'LIVE') filtered = filtered.filter((p) => p.status === 'APPROVED' && p.isPublished);
+    if (statusFilter === 'PENDING') filtered = filtered.filter((p) => p.status === 'PENDING');
+    if (statusFilter === 'ACTION') filtered = filtered.filter((p) => p.status === 'REJECTED');
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter((p) => {
+        const name = `${p.title || p.name || ''}`.toLowerCase();
+        const sku = `${p.sku || ''}`.toLowerCase();
+        return name.includes(q) || sku.includes(q);
+      });
+    }
+    return filtered;
+  }, [listings, statusFilter, search]);
 
   const renderListing = ({ item }) => (
     <View style={styles.listingCard}>
@@ -43,6 +54,11 @@ export default function VendorInventoryScreen() {
         <Text style={styles.productName}>{item.title || item.name}</Text>
         <Text style={styles.productMeta}>{item.subCategory || item.category}</Text>
         <Text style={styles.productSku}>SKU: {item.sku || 'N/A'}</Text>
+        {typeof item.quantity === 'number' && item.quantity > 0 && item.quantity <= 5 ? (
+          <View style={styles.lowStockPill}>
+            <Text style={styles.lowStockText}>Only {item.quantity} left</Text>
+          </View>
+        ) : null}
         <View style={styles.metricsRow}>
           {editingId === item.id ? (
             <>
@@ -71,9 +87,7 @@ export default function VendorInventoryScreen() {
             </>
           )}
         </View>
-        <View style={[styles.statusPill, statusStyle(item)]}>
-          <Text style={styles.statusText}>{statusLabel(item)}</Text>
-        </View>
+        <StatusPill label={statusLabel(item)} tone={statusTone(item)} />
         <View style={styles.editRow}>
           {editingId === item.id ? (
             <>
@@ -143,6 +157,15 @@ export default function VendorInventoryScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            <View style={styles.searchWrap}>
+              <TextInput
+                placeholder="Search by SKU or name"
+                placeholderTextColor={vendorColors.muted}
+                value={search}
+                onChangeText={setSearch}
+                style={styles.searchInput}
+              />
+            </View>
           </View>
         }
       />
@@ -156,11 +179,11 @@ export default function VendorInventoryScreen() {
     return item.status || 'PENDING';
   }
 
-  function statusStyle(item) {
-    if (item.status === 'APPROVED' && item.isPublished) return styles.statusLive;
-    if (item.status === 'PENDING') return styles.statusPending;
-    if (item.status === 'REJECTED') return styles.statusAction;
-    return styles.statusPending;
+  function statusTone(item) {
+    if (item.status === 'APPROVED' && item.isPublished) return 'success';
+    if (item.status === 'PENDING') return 'warning';
+    if (item.status === 'REJECTED') return 'danger';
+    return 'warning';
   }
 }
 
@@ -205,6 +228,17 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: vendorColors.text },
   subtitle: { color: vendorColors.muted, marginTop: 6, fontSize: 12 },
   categoryRow: { paddingHorizontal: vendorSpacing.lg, paddingBottom: vendorSpacing.sm, paddingTop: vendorSpacing.md },
+  searchWrap: {
+    marginTop: vendorSpacing.sm,
+    marginHorizontal: vendorSpacing.lg,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 12,
+    backgroundColor: vendorColors.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  searchInput: { color: vendorColors.text, fontSize: 12, paddingVertical: 6 },
   categoryPill: {
     paddingHorizontal: vendorSpacing.md,
     paddingVertical: 8,
@@ -232,6 +266,17 @@ const styles = StyleSheet.create({
   productName: { color: vendorColors.text, fontWeight: '700' },
   productMeta: { color: vendorColors.muted, marginTop: 4, fontSize: 12 },
   productSku: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
+  lowStockPill: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#2C1B0D',
+    borderWidth: 1,
+    borderColor: '#8C5B2D',
+  },
+  lowStockText: { color: '#F5C391', fontSize: 10, fontWeight: '700' },
   metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
   metricCard: {
     paddingHorizontal: 10,
@@ -247,17 +292,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: 0,
   },
-  statusPill: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  statusText: { color: '#FFFFFF', fontWeight: '700', fontSize: 10 },
-  statusLive: { backgroundColor: vendorColors.primary },
-  statusPending: { backgroundColor: vendorColors.accent },
-  statusAction: { backgroundColor: '#D9534F' },
   editRow: { flexDirection: 'row', gap: vendorSpacing.sm, marginTop: vendorSpacing.sm },
   editBtn: {
     alignSelf: 'flex-start',

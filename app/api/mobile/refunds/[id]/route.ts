@@ -18,10 +18,22 @@ export async function PATCH(
   }
 
   const resolved = await params;
-  await prisma.refundRequest.update({
+  const refund = await prisma.refundRequest.update({
     where: { id: resolved.id },
     data: { status },
   });
+
+  if (refund?.orderItemId) {
+    let nextStatus = null;
+    if (status === "APPROVED") nextStatus = "REFUNDED";
+    if (status === "REJECTED") nextStatus = "REFUND_REJECTED";
+    if (nextStatus) {
+      await prisma.orderItem.update({
+        where: { id: refund.orderItemId },
+        data: { status: nextStatus },
+      });
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

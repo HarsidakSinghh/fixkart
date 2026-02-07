@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
@@ -9,21 +9,29 @@ import { getStoreProducts } from './storeApi';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
+import { ErrorState } from '../components/StateViews';
 
 export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { addItem, items: cartItems } = useCart();
   const { isAuthenticated, clearSession } = useAuth();
   const { signOut } = useClerkAuth();
 
-  const fetchProducts = useCallback(async () => {
-    const data = await getStoreProducts({ query, category: category === 'All' ? '' : category });
-    return data.products;
-  }, [query, category]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 400);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-  const { items: products, loading } = useAsyncList(fetchProducts, []);
+  const fetchProducts = useCallback(async () => {
+    const data = await getStoreProducts({ query: debouncedQuery, category: category === 'All' ? '' : category });
+    return data.products;
+  }, [debouncedQuery, category]);
+
+  const { items: products, loading, error, refresh } = useAsyncList(fetchProducts, []);
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleAdd = (product) => {
     if (!isAuthenticated) {
@@ -80,6 +88,37 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         numColumns={2}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.grid}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try {
+                await refresh();
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+          />
+        }
+        ListEmptyComponent={
+          error ? (
+            <ErrorState message={error} onRetry={refresh} />
+          ) : !loading ? (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>No products found.</Text>
+              <Text style={styles.emptySubtext}>Try clearing filters or searching again.</Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.footerLoading}>
+              <ActivityIndicator color={customerColors.primary} />
+              <Text style={styles.footerText}>Loading products…</Text>
+            </View>
+          ) : null
+        }
         ListHeaderComponent={() => (
           <>
             <View style={styles.hero}>
@@ -179,4 +218,9 @@ const styles = StyleSheet.create({
   filterText: { color: customerColors.primary, fontWeight: '700', fontSize: 12 },
   grid: { paddingHorizontal: customerSpacing.lg, paddingBottom: 160 },
   gridRow: { justifyContent: 'space-between' },
+  footerLoading: { alignItems: 'center', paddingVertical: customerSpacing.md },
+  footerText: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
+  emptyWrap: { alignItems: 'center', paddingVertical: customerSpacing.xl },
+  emptyText: { color: customerColors.text, fontWeight: '700' },
+  emptySubtext: { color: customerColors.muted, marginTop: 6, textAlign: 'center' },
 });

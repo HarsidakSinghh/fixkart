@@ -1,8 +1,10 @@
 import React, { useCallback } from "react";
 import AdminScreenLayout from "../components/AdminScreenLayout";
-import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
+import { ScreenTitle, SectionHeader, RowCard, ActionRow } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getRefunds, updateRefundStatus } from "../services/api";
+import { ErrorState, SkeletonList } from "../components/StateViews";
+import StatusPill from "../components/StatusPill";
 
 export default function RefundsScreen() {
   const fetchRefunds = useCallback(async () => {
@@ -10,7 +12,7 @@ export default function RefundsScreen() {
     return data.refunds;
   }, []);
 
-  const { items, setItems } = useAsyncList(fetchRefunds, []);
+  const { items, setItems, error, refresh, loading } = useAsyncList(fetchRefunds, []);
 
   async function updateStatus(id, status) {
     await updateRefundStatus(id, status);
@@ -21,12 +23,14 @@ export default function RefundsScreen() {
     <AdminScreenLayout>
       <ScreenTitle title="Refunds" subtitle="Finance desk" />
       <SectionHeader title="Refund Queue" actionLabel="Export" />
+      {loading && items.length === 0 ? <SkeletonList count={4} /> : null}
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((item) => (
         <RowCard
           key={item.id}
           title={`₹${item.amount}`}
           subtitle={`${item.orderId}  •  ${item.id}`}
-          right={<Badge text={item.status} tone={statusTone(item.status)} />}
+          right={<StatusPill label={item.status} tone={statusTone(item.status)} />}
           meta={
             <ActionRow
               secondaryLabel="Reject"

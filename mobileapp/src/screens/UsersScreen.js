@@ -3,6 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, Pill, ActionRow } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getUsers, updateUserStatus } from "../services/api";
+import { ErrorState } from "../components/StateViews";
 
 export default function UsersScreen() {
   const fetchUsers = useCallback(async () => {
@@ -10,7 +11,7 @@ export default function UsersScreen() {
     return data.users;
   }, []);
 
-  const { items, setItems } = useAsyncList(fetchUsers, []);
+  const { items, setItems, error, refresh } = useAsyncList(fetchUsers, []);
 
   async function updateStatus(id, status) {
     await updateUserStatus(id, status);
@@ -21,6 +22,7 @@ export default function UsersScreen() {
     <AdminScreenLayout>
       <ScreenTitle title="Admin Users" subtitle="Access control" />
       <SectionHeader title="Team Members" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((user) => (
         <RowCard
           key={user.id}

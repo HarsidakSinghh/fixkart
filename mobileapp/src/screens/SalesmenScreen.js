@@ -5,13 +5,14 @@ import { useAsyncList } from "../services/useAsyncList";
 import { getSalesmen, getSalesmanDetail } from "../services/salesmanAdminApi";
 import { View, Text, StyleSheet } from "react-native";
 import { colors, spacing } from "../theme";
+import { ErrorState } from "../components/StateViews";
 
 export default function SalesmenScreen() {
   const fetchSalesmen = useCallback(async () => {
     return await getSalesmen();
   }, []);
 
-  const { items } = useAsyncList(fetchSalesmen, []);
+  const { items, error, refresh } = useAsyncList(fetchSalesmen, []);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
 
@@ -25,6 +26,7 @@ export default function SalesmenScreen() {
     <AdminScreenLayout>
       <ScreenTitle title="Salesmen" subtitle="Field team visibility" />
       <SectionHeader title="Registered Salesmen" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((s) => (
         <RowCard
           key={s.id}

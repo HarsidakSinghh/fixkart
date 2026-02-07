@@ -13,6 +13,9 @@ async function getAuthToken() {
 }
 
 async function authFetch(path, options = {}) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
   const token = await getAuthToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -33,6 +36,35 @@ async function authFetch(path, options = {}) {
 
 export async function getCustomerOrders() {
   return authFetch('/api/mobile/customer-orders');
+}
+
+export async function getCustomerComplaints() {
+  return authFetch('/api/mobile/customer/complaints');
+}
+
+export async function getCustomerRefunds() {
+  return authFetch('/api/mobile/customer/refunds');
+}
+
+export async function submitComplaint(payload) {
+  return authFetch('/api/mobile/complaints', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function submitRefund(payload) {
+  return authFetch('/api/mobile/refunds/request', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadComplaintImage(imageBase64, filename) {
+  return authFetch('/api/mobile/uploads', {
+    method: 'POST',
+    body: JSON.stringify({ imageBase64, filename }),
+  });
 }
 
 export async function seedCustomerOrders() {

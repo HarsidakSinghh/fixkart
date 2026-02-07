@@ -12,7 +12,9 @@ export const CLERK_CONFIG = {
 
 // API Configuration
 export const API_CONFIG = {
-  baseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.2.93:3000',
+  baseUrl:
+    process.env.EXPO_PUBLIC_API_BASE_URL ||
+    (__DEV__ ? 'http://192.168.2.93:3000' : ''),
   timeout: 30000, // 30 seconds
   useMock: process.env.EXPO_PUBLIC_USE_MOCK === 'true',
 };

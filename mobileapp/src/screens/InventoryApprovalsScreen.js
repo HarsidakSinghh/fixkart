@@ -3,6 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getInventoryApprovals, approveProduct, rejectProduct } from "../services/api";
+import { ErrorState } from "../components/StateViews";
 
 export default function InventoryApprovalsScreen() {
   const fetchInventoryApprovals = useCallback(async () => {
@@ -10,7 +11,7 @@ export default function InventoryApprovalsScreen() {
     return data.products;
   }, []);
 
-  const { items, setItems } = useAsyncList(fetchInventoryApprovals, []);
+  const { items, setItems, error, refresh } = useAsyncList(fetchInventoryApprovals, []);
 
   async function updateStatus(id, status) {
     if (status === "APPROVED") await approveProduct(id);
@@ -22,6 +23,7 @@ export default function InventoryApprovalsScreen() {
     <AdminScreenLayout>
       <ScreenTitle title="Inventory Approvals" subtitle="Pending listings" />
       <SectionHeader title="Awaiting Review" actionLabel="Bulk" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((item) => (
         <RowCard
           key={item.id}

@@ -1,11 +1,13 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, ScrollView } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { useCart } from '../context/CartContext';
 import { placeCustomerOrder, getCustomerProfile } from './customerApi';
+import { useToast } from '../components/Toast';
 
 const PREF_KEY = 'customer_billing_pref';
+const DRAFT_KEY = 'customer_checkout_draft';
 
 export default function CustomerCheckoutScreen({ onDone, onBack }) {
   const { items, totals, clearCart } = useCart();
@@ -14,6 +16,8 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
   const [savePref, setSavePref] = useState(true);
   const [usePref, setUsePref] = useState(false);
   const [prefData, setPrefData] = useState(null);
+  const draftLoaded = useRef(false);
+  const toast = useToast();
   const [billing, setBilling] = useState({
     fullName: '',
     phone: '',
@@ -27,6 +31,21 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
 
   useEffect(() => {
     async function loadPref() {
+      try {
+        const draftRaw = await SecureStore.getItemAsync(DRAFT_KEY);
+        if (draftRaw) {
+          const draft = JSON.parse(draftRaw);
+          if (draft?.billing) {
+            setBilling((prev) => ({ ...prev, ...draft.billing }));
+          }
+          if (draft?.paymentMethod) setPaymentMethod(draft.paymentMethod);
+          if (draft?.step) setStep(draft.step);
+          if (typeof draft?.savePref === 'boolean') setSavePref(draft.savePref);
+          if (typeof draft?.usePref === 'boolean') setUsePref(draft.usePref);
+        }
+      } catch (_) {
+        // ignore
+      }
       const raw = await SecureStore.getItemAsync(PREF_KEY);
       if (raw) {
         try {
@@ -63,9 +82,22 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
       } catch (_) {
         // ignore
       }
+      draftLoaded.current = true;
     }
     loadPref();
   }, []);
+
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    const payload = {
+      billing,
+      paymentMethod,
+      step,
+      savePref,
+      usePref,
+    };
+    SecureStore.setItemAsync(DRAFT_KEY, JSON.stringify(payload));
+  }, [billing, paymentMethod, step, savePref, usePref]);
 
   const isValid = useMemo(() => {
     return (
@@ -94,11 +126,12 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
         await SecureStore.setItemAsync(PREF_KEY, JSON.stringify(billing));
       }
       await SecureStore.setItemAsync('customer_profile_cache', JSON.stringify(billing));
+      await SecureStore.deleteItemAsync(DRAFT_KEY);
       clearCart();
-      Alert.alert('Order placed', 'Your order has been placed successfully.');
+      toast.show('Order placed successfully', 'success');
       onDone?.();
     } catch (error) {
-      Alert.alert('Order failed', 'Unable to place the order. Please try again.');
+      toast.show('Order failed. Try again.', 'error');
     } finally {
       setSubmitting(false);
     }

@@ -3,6 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getInventory } from "../services/api";
+import { ErrorState } from "../components/StateViews";
 
 export default function InventoryScreen() {
   const fetchInventory = useCallback(async () => {
@@ -10,12 +11,13 @@ export default function InventoryScreen() {
     return data.inventory;
   }, []);
 
-  const { items } = useAsyncList(fetchInventory, []);
+  const { items, error, refresh } = useAsyncList(fetchInventory, []);
 
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Inventory" subtitle="Warehouse status" />
       <SectionHeader title="Stock Watch" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((item) => (
         <RowCard
           key={item.id}

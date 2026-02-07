@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/vendor-guard";
+import { sendPushToUsers } from "@/lib/push";
 
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -25,6 +26,23 @@ export async function PATCH(
 
   if (!updated.count) {
     return NextResponse.json({ error: "Order item not found" }, { status: 404 });
+  }
+
+  try {
+    const item = await prisma.orderItem.findUnique({
+      where: { id: resolved.id },
+      include: { order: true },
+    });
+    if (item?.order?.customerId) {
+      await sendPushToUsers(
+        [item.order.customerId],
+        "Order Ready",
+        `Your order item is ready for dispatch. Code: ${code}`,
+        { orderId: item.orderId, status: "READY" }
+      );
+    }
+  } catch (err) {
+    console.error("[push] failed to notify customer", err);
   }
 
   return NextResponse.json({ success: true, code });

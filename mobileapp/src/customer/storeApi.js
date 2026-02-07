@@ -4,6 +4,9 @@ import { getCache, setCache } from '../services/cache';
 const BASE_URL = API_CONFIG.baseUrl;
 
 export async function getStoreProducts({ query = '', category = '' } = {}) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
   const cacheKey = `store:products:${query}:${category}`;
   const cached = getCache(cacheKey);
   if (cached) return cached;
@@ -21,6 +24,9 @@ export async function getStoreProducts({ query = '', category = '' } = {}) {
 }
 
 export async function getStoreProduct(id) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
   const res = await fetch(`${BASE_URL}/api/mobile/store/products/${id}`);
   if (!res.ok) {
     throw new Error(`Request failed: ${res.status}`);

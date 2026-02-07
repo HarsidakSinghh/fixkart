@@ -18,10 +18,23 @@ export async function PATCH(
     return NextResponse.json({ error: "Missing status" }, { status: 400 });
   }
 
-  await prisma.complaint.update({
+  const complaint = await prisma.complaint.update({
     where: { id: resolvedParams.id },
     data: { status },
   });
+
+  if (complaint?.orderItemId) {
+    let nextStatus = null;
+    if (status === "RESOLVED") nextStatus = "COMPLAINT_RESOLVED";
+    if (status === "IN_REVIEW") nextStatus = "COMPLAINT_REVIEW";
+    if (status === "OPEN") nextStatus = "COMPLAINT";
+    if (nextStatus) {
+      await prisma.orderItem.update({
+        where: { id: complaint.orderItemId },
+        data: { status: nextStatus },
+      });
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

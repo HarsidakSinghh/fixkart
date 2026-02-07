@@ -3,6 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getCustomers } from "../services/api";
+import { ErrorState } from "../components/StateViews";
 
 export default function OnboardedCustomersScreen() {
   const fetchCustomers = useCallback(async () => {
@@ -10,12 +11,13 @@ export default function OnboardedCustomersScreen() {
     return data.customers;
   }, []);
 
-  const { items } = useAsyncList(fetchCustomers, []);
+  const { items, error, refresh } = useAsyncList(fetchCustomers, []);
 
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Onboarded Customers" subtitle="Verified accounts" />
       <SectionHeader title="Active Customers" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((customer) => (
         <RowCard
           key={customer.id}

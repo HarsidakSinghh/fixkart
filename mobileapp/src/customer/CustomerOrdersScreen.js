@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerOrders, seedCustomerOrders } from './customerApi';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
+import { ErrorState } from '../components/StateViews';
+import StatusPill from '../components/StatusPill';
 
 const STATUS_STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
 const STATUS_ALIAS = {
@@ -17,12 +20,24 @@ function getStepIndex(status) {
   return idx >= 0 ? idx : 0;
 }
 
-export default function CustomerOrdersScreen() {
+function itemStatusLabel(status) {
+  if (!status) return null;
+  if (status === 'COMPLAINT') return 'Complaint registered';
+  if (status === 'COMPLAINT_REVIEW') return 'Complaint in review';
+  if (status === 'COMPLAINT_RESOLVED') return 'Complaint resolved';
+  if (status === 'REFUND_REQUESTED') return 'Refund requested';
+  if (status === 'REFUNDED') return 'Refund approved';
+  if (status === 'REFUND_REJECTED') return 'Refund rejected';
+  return null;
+}
+
+export default function CustomerOrdersScreen({ onOpenSupport }) {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -30,6 +45,17 @@ export default function CustomerOrdersScreen() {
     try {
       const data = await getCustomerOrders();
       setOrders(data.orders || []);
+      try {
+        const notifications = (data.orders || []).slice(0, 5).map((order) => ({
+          id: order.id,
+          title: `Order ${order.status}`,
+          message: `Order #${order.id.slice(-6).toUpperCase()} • ₹${Math.round(order.totalAmount || 0)}`,
+          createdAt: order.createdAt,
+        }));
+        await SecureStore.setItemAsync('customer_notifications', JSON.stringify(notifications));
+      } catch (_) {
+        // ignore
+      }
     } catch (err) {
       setError('Unable to load orders.');
     } finally {
@@ -70,17 +96,34 @@ export default function CustomerOrdersScreen() {
           data={orders}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                setRefreshing(true);
+                try {
+                  await loadOrders();
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+            />
+          }
           ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>No orders yet.</Text>
-              <Text style={styles.emptySubtext}>Once you place an order, it will appear here.</Text>
-              {user?.email === 'sidak798@gmail.com' && (
-                <TouchableOpacity style={styles.seedButton} onPress={handleSeed} disabled={seeding}>
-                  <Text style={styles.seedText}>{seeding ? 'Creating…' : 'Create sample orders'}</Text>
-                </TouchableOpacity>
-              )}
-              {!!error && <Text style={styles.errorText}>{error}</Text>}
-            </View>
+            error ? (
+              <ErrorState message={error} onRetry={loadOrders} />
+            ) : (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>No orders yet.</Text>
+                <Text style={styles.emptySubtext}>Once you place an order, it will appear here.</Text>
+                {user?.email === 'sidak798@gmail.com' && (
+                  <TouchableOpacity style={styles.seedButton} onPress={handleSeed} disabled={seeding}>
+                    <Text style={styles.seedText}>{seeding ? 'Creating…' : 'Create sample orders'}</Text>
+                  </TouchableOpacity>
+                )}
+                {!!error && <Text style={styles.errorText}>{error}</Text>}
+              </View>
+            )
           }
           renderItem={({ item }) => {
             const stepIndex = getStepIndex(item.status);
@@ -91,9 +134,7 @@ export default function CustomerOrdersScreen() {
                     <Text style={styles.orderId}>Order #{item.id.slice(-6).toUpperCase()}</Text>
                     <Text style={styles.orderDate}>{new Date(item.createdAt).toDateString()}</Text>
                   </View>
-                  <View style={styles.statusPill}>
-                    <Text style={styles.statusText}>{item.status}</Text>
-                  </View>
+                <StatusPill label={item.status} tone={statusTone(item.status)} />
                 </View>
 
                 <View style={styles.amountRow}>
@@ -120,14 +161,25 @@ export default function CustomerOrdersScreen() {
 
                 <View style={styles.itemsWrap}>
                   {(item.items || []).slice(0, 2).map((product) => (
-                    <Text key={product.id} style={styles.itemText}>
-                      • {product.productName} × {product.quantity}
-                    </Text>
+                    <View key={product.id} style={styles.itemRow}>
+                      <Text style={styles.itemText}>
+                        • {product.productName} × {product.quantity}
+                      </Text>
+                      {itemStatusLabel(product.status) ? (
+                        <Text style={styles.itemStatus}>{itemStatusLabel(product.status)}</Text>
+                      ) : null}
+                    </View>
                   ))}
                   {(item.items || []).length > 2 && (
                     <Text style={styles.moreText}>+{(item.items || []).length - 2} more items</Text>
                   )}
                 </View>
+
+                {onOpenSupport ? (
+                  <TouchableOpacity style={styles.helpBtn} onPress={() => onOpenSupport(item)}>
+                    <Text style={styles.helpText}>Help / Complaint / Refund</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             );
           }}
@@ -190,13 +242,6 @@ const styles = StyleSheet.create({
   },
   orderId: { fontWeight: '800', color: customerColors.text },
   orderDate: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
-  statusPill: {
-    backgroundColor: customerColors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  statusText: { color: customerColors.primary, fontWeight: '700', fontSize: 11 },
   amountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -223,6 +268,26 @@ const styles = StyleSheet.create({
   stepLabel: { fontSize: 10, color: customerColors.muted },
   stepLabelActive: { color: customerColors.success, fontWeight: '700' },
   itemsWrap: { marginTop: customerSpacing.md },
+  itemRow: { marginTop: 4 },
   itemText: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
+  itemStatus: { color: customerColors.primary, fontSize: 11, marginTop: 2, fontWeight: '600' },
   moreText: { color: customerColors.primary, fontSize: 12, marginTop: 4 },
+  helpBtn: {
+    marginTop: customerSpacing.md,
+    alignSelf: 'flex-start',
+    backgroundColor: customerColors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  helpText: { color: customerColors.primary, fontSize: 12, fontWeight: '700' },
 });
+
+function statusTone(status) {
+  if (status === 'DELIVERED' || status === 'COMPLETED') return 'success';
+  if (status === 'SHIPPED' || status === 'PROCESSING' || status === 'APPROVED') return 'info';
+  if (status === 'CANCELLED' || status === 'REJECTED') return 'danger';
+  return 'warning';
+}

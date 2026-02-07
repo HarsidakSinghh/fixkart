@@ -46,10 +46,18 @@ export const shadow = {
 };
 
 export const font = {
-  title: { fontSize: 26, fontWeight: "700", color: colors.text },
+  title: { fontSize: 28, fontWeight: "800", color: colors.text },
   subtitle: { fontSize: 12, fontWeight: "700", color: colors.muted, letterSpacing: 1.2 },
-  section: { fontSize: 15, fontWeight: "700", color: colors.text },
+  section: { fontSize: 16, fontWeight: "700", color: colors.text },
   body: { fontSize: 14, color: colors.text },
   caption: { fontSize: 12, color: colors.muted },
   micro: { fontSize: 10, color: colors.muted, letterSpacing: 0.6 },
+};
+
+export const typeScale = {
+  display: { fontSize: 32, fontWeight: "800", color: colors.text },
+  headline: { fontSize: 22, fontWeight: "800", color: colors.text },
+  title: { fontSize: 18, fontWeight: "700", color: colors.text },
+  body: { fontSize: 14, color: colors.text },
+  label: { fontSize: 12, color: colors.muted },
 };

@@ -3,6 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getCustomers, updateCustomerStatus } from "../services/api";
+import { ErrorState } from "../components/StateViews";
 
 export default function CustomerApprovalsScreen() {
   const fetchCustomers = useCallback(async () => {
@@ -10,7 +11,7 @@ export default function CustomerApprovalsScreen() {
     return data.customers;
   }, []);
 
-  const { items, setItems } = useAsyncList(fetchCustomers, []);
+  const { items, setItems, error, refresh } = useAsyncList(fetchCustomers, []);
 
   async function updateStatus(id, status) {
     await updateCustomerStatus(id, status);
@@ -21,6 +22,7 @@ export default function CustomerApprovalsScreen() {
     <AdminScreenLayout>
       <ScreenTitle title="Customer Approvals" subtitle="Pending access" />
       <SectionHeader title="Awaiting Approval" actionLabel="Bulk" />
+      {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {items.map((customer) => (
         <RowCard
           key={customer.id}

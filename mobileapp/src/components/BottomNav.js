@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Pressable, Text, StyleSheet } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { colors, spacing, shadow } from "../theme";
 
 export default function BottomNav({ tabs, activeKey, onChange }) {
@@ -9,6 +10,13 @@ export default function BottomNav({ tabs, activeKey, onChange }) {
         const active = tab.key === activeKey;
         return (
           <Pressable key={tab.key} onPress={() => onChange(tab.key)} style={styles.item}>
+            {tab.icon ? (
+              <Feather
+                name={tab.icon}
+                size={18}
+                color={active ? colors.text : colors.muted}
+              />
+            ) : null}
             <Text style={[styles.label, active && styles.labelActive]}>{tab.label}</Text>
             {active ? <View style={styles.dot} /> : null}
           </Pressable>
@@ -30,7 +38,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
   },
   item: { alignItems: "center", flex: 1 },
-  label: { color: colors.muted, fontSize: 13, fontWeight: "700", letterSpacing: 0.3 },
+  label: { color: colors.muted, fontSize: 11, fontWeight: "700", letterSpacing: 0.3, marginTop: 6 },
   labelActive: { color: colors.text },
   dot: {
     width: 8,

@@ -5,6 +5,7 @@ import { ScreenTitle, SectionHeader, StatCard, RowCard, Badge } from "../compone
 import { colors, spacing } from "../theme";
 import { useAsyncList } from "../services/useAsyncList";
 import { getDashboard } from "../services/api";
+import { ErrorState } from "../components/StateViews";
 
 export default function DashboardScreen() {
   const [dashboard, setDashboard] = useState({
@@ -38,10 +39,7 @@ export default function DashboardScreen() {
   if (error) {
     return (
       <AdminScreenLayout>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load dashboard</Text>
-          <Text style={styles.errorSubtext}>{error.message}</Text>
-        </View>
+        <ErrorState title="Failed to load dashboard" message={error} onRetry={fetchDashboard} />
       </AdminScreenLayout>
     );
   }

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getVendorOrders, markVendorOrderReady } from './vendorApi';
+import StatusPill from '../components/StatusPill';
+import * as SecureStore from 'expo-secure-store';
 
 export default function VendorOrdersScreen({ onSwitchToListings }) {
   const [orders, setOrders] = useState([]);
@@ -13,6 +15,17 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
     try {
       const data = await getVendorOrders();
       setOrders(data.orders || []);
+      try {
+        const notifications = (data.orders || []).slice(0, 5).map((order) => ({
+          id: order.id,
+          title: `Order ${order.status || 'NEW'}`,
+          message: `${order.productName} × ${order.quantity}`,
+          createdAt: order.createdAt,
+        }));
+        await SecureStore.setItemAsync('vendor_notifications', JSON.stringify(notifications));
+      } catch (_) {
+        // ignore
+      }
     } catch (error) {
       console.error('Failed to load vendor orders', error);
     } finally {
@@ -46,6 +59,9 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
         <Text style={styles.meta}>Customer: {item.customer?.name || 'Customer'}</Text>
         <Text style={styles.meta}>{item.customer?.phone || ''}</Text>
         <Text style={styles.meta}>{item.customer?.address || ''}</Text>
+        <View style={{ marginTop: vendorSpacing.sm }}>
+          <StatusPill label={item.status || 'NEW'} tone={statusTone(item.status)} />
+        </View>
 
         {item.dispatchCode ? (
           <View style={styles.codeBadge}>
@@ -92,6 +108,13 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
       ) : null}
     </View>
   );
+}
+
+function statusTone(status) {
+  if (status === 'DELIVERED' || status === 'COMPLETED' || status === 'READY') return 'success';
+  if (status === 'SHIPPED' || status === 'APPROVED') return 'info';
+  if (status === 'CANCELLED' || status === 'REJECTED') return 'danger';
+  return 'warning';
 }
 
 const styles = StyleSheet.create({
