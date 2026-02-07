@@ -12,6 +12,7 @@ import { getCustomerOrders } from './customerApi';
 import CustomerSupportScreen from './CustomerSupportScreen';
 import CustomerSupportHistoryScreen from './CustomerSupportHistoryScreen';
 import CustomerNotificationsScreen from './CustomerNotificationsScreen';
+import NotificationDebugScreen from '../screens/NotificationDebugScreen';
 
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
@@ -28,6 +29,7 @@ export default function CustomerPortal({ onOpenLogin }) {
   const [supportOrder, setSupportOrder] = useState(null);
   const [showSupportHistory, setShowSupportHistory] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showPushDebug, setShowPushDebug] = useState(false);
 
   async function refreshOrderBadge() {
     try {
@@ -72,6 +74,10 @@ export default function CustomerPortal({ onOpenLogin }) {
     return <CustomerNotificationsScreen onBack={() => setShowNotifications(false)} />;
   }
 
+  if (showPushDebug) {
+    return <NotificationDebugScreen onBack={() => setShowPushDebug(false)} />;
+  }
+
   if (showCheckout) {
     return (
       <CustomerCheckoutScreen
@@ -102,6 +108,7 @@ export default function CustomerPortal({ onOpenLogin }) {
       <CustomerProfileScreen
         onOpenSupportHistory={() => setShowSupportHistory(true)}
         onOpenNotifications={() => setShowNotifications(true)}
+        onOpenPushDebug={() => setShowPushDebug(true)}
       />
     );
   }

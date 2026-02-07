@@ -9,6 +9,7 @@ import VendorProfileScreen from './VendorProfileScreen';
 import VendorOrdersScreen from './VendorOrdersScreen';
 import VendorComplaintsScreen from './VendorComplaintsScreen';
 import VendorNotificationsScreen from './VendorNotificationsScreen';
+import NotificationDebugScreen from '../screens/NotificationDebugScreen';
 import { getVendorProfile, getVendorOrders } from './vendorApi';
 
 const TABS = [
@@ -24,6 +25,7 @@ export default function VendorPortal() {
   const [status, setStatus] = useState('PENDING');
   const [ordersBadge, setOrdersBadge] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showPushDebug, setShowPushDebug] = useState(false);
 
   const handleStatus = useCallback((nextStatus) => {
     if (nextStatus) {
@@ -74,12 +76,17 @@ export default function VendorPortal() {
       <VendorProfileScreen
         onStatusLoaded={handleStatus}
         onOpenNotifications={() => setShowNotifications(true)}
+        onOpenPushDebug={() => setShowPushDebug(true)}
       />
     );
   }
 
   if (showNotifications) {
     return <VendorNotificationsScreen onBack={() => setShowNotifications(false)} />;
+  }
+
+  if (showPushDebug) {
+    return <NotificationDebugScreen onBack={() => setShowPushDebug(false)} />;
   }
 
   return (

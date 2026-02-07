@@ -5,7 +5,7 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerProfile, updateCustomerProfile } from './customerApi';
 import { useAuth } from '../context/AuthContext';
 
-export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications }) {
+export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications, onOpenPushDebug }) {
   const { isAuthenticated } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +95,11 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
           {onOpenNotifications ? (
             <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenNotifications}>
               <Text style={styles.secondaryText}>Notifications</Text>
+            </TouchableOpacity>
+          ) : null}
+          {onOpenPushDebug ? (
+            <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenPushDebug}>
+              <Text style={styles.secondaryText}>Push Debug</Text>
             </TouchableOpacity>
           ) : null}
         </View>

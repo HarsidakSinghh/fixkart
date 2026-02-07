@@ -5,7 +5,7 @@ import { getVendorProfile } from './vendorApi';
 import * as SecureStore from 'expo-secure-store';
 import StatusPill from '../components/StatusPill';
 
-export default function VendorProfileScreen({ onStatusLoaded, onOpenNotifications }) {
+export default function VendorProfileScreen({ onStatusLoaded, onOpenNotifications, onOpenPushDebug }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
@@ -60,6 +60,11 @@ export default function VendorProfileScreen({ onStatusLoaded, onOpenNotification
         {onOpenNotifications ? (
           <TouchableOpacity style={styles.notifyBtn} onPress={onOpenNotifications}>
             <Text style={styles.notifyText}>Notifications</Text>
+          </TouchableOpacity>
+        ) : null}
+        {onOpenPushDebug ? (
+          <TouchableOpacity style={styles.notifyBtn} onPress={onOpenPushDebug}>
+            <Text style={styles.notifyText}>Push Debug</Text>
           </TouchableOpacity>
         ) : null}
       </View>
