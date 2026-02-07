@@ -12,8 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { getPublicCategories, submitVendorProduct } from './vendorApi';
-import { getStoreProducts, getStoreTypes } from '../customer/storeApi';
+import { getPublicCategories, submitVendorProduct, getVendorCatalogProducts, getVendorTypes } from './vendorApi';
 
 export default function VendorHomeScreen({ canAdd, status }) {
   const [categories, setCategories] = useState([]);
@@ -70,7 +69,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     if (!activeCategory) return;
     setTypesLoading(true);
     try {
-      const data = await getStoreTypes(activeCategory === 'All' ? '' : activeCategory);
+      const data = await getVendorTypes(activeCategory === 'All' ? '' : activeCategory);
       setTypes(data.types || []);
     } catch (error) {
       console.error('Failed to load types', error);
@@ -83,7 +82,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     if (!activeCategory || !activeType) return;
     setLoading(true);
     try {
-      const data = await getStoreProducts({
+      const data = await getVendorCatalogProducts({
         category: activeCategory === 'All' ? '' : activeCategory,
         subCategory: activeType,
       });
@@ -224,7 +223,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
               {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
             </View>
             <Text style={styles.typeLabel} numberOfLines={2}>{item.label}</Text>
-            <Text style={styles.typeMeta}>{item.count} listings</Text>
+            <TouchableOpacity style={styles.typeAction} onPress={() => openType(item.label)}>
+              <Text style={styles.typeActionText}>Add listing</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         )}
         ListHeaderComponent={
@@ -444,7 +445,14 @@ const styles = StyleSheet.create({
   },
   typeImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: vendorColors.surface },
   typeLabel: { color: vendorColors.text, fontWeight: '700', marginTop: 8, fontSize: 12 },
-  typeMeta: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
+  typeAction: {
+    marginTop: 8,
+    backgroundColor: vendorColors.primary,
+    borderRadius: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  typeActionText: { color: '#fff', fontWeight: '700', fontSize: 11 },
   productCard: {
     backgroundColor: vendorColors.card,
     borderRadius: 16,

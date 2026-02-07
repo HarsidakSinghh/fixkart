@@ -81,6 +81,30 @@ export async function getVendorProducts(category = '') {
   return data;
 }
 
+export async function getVendorTypes(category = '') {
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  const cacheKey = `vendor:types:${category}`;
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+  const data = await authFetch(`/api/mobile/vendor/types?${params.toString()}`);
+  setCache(cacheKey, data, 60000);
+  return data;
+}
+
+export async function getVendorCatalogProducts({ category = '', subCategory = '' } = {}) {
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  if (subCategory) params.set('subCategory', subCategory);
+  params.set('all', '1');
+  const cacheKey = `vendor:catalog:${category}:${subCategory}`;
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+  const data = await authFetch(`/api/mobile/vendor/products?${params.toString()}`);
+  setCache(cacheKey, data, 30000);
+  return data;
+}
+
 export async function getVendorListings() {
   const cacheKey = 'vendor:listings';
   const cached = getCache(cacheKey);

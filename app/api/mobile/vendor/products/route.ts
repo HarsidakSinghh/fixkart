@@ -10,25 +10,41 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category") || undefined;
+  const subCategory = searchParams.get("subCategory") || undefined;
+  const includeAll = searchParams.get("all") === "1";
+
+  const whereClause: any = {};
+  if (!includeAll) {
+    whereClause.isPublished = true;
+    whereClause.status = "APPROVED";
+  }
+  if (category) {
+    whereClause.category = category;
+  }
+  if (subCategory) {
+    whereClause.OR = [
+      { subSubCategory: { contains: subCategory, mode: "insensitive" } },
+      { subCategory: { contains: subCategory, mode: "insensitive" } },
+      { name: { contains: subCategory, mode: "insensitive" } },
+      { title: { contains: subCategory, mode: "insensitive" } },
+    ];
+  }
 
   const products = await prisma.product.findMany({
-    where: {
-      isPublished: true,
-      status: "APPROVED",
-      ...(category ? { category } : {}),
-    },
+    where: whereClause,
     select: {
       id: true,
       name: true,
       title: true,
       category: true,
       subCategory: true,
+      subSubCategory: true,
       image: true,
       price: true,
       sku: true,
     },
     orderBy: { updatedAt: "desc" },
-    take: 200,
+    take: 500,
   });
 
   return NextResponse.json({ products });
