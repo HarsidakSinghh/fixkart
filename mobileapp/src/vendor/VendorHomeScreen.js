@@ -12,7 +12,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { getVendorCategories, getVendorProducts, submitVendorProduct } from './vendorApi';
+import { getPublicCategories, submitVendorProduct } from './vendorApi';
+import { getStoreProducts } from '../customer/storeApi';
 
 export default function VendorHomeScreen({ canAdd, status }) {
   const [categories, setCategories] = useState([]);
@@ -50,11 +51,12 @@ export default function VendorHomeScreen({ canAdd, status }) {
 
   const loadCategories = useCallback(async () => {
     try {
-      const data = await getVendorCategories();
+      const data = await getPublicCategories();
       const list = data.categories || [];
-      setCategories(list);
-      if (!activeCategory && list.length > 0) {
-        setActiveCategory(list[0]);
+      const merged = ['All', ...list];
+      setCategories(merged);
+      if (!activeCategory && merged.length > 0) {
+        setActiveCategory('All');
       }
     } catch (error) {
       console.error('Failed to load categories', error);
@@ -65,7 +67,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
     if (!activeCategory) return;
     setLoading(true);
     try {
-      const data = await getVendorProducts(activeCategory);
+      const data = await getStoreProducts({
+        category: activeCategory === 'All' ? '' : activeCategory,
+      });
       setCatalog(data.products || []);
     } catch (error) {
       console.error('Failed to load products', error);
@@ -209,25 +213,23 @@ export default function VendorHomeScreen({ canAdd, status }) {
                 </View>
               ) : null}
 
-              {categories.length > 1 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoryRow}
-                >
-                  {categories.map((item) => (
-                    <TouchableOpacity
-                      key={item}
-                      style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
-                      onPress={() => setActiveCategory(item)}
-                    >
-                      <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
-                        {item}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              ) : null}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryRow}
+              >
+                {categories.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
+                    onPress={() => setActiveCategory(item)}
+                  >
+                    <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           }
         />

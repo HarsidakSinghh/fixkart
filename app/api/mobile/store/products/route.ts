@@ -5,26 +5,42 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query") || "";
   const category = searchParams.get("category") || "";
+  const subCategory = searchParams.get("subCategory") || "";
 
   const whereClause: any = {
     isPublished: true,
     status: "APPROVED",
+    AND: [],
   };
 
   if (query) {
-    whereClause.OR = [
+    whereClause.AND.push({
+      OR: [
       { title: { contains: query, mode: "insensitive" } },
       { name: { contains: query, mode: "insensitive" } },
       { sku: { contains: query, mode: "insensitive" } },
-    ];
+      ],
+    });
   }
 
   if (category) {
-    whereClause.OR = [
+    whereClause.AND.push({
+      OR: [
       { category: { contains: category, mode: "insensitive" } },
       { subCategory: { contains: category, mode: "insensitive" } },
       { subSubCategory: { contains: category, mode: "insensitive" } },
-    ];
+      ],
+    });
+  }
+
+  if (subCategory) {
+    whereClause.AND.push({
+      subCategory: { contains: subCategory, mode: "insensitive" },
+    });
+  }
+
+  if (!whereClause.AND.length) {
+    delete whereClause.AND;
   }
 
   const products = await prisma.product.findMany({

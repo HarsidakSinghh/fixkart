@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
 import ProductCard from './ProductCard';
 import { useAsyncList } from '../services/useAsyncList';
-import { getStoreProducts } from './storeApi';
+import { getStoreProducts, getStoreTypes } from './storeApi';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
@@ -16,6 +16,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [types, setTypes] = useState([]);
   const { addItem, items: cartItems } = useCart();
   const { isAuthenticated, clearSession } = useAuth();
   const { signOut } = useClerkAuth();
@@ -25,6 +26,15 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     return () => clearTimeout(timer);
   }, [query]);
 
+  const loadTypes = useCallback(async () => {
+    try {
+      const data = await getStoreTypes(category === 'All' ? '' : category);
+      setTypes(data.types || []);
+    } catch (error) {
+      console.error('Failed to load types', error);
+    }
+  }, [category]);
+
   const fetchProducts = useCallback(async () => {
     const data = await getStoreProducts({ query: debouncedQuery, category: category === 'All' ? '' : category });
     return data.products;
@@ -32,6 +42,10 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
 
   const { items: products, loading, error, refresh } = useAsyncList(fetchProducts, []);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadTypes();
+  }, [loadTypes]);
 
   const handleAdd = (product) => {
     if (!isAuthenticated) {
@@ -139,6 +153,33 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
                 <Text style={styles.filterText}>Filter</Text>
               </TouchableOpacity>
             </View>
+
+            {types.length > 0 ? (
+              <View style={styles.typeSection}>
+                <Text style={styles.typeTitle}>Browse Types</Text>
+                <FlatList
+                  data={types}
+                  keyExtractor={(item) => item.label}
+                  numColumns={2}
+                  scrollEnabled={false}
+                  columnWrapperStyle={styles.typeRow}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.typeCard}
+                      onPress={() => onOpenProduct({ type: item.label, isType: true })}
+                    >
+                      <View style={styles.typeImage}>
+                        {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
+                      </View>
+                      <Text style={styles.typeLabel} numberOfLines={2}>
+                        {item.label}
+                      </Text>
+                      <Text style={styles.typeMeta}>{item.count} listings</Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            ) : null}
           </>
         )}
         renderItem={({ item }) => (
@@ -216,6 +257,24 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   filterText: { color: customerColors.primary, fontWeight: '700', fontSize: 12 },
+  typeSection: {
+    paddingHorizontal: customerSpacing.lg,
+    marginTop: customerSpacing.md,
+  },
+  typeTitle: { color: customerColors.text, fontWeight: '700', marginBottom: customerSpacing.sm },
+  typeRow: { justifyContent: 'space-between' },
+  typeCard: {
+    width: '48%',
+    backgroundColor: customerColors.card,
+    borderRadius: 16,
+    padding: customerSpacing.sm,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    marginBottom: customerSpacing.sm,
+  },
+  typeImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: customerColors.surface },
+  typeLabel: { color: customerColors.text, fontWeight: '700', marginTop: 8, fontSize: 12 },
+  typeMeta: { color: customerColors.muted, marginTop: 4, fontSize: 11 },
   grid: { paddingHorizontal: customerSpacing.lg, paddingBottom: 160 },
   gridRow: { justifyContent: 'space-between' },
   footerLoading: { alignItems: 'center', paddingVertical: customerSpacing.md },

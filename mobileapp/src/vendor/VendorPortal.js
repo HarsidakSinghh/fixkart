@@ -18,7 +18,6 @@ const TABS = [
   { key: 'inventory', label: 'Inventory', icon: 'box' },
   { key: 'orders', label: 'Orders', icon: 'shopping-bag' },
   { key: 'complaints', label: 'Support', icon: 'help-circle' },
-  { key: 'salesmen', label: 'Salesmen', icon: 'users' },
   { key: 'profile', label: 'Profile', icon: 'user' },
 ];
 
@@ -28,6 +27,7 @@ export default function VendorPortal() {
   const [ordersBadge, setOrdersBadge] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showPushDebug, setShowPushDebug] = useState(false);
+  const [showSalesmen, setShowSalesmen] = useState(false);
 
   const handleStatus = useCallback((nextStatus) => {
     if (nextStatus) {
@@ -73,14 +73,13 @@ export default function VendorPortal() {
     content = <VendorOrdersScreen />;
   } else if (active === 'complaints') {
     content = <VendorComplaintsScreen />;
-  } else if (active === 'salesmen') {
-    content = <VendorSalesmenScreen />;
   } else {
     content = (
       <VendorProfileScreen
         onStatusLoaded={handleStatus}
         onOpenNotifications={() => setShowNotifications(true)}
         onOpenPushDebug={() => setShowPushDebug(true)}
+        onOpenSalesmen={() => setShowSalesmen(true)}
       />
     );
   }
@@ -91,6 +90,10 @@ export default function VendorPortal() {
 
   if (showPushDebug) {
     return <NotificationDebugScreen onBack={() => setShowPushDebug(false)} />;
+  }
+
+  if (showSalesmen) {
+    return <VendorSalesmenScreen />;
   }
 
   return (

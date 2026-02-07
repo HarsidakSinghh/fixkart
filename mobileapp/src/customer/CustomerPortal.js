@@ -13,6 +13,7 @@ import CustomerSupportScreen from './CustomerSupportScreen';
 import CustomerSupportHistoryScreen from './CustomerSupportHistoryScreen';
 import CustomerNotificationsScreen from './CustomerNotificationsScreen';
 import NotificationDebugScreen from '../screens/NotificationDebugScreen';
+import CustomerTypeListingsScreen from './CustomerTypeListingsScreen';
 
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
@@ -48,6 +49,15 @@ export default function CustomerPortal({ onOpenLogin }) {
   }, []);
 
   if (detailProduct) {
+    if (detailProduct?.isType) {
+      return (
+        <CustomerTypeListingsScreen
+          typeLabel={detailProduct.type}
+          onBack={() => setDetailProduct(null)}
+          onOpenProduct={(product) => setDetailProduct(product)}
+        />
+      );
+    }
     return (
       <ProductDetailScreen
         product={detailProduct}
