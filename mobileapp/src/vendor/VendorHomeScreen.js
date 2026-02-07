@@ -13,13 +13,16 @@ import {
 } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getPublicCategories, submitVendorProduct } from './vendorApi';
-import { getStoreProducts } from '../customer/storeApi';
+import { getStoreProducts, getStoreTypes } from '../customer/storeApi';
 
 export default function VendorHomeScreen({ canAdd, status }) {
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState('');
+  const [types, setTypes] = useState([]);
+  const [activeType, setActiveType] = useState('');
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [typesLoading, setTypesLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [form, setForm] = useState({
@@ -63,12 +66,26 @@ export default function VendorHomeScreen({ canAdd, status }) {
     }
   }, [activeCategory]);
 
-  const loadCatalog = useCallback(async () => {
+  const loadTypes = useCallback(async () => {
     if (!activeCategory) return;
+    setTypesLoading(true);
+    try {
+      const data = await getStoreTypes(activeCategory === 'All' ? '' : activeCategory);
+      setTypes(data.types || []);
+    } catch (error) {
+      console.error('Failed to load types', error);
+    } finally {
+      setTypesLoading(false);
+    }
+  }, [activeCategory]);
+
+  const loadCatalog = useCallback(async () => {
+    if (!activeCategory || !activeType) return;
     setLoading(true);
     try {
       const data = await getStoreProducts({
         category: activeCategory === 'All' ? '' : activeCategory,
+        subCategory: activeType,
       });
       setCatalog(data.products || []);
     } catch (error) {
@@ -76,11 +93,15 @@ export default function VendorHomeScreen({ canAdd, status }) {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory]);
+  }, [activeCategory, activeType]);
 
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  useEffect(() => {
+    loadTypes();
+  }, [loadTypes]);
 
   useEffect(() => {
     loadCatalog();
@@ -115,6 +136,15 @@ export default function VendorHomeScreen({ canAdd, status }) {
     setMessage('');
     setShowAdvanced(false);
     setModalOpen(true);
+  };
+
+  const openType = (label) => {
+    setActiveType(label);
+  };
+
+  const resetTypes = () => {
+    setActiveType('');
+    setCatalog([]);
   };
 
   const handleSubmit = async () => {
@@ -184,56 +214,86 @@ export default function VendorHomeScreen({ canAdd, status }) {
 
   return (
     <View style={styles.container}>
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={vendorColors.primary} />
-          <Text style={styles.loadingText}>Loading products…</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={catalog}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.productList}
-          renderItem={renderCatalogItem}
-          ListHeaderComponent={
-            <View>
-              <View style={styles.heroCard}>
-                <Text style={styles.heroTitle}>Catalog</Text>
-                <Text style={styles.heroSubtitle}>Pick a product to add your inventory.</Text>
-                <View style={[styles.heroBadge, styles.heroBadgeSingle]}>
-                  <Text style={styles.heroBadgeText}>Status</Text>
-                  <Text style={styles.heroBadgeValue}>{status}</Text>
-                </View>
-              </View>
-
-              {!canAdd ? (
-                <View style={styles.banner}>
-                  <Text style={styles.bannerTitle}>Approval Pending</Text>
-                  <Text style={styles.bannerText}>You can add products after admin approval.</Text>
-                </View>
-              ) : null}
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryRow}
-              >
-                {categories.map((item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
-                    onPress={() => setActiveCategory(item)}
-                  >
-                    <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+      <FlatList
+        data={activeType ? catalog : types}
+        keyExtractor={(item) => item.id || item.label}
+        contentContainerStyle={styles.productList}
+        renderItem={activeType ? renderCatalogItem : ({ item }) => (
+          <TouchableOpacity style={styles.typeCard} onPress={() => openType(item.label)}>
+            <View style={styles.typeImage}>
+              {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
             </View>
-          }
-        />
-      )}
+            <Text style={styles.typeLabel} numberOfLines={2}>{item.label}</Text>
+            <Text style={styles.typeMeta}>{item.count} listings</Text>
+          </TouchableOpacity>
+        )}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.heroCard}>
+              <Text style={styles.heroTitle}>Catalog</Text>
+              <Text style={styles.heroSubtitle}>
+                {activeType ? `Products under ${activeType}` : 'Pick a type to add your inventory.'}
+              </Text>
+              <View style={[styles.heroBadge, styles.heroBadgeSingle]}>
+                <Text style={styles.heroBadgeText}>Status</Text>
+                <Text style={styles.heroBadgeValue}>{status}</Text>
+              </View>
+            </View>
+
+            {!canAdd ? (
+              <View style={styles.banner}>
+                <Text style={styles.bannerTitle}>Approval Pending</Text>
+                <Text style={styles.bannerText}>You can add products after admin approval.</Text>
+              </View>
+            ) : null}
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRow}
+            >
+              {categories.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
+                  onPress={() => {
+                    setActiveCategory(item);
+                    resetTypes();
+                  }}
+                >
+                  <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {activeType ? (
+              <View style={styles.activeTypeRow}>
+                <TouchableOpacity onPress={resetTypes}>
+                  <Text style={styles.backText}>← All types</Text>
+                </TouchableOpacity>
+                <Text style={styles.activeTypeLabel}>{activeType}</Text>
+              </View>
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          (activeType && !loading) || (!activeType && !typesLoading) ? (
+            <View style={styles.loadingWrap}>
+              <Text style={styles.loadingText}>No items found.</Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          loading || typesLoading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={vendorColors.primary} />
+              <Text style={styles.loadingText}>{activeType ? 'Loading products…' : 'Loading types…'}</Text>
+            </View>
+          ) : null
+        }
+      />
 
       <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>
         <View style={styles.modalOverlay}>
@@ -361,9 +421,30 @@ const styles = StyleSheet.create({
   categoryPillActive: { backgroundColor: vendorColors.primary, borderColor: vendorColors.primary },
   categoryText: { color: vendorColors.muted, fontWeight: '600', fontSize: 12 },
   categoryTextActive: { color: '#FFFFFF' },
+  activeTypeRow: {
+    marginHorizontal: vendorSpacing.lg,
+    marginTop: vendorSpacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backText: { color: vendorColors.primary, fontWeight: '700' },
+  activeTypeLabel: { color: vendorColors.text, fontWeight: '700' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: vendorColors.muted },
   productList: { padding: vendorSpacing.lg, paddingBottom: 120, paddingTop: 0 },
+  typeCard: {
+    width: '48%',
+    backgroundColor: vendorColors.card,
+    borderRadius: 16,
+    padding: vendorSpacing.sm,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    marginBottom: vendorSpacing.sm,
+  },
+  typeImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: vendorColors.surface },
+  typeLabel: { color: vendorColors.text, fontWeight: '700', marginTop: 8, fontSize: 12 },
+  typeMeta: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
   productCard: {
     backgroundColor: vendorColors.card,
     borderRadius: 16,

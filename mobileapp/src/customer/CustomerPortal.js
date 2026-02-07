@@ -55,6 +55,7 @@ export default function CustomerPortal({ onOpenLogin }) {
           typeLabel={detailProduct.type}
           onBack={() => setDetailProduct(null)}
           onOpenProduct={(product) => setDetailProduct(product)}
+          onOpenLogin={onOpenLogin}
         />
       );
     }

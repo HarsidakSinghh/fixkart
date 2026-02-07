@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { getTypeListings } from './storeApi';
+import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
-export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenProduct }) {
+export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenProduct, onOpenLogin }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { addItem } = useCart();
+  const { isAuthenticated } = useAuth();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -22,6 +26,24 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleAdd = (item) => {
+    if (!isAuthenticated) {
+      onOpenLogin?.();
+      return;
+    }
+    if (typeof item.quantity === 'number' && item.quantity <= 0) {
+      Alert.alert('Out of stock', 'This item is currently unavailable.');
+      return;
+    }
+    const result = addItem(item);
+    if (!result.added) {
+      const label = result.maxQty ? `Only ${result.maxQty} left in stock.` : 'Stock limit reached.';
+      Alert.alert('Stock limit reached', label);
+      return;
+    }
+    Alert.alert('Added to cart', `${item.name} has been added.`);
+  };
 
   return (
     <View style={styles.container}>
@@ -45,14 +67,18 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.listingCard} onPress={() => onOpenProduct(item)}>
-              <View style={styles.cardTop}>
-                <View>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
-                  <Text style={styles.cardVendor} numberOfLines={1}>{item.vendorName}</Text>
+              <Image source={{ uri: item.image }} style={styles.cardImage} />
+              <View style={styles.cardBody}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.cardVendor} numberOfLines={1}>{item.vendorName}</Text>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardPrice}>₹{Math.round(item.price || 0)}</Text>
+                  <Text style={styles.cardMeta}>Qty: {item.quantity ?? 0}</Text>
                 </View>
-                <Text style={styles.cardPrice}>₹{Math.round(item.price || 0)}</Text>
+                <TouchableOpacity style={styles.addButton} onPress={() => handleAdd(item)}>
+                  <Text style={styles.addText}>Add to cart</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.cardMeta}>Qty: {item.quantity ?? 0}</Text>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
@@ -82,15 +108,32 @@ const styles = StyleSheet.create({
   emptyText: { color: customerColors.muted },
   listingCard: {
     backgroundColor: customerColors.card,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: customerSpacing.md,
     borderWidth: 1,
     borderColor: customerColors.border,
     marginBottom: customerSpacing.sm,
+    flexDirection: 'row',
+    gap: 12,
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  cardTitle: { color: customerColors.text, fontWeight: '700', flex: 1 },
+  cardImage: {
+    width: 92,
+    height: 92,
+    borderRadius: 14,
+    backgroundColor: customerColors.surface,
+  },
+  cardBody: { flex: 1, justifyContent: 'space-between' },
+  cardTitle: { color: customerColors.text, fontWeight: '700' },
   cardVendor: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   cardPrice: { color: customerColors.primary, fontWeight: '800' },
-  cardMeta: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
+  cardMeta: { color: customerColors.muted, fontSize: 12 },
+  addButton: {
+    marginTop: 10,
+    backgroundColor: customerColors.primary,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  addText: { color: '#fff', fontWeight: '700', fontSize: 12 },
 });

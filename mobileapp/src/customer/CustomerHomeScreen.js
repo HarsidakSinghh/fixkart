@@ -1,15 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
-import ProductCard from './ProductCard';
-import { useAsyncList } from '../services/useAsyncList';
-import { getStoreProducts, getStoreTypes } from './storeApi';
-import { useCart } from '../context/CartContext';
+import { getStoreTypes } from './storeApi';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
-import { ErrorState } from '../components/StateViews';
 
 export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [query, setQuery] = useState('');
@@ -17,7 +13,6 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [category, setCategory] = useState('All');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [types, setTypes] = useState([]);
-  const { addItem, items: cartItems } = useCart();
   const { isAuthenticated, clearSession } = useAuth();
   const { signOut } = useClerkAuth();
 
@@ -26,60 +21,30 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     return () => clearTimeout(timer);
   }, [query]);
 
+  const [loadingTypes, setLoadingTypes] = useState(false);
+
   const loadTypes = useCallback(async () => {
+    setLoadingTypes(true);
     try {
       const data = await getStoreTypes(category === 'All' ? '' : category);
       setTypes(data.types || []);
     } catch (error) {
       console.error('Failed to load types', error);
+    } finally {
+      setLoadingTypes(false);
     }
   }, [category]);
-
-  const fetchProducts = useCallback(async () => {
-    const data = await getStoreProducts({ query: debouncedQuery, category: category === 'All' ? '' : category });
-    return data.products;
-  }, [debouncedQuery, category]);
-
-  const { items: products, loading, error, refresh } = useAsyncList(fetchProducts, []);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadTypes();
   }, [loadTypes]);
 
-  const handleAdd = (product) => {
-    if (!isAuthenticated) {
-      onOpenLogin();
-      return;
-    }
-    if (typeof product.quantity === 'number' && product.quantity <= 0) {
-      Alert.alert('Out of stock', 'This item is currently unavailable.');
-      return;
-    }
-    const available = typeof product.quantity === 'number' ? product.quantity : null;
-    const inCart = productsInCart(product.id, available);
-    if (!inCart) {
-      Alert.alert(
-        'Stock limit reached',
-        available ? `Only ${available} left in stock.` : 'You cannot add more than available stock.'
-      );
-      return;
-    }
-    const result = addItem(product);
-    if (!result.added) {
-      const label = result.maxQty ? `Only ${result.maxQty} left in stock.` : 'Stock limit reached.';
-      Alert.alert('Stock limit reached', label);
-      return;
-    }
-    Alert.alert('Added to cart', `${product.title || product.name} has been added.`);
-  };
-
-  function productsInCart(productId, maxQty) {
-    const cartItem = cartItems.find((item) => item.id === productId);
-    if (!cartItem) return true;
-    if (typeof maxQty !== 'number') return true;
-    return cartItem.qty < maxQty;
-  }
+  const filteredTypes = useMemo(() => {
+    if (!debouncedQuery) return types;
+    const needle = debouncedQuery.toLowerCase();
+    return types.filter((item) => item.label?.toLowerCase().includes(needle));
+  }, [types, debouncedQuery]);
 
   return (
     <View style={styles.container}>
@@ -97,18 +62,18 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
       />
 
       <FlatList
-        data={products}
-        keyExtractor={(item) => item.id}
+        data={filteredTypes}
+        keyExtractor={(item) => item.label}
         numColumns={2}
-        columnWrapperStyle={styles.gridRow}
-        contentContainerStyle={styles.grid}
+        columnWrapperStyle={styles.typeRow}
+        contentContainerStyle={styles.typesGrid}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={async () => {
               setRefreshing(true);
               try {
-                await refresh();
+                await loadTypes();
               } finally {
                 setRefreshing(false);
               }
@@ -116,20 +81,18 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
           />
         }
         ListEmptyComponent={
-          error ? (
-            <ErrorState message={error} onRetry={refresh} />
-          ) : !loading ? (
+          !loadingTypes ? (
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>No products found.</Text>
-              <Text style={styles.emptySubtext}>Try clearing filters or searching again.</Text>
+              <Text style={styles.emptyText}>No types found.</Text>
+              <Text style={styles.emptySubtext}>Try a different category or search.</Text>
             </View>
           ) : null
         }
         ListFooterComponent={
-          loading ? (
+          loadingTypes ? (
             <View style={styles.footerLoading}>
               <ActivityIndicator color={customerColors.primary} />
-              <Text style={styles.footerText}>Loading products…</Text>
+              <Text style={styles.footerText}>Loading types…</Text>
             </View>
           ) : null
         }
@@ -146,48 +109,30 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
 
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>{category === 'All' ? 'Top Products' : category}</Text>
-                <Text style={styles.sectionSubtitle}>{loading ? 'Loading products…' : `${products.length} items`}</Text>
+                <Text style={styles.sectionTitle}>{category === 'All' ? 'Browse Types' : category}</Text>
+                <Text style={styles.sectionSubtitle}>
+                  {loadingTypes ? 'Loading types…' : `${filteredTypes.length} types`}
+                </Text>
               </View>
               <TouchableOpacity style={styles.filterButton} onPress={() => setDrawerOpen(true)}>
                 <Text style={styles.filterText}>Filter</Text>
               </TouchableOpacity>
             </View>
-
-            {types.length > 0 ? (
-              <View style={styles.typeSection}>
-                <Text style={styles.typeTitle}>Browse Types</Text>
-                <FlatList
-                  data={types}
-                  keyExtractor={(item) => item.label}
-                  numColumns={2}
-                  scrollEnabled={false}
-                  columnWrapperStyle={styles.typeRow}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.typeCard}
-                      onPress={() => onOpenProduct({ type: item.label, isType: true })}
-                    >
-                      <View style={styles.typeImage}>
-                        {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
-                      </View>
-                      <Text style={styles.typeLabel} numberOfLines={2}>
-                        {item.label}
-                      </Text>
-                      <Text style={styles.typeMeta}>{item.count} listings</Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            ) : null}
           </>
         )}
         renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            onPress={() => onOpenProduct(item)}
-            onAdd={() => handleAdd(item)}
-          />
+          <TouchableOpacity
+            style={styles.typeCard}
+            onPress={() => onOpenProduct({ type: item.label, isType: true })}
+          >
+            <View style={styles.typeImage}>
+              {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
+            </View>
+            <Text style={styles.typeLabel} numberOfLines={2}>
+              {item.label}
+            </Text>
+            <Text style={styles.typeMeta}>{item.count} listings</Text>
+          </TouchableOpacity>
         )}
       />
 
@@ -262,7 +207,7 @@ const styles = StyleSheet.create({
     marginTop: customerSpacing.md,
   },
   typeTitle: { color: customerColors.text, fontWeight: '700', marginBottom: customerSpacing.sm },
-  typeRow: { justifyContent: 'space-between' },
+  typeRow: { justifyContent: 'space-between', gap: 12 },
   typeCard: {
     width: '48%',
     backgroundColor: customerColors.card,
@@ -275,8 +220,7 @@ const styles = StyleSheet.create({
   typeImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: customerColors.surface },
   typeLabel: { color: customerColors.text, fontWeight: '700', marginTop: 8, fontSize: 12 },
   typeMeta: { color: customerColors.muted, marginTop: 4, fontSize: 11 },
-  grid: { paddingHorizontal: customerSpacing.lg, paddingBottom: 160 },
-  gridRow: { justifyContent: 'space-between' },
+  typesGrid: { paddingHorizontal: customerSpacing.lg, paddingBottom: 160, paddingTop: customerSpacing.md },
   footerLoading: { alignItems: 'center', paddingVertical: customerSpacing.md },
   footerText: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
   emptyWrap: { alignItems: 'center', paddingVertical: customerSpacing.xl },
