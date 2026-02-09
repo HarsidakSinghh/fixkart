@@ -1,0 +1,376 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. PRODUCT & INVENTORY
+// ==========================================
+
+model Product {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // --- OWNER TRACKING ---
+  vendorId       String   // Clerk User ID of the Seller
+  
+  // --- IDENTIFICATION ---
+  name           String   
+  title          String?  
+  slug           String   @unique
+  description    String?  
+  status         String   @default("PENDING") 
+
+  // --- HIERARCHY ---
+  category       String 
+  subCategory    String? 
+  subSubCategory String? 
+
+  // --- IMAGES ---
+  image          String 
+  imagePath      String? 
+  gallery        String[] 
+  
+  // --- PRICE & INVENTORY ---
+  price          Float    @default(0.0)
+  quantity       Int      @default(10)
+  sku            String?  @unique
+  
+  // --- SPECS ---
+  specs          Json?    
+  brand          String?
+  
+  // --- STATUS ---
+  isPublished    Boolean  @default(true)
+  isFeatured     Boolean  @default(false)
+
+  // --- RELATIONS ---
+  variants       Variant[]
+  orderItems     OrderItem[] 
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Variant {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  name      String 
+  price     Float
+  stock     Int     @default(0)
+  sku       String?
+  
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String  @db.ObjectId
+}
+
+// ==========================================
+// 2. VENDOR PROFILE
+// ==========================================
+
+model VendorProfile {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @unique // Clerk User ID
+
+  status         String   @default("PENDING")
+
+  // --- BASIC INFO ---
+  fullName       String
+  companyName    String?
+  gstNumber      String?
+  phone          String
+  email          String
+  address        String
+  city           String
+  state          String
+  postalCode     String
+
+  // --- BUSINESS DETAILS ---
+  category        String? 
+  businessType    String? 
+  yearsInBusiness String?
+  
+  // -- DOCS --
+  gstCertificateUrl  String?
+  msmeCertificateUrl String?
+  panCardUrl         String?
+  ownerPhotoUrl      String?
+  aadharCardUrl      String?
+
+  // --- KYC ---
+  idProofType    String 
+  idProofNumber  String
+  idProofUrl     String 
+
+  // --- BANKING ---
+  bankName           String
+  accountHolder      String
+  accountNumber      String
+  ifscCode           String
+  cancelledChequeUrl String?
+
+  // --- EXTRA ---
+  tradeLicense       String?
+  contactPerson      String?
+  alternateContact   String?
+  
+  // --- BACKUP CONTACTS ---
+  backup1Name        String?
+  backup1Phone       String?
+  backup1IdUrl       String?
+
+  backup2Name        String?
+  backup2Phone       String?
+  backup2IdUrl       String?
+  
+  // --- LOCATION ---
+  gpsLat             Float?
+  gpsLng             Float?
+  locationPhotoUrl   String
+
+  // --- RELATIONS ---
+  orderItems     OrderItem[] // Tracks items sold by this vendor
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ==========================================
+// 3. CUSTOMER PROFILE (B2B)
+// ==========================================
+
+model CustomerProfile {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @unique // Clerk User ID
+  
+  // --- BASIC INFO ---
+  fullName       String
+  companyName    String
+  phone          String
+  email          String
+  address        String
+  city           String
+  state          String
+  postalCode     String
+
+  // --- BUSINESS DETAILS ---
+  category        String?  
+  businessType    String?  
+  yearsInBusiness String?
+  gstNumber       String?
+  tradeLicense    String?
+  panNumber       String?
+
+  // --- DOCS ---
+  businessProofUrl   String?
+  idProofUrl         String?
+  gstCertificateUrl  String?
+  msmeCertificateUrl String?
+  panCardUrl         String?
+  aadharCardUrl      String?
+  ownerPhotoUrl      String?
+
+  // --- BANKING ---
+  bankName           String?
+  accountHolder      String?
+  accountNumber      String?
+  ifscCode           String?
+  cancelledChequeUrl String?
+
+  // --- BACKUP CONTACTS ---
+  backup1Name        String?
+  backup1Phone       String?
+  backup1IdUrl       String?
+
+  backup2Name        String?
+  backup2Phone       String?
+  backup2IdUrl       String?
+
+  // --- LOCATION ---
+  gpsLat             Float?
+  gpsLng             Float?
+  locationPhotoUrl   String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  status          String   @default("PENDING")
+}
+
+// ==========================================
+// 4. ORDER MANAGEMENT
+// ==========================================
+
+model Order {
+  id             String      @id @default(cuid()) @map("_id")
+  customerId     String      // Clerk User ID of customer
+  customerName   String?     
+  customerEmail  String?     
+  customerPhone  String?     
+
+  totalAmount    Float
+  status         String      @default("PENDING") 
+  
+  items          OrderItem[] 
+  
+  // Relation to Complaints
+  complaints     Complaint[]
+  
+  // --- NEW FIELDS FOR AUTOMATION ---
+  address        String?     // Stores JSON address
+  customerPoUrl  String?     // Stores the Purchase Order PDF link
+  invoiceUrl     String?     // Stores the Tax Invoice PDF link
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model OrderItem {
+  id             String   @id @default(cuid()) @map("_id")
+  
+  // Link to Order
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id])
+  
+  // Link to Product
+  productId      String   @db.ObjectId
+  product        Product  @relation(fields: [productId], references: [id])
+  
+  // Link to Vendor
+  vendorId       String   
+  vendor         VendorProfile @relation(fields: [vendorId], references: [userId])
+
+  quantity       Int
+  price          Float    
+  status         String   @default("PENDING") 
+
+  // --- DELIVERY & DOCS ---
+  deliveryDate      DateTime? 
+  transportSlipUrl  String?
+  billUrl           String?
+
+  // Relation to Refund
+  refundRequest     RefundRequest?
+
+  createdAt     DateTime @default(now())
+}
+
+// ==========================================
+// 5. RETURNS & COMPLAINTS
+// ==========================================
+
+model RefundRequest {
+  id            String    @id @default(cuid()) @map("_id")
+  
+  // Link to Item
+  orderItemId   String    @unique
+  item          OrderItem? @relation(fields: [orderItemId], references: [id])
+
+  vendorId      String
+  customerId    String
+  reason        String
+  status        String    @default("PENDING") 
+  proofImages   String[]
+
+  // --- DISPUTE INFO ---
+  vendorRejectionReason String?
+  vendorRejectionProof  String[]
+  adminResolution       String?
+
+  messages     RefundChat[] 
+
+  createdAt    DateTime  @default(now())
+}
+
+model Complaint {
+  id            String   @id @default(cuid()) @map("_id")
+  
+  // Link to Order
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id])
+
+  vendorId      String?  
+  customerId    String
+  message       String
+  status        String   @default("OPEN") 
+  
+  vendorSolution     String?    
+  closureRequestedAt DateTime?
+  proofImages        String[] 
+
+  createdAt     DateTime @default(now())
+}
+
+model RefundChat {
+  id              String        @id @default(cuid()) @map("_id")
+  refundRequestId String
+  refundRequest   RefundRequest @relation(fields: [refundRequestId], references: [id])
+  
+  senderId        String        
+  senderRole      String        // "ADMIN" | "VENDOR"
+  message         String
+  
+  createdAt       DateTime      @default(now())
+  @@map("RefundChat")
+}
+
+// ==========================================
+// 6. SALESMAN TRACKING SYSTEM
+// ==========================================
+
+model Salesman {
+  id          String   @id @default(cuid()) @map("_id")
+  vendorId    String   // Linked to the Vendor (Clerk User ID)
+  
+  name        String
+  phone       String   @unique
+  code        String   @unique // Access Code for Login (e.g., "1234")
+  
+  status      String   @default("INACTIVE") // "ACTIVE", "INACTIVE"
+  
+  // Real-time current location (for quick map view)
+  currentLat  Float?
+  currentLng  Float?
+  lastUpdated DateTime?
+
+  // Relations
+  trackingLogs     TrackingLog[]
+  visitCheckpoints VisitCheckpoint[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 1. RAW PATH (Draws the Blue Line)
+model TrackingLog {
+  id         String   @id @default(cuid()) @map("_id")
+  salesmanId String
+  salesman   Salesman @relation(fields: [salesmanId], references: [id], onDelete: Cascade)
+  
+  lat        Float
+  lng        Float
+  timestamp  DateTime @default(now())
+}
+
+// 2. WORK CHECKPOINTS (Draws the Pins/Markers)
+model VisitCheckpoint {
+  id          String   @id @default(cuid()) @map("_id")
+  salesmanId  String
+  salesman    Salesman @relation(fields: [salesmanId], references: [id], onDelete: Cascade)
+  vendorId    String
+  
+  // Location where action happened
+  lat         Float
+  lng         Float
+  
+  // Details
+  type        String   // "START_DUTY", "SHOP_VISIT", "ORDER_TAKEN", "END_DUTY"
+  shopName    String?
+  notes       String?
+  imageUrl    String?  // Proof photo from Cloudinary
+  
+  createdAt   DateTime @default(now())
+}
