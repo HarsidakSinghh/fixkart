@@ -64,6 +64,12 @@ export async function getSalesmanVisits() {
   return authFetch('/api/mobile/salesman/visits');
 }
 
+export async function deleteSalesmanVisit(id) {
+  return authFetch(`/api/mobile/salesman/visits/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function startDay(lat, lng) {
   return authFetch('/api/mobile/salesman/day/start', {
     method: 'POST',

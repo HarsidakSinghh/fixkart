@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
-import { getSalesmanDashboard, getSalesmanBeats, getSalesmanVisits, startDay, endDay, startVisit } from './salesmanApi';
+import { getSalesmanDashboard, getSalesmanBeats, getSalesmanVisits, startDay, endDay, startVisit, deleteSalesmanVisit } from './salesmanApi';
 import { useAuth } from '../context/AuthContext';
 
 export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
@@ -127,7 +127,12 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
             ) : null}
             {visit.note ? <Text style={styles.beatNote}>{visit.note}</Text> : null}
           </View>
-          <Text style={styles.visitDate}>{new Date(visit.createdAt).toLocaleDateString()}</Text>
+          <View style={styles.visitRight}>
+            <Text style={styles.visitDate}>{new Date(visit.createdAt).toLocaleDateString()}</Text>
+            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteVisit(visit.id)}>
+              <Text style={styles.deleteText}>X</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ))}
     </View>
@@ -200,7 +205,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: salesmanSpacing.sm,
   },
+  visitRight: { alignItems: 'flex-end', gap: 8 },
   visitDate: { color: salesmanColors.muted, fontSize: 11 },
+  deleteBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FDECEC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F5C2C2',
+  },
+  deleteText: { color: '#C0392B', fontSize: 12, fontWeight: '800' },
   beatCard: {
     backgroundColor: salesmanColors.card,
     borderRadius: 14,
@@ -217,3 +234,17 @@ const styles = StyleSheet.create({
   visitButton: { backgroundColor: salesmanColors.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: salesmanColors.border },
   visitText: { color: salesmanColors.primary, fontWeight: '700', fontSize: 11 },
 });
+  const handleDeleteVisit = (visitId) => {
+    Alert.alert('Delete visit', 'Remove this visit record?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteSalesmanVisit(visitId);
+          const visitsData = await getSalesmanVisits();
+          setRecentVisits(visitsData.visits || []);
+        },
+      },
+    ]);
+  };
