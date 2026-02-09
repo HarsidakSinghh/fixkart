@@ -109,7 +109,11 @@ export async function PATCH(
   };
 
   if (Object.keys(specPayload).length > 0) {
-    nextData.specs = { ...(product.specs || {}), ...specPayload };
+    const currentSpecs =
+      product.specs && typeof product.specs === "object" && !Array.isArray(product.specs)
+        ? product.specs
+        : {};
+    nextData.specs = { ...(currentSpecs as Record<string, any>), ...specPayload };
     requiresReview = true;
   }
 
