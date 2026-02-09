@@ -117,15 +117,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardImage: {
-    width: 92,
-    height: 92,
+    width: 104,
+    height: 104,
     borderRadius: 14,
     backgroundColor: customerColors.surface,
   },
   cardBody: { flex: 1, justifyContent: 'space-between' },
   cardTitle: { color: customerColors.text, fontWeight: '700' },
   cardVendor: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, alignItems: 'center' },
   cardPrice: { color: customerColors.primary, fontWeight: '800' },
   cardMeta: { color: customerColors.muted, fontSize: 12 },
   addButton: {

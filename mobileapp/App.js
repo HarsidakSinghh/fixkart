@@ -289,7 +289,9 @@ function AppGate() {
         }}
         onLoginSuccess={(selectedRole) => {
           setShowLogin(false);
+          setRoleSyncing(true);
           setPortalPersist(selectedRole || loginMode || 'customer');
+          setTimeout(() => setRoleSyncing(false), 1500);
         }}
       />
     );

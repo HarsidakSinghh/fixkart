@@ -49,18 +49,29 @@ export async function GET(req: Request) {
     take: 100,
   });
 
-  const mapped = products.map((p) => ({
-    id: p.id,
-    name: p.title || p.name,
-    category: p.category,
-    subCategory: p.subCategory,
-    subSubCategory: p.subSubCategory,
-    price: p.price,
-    image: p.image,
-    gallery: p.gallery || [],
-    description: p.description || "No description provided.",
-    quantity: p.quantity || 0,
-  }));
+  const mapped = products.map((p) => {
+    const specs: any = p.specs || {};
+    const description =
+      p.description ||
+      specs.description ||
+      specs.features ||
+      specs.details ||
+      null;
+    return {
+      id: p.id,
+      name: p.title || p.name,
+      category: p.category,
+      subCategory: p.subCategory,
+      subSubCategory: p.subSubCategory,
+      price: p.price,
+      image: p.image,
+      gallery: p.gallery || [],
+      description: description || "No description provided.",
+      quantity: p.quantity || 0,
+      specs: p.specs || null,
+      brand: p.brand || null,
+    };
+  });
 
   return NextResponse.json({ products: mapped });
 }

@@ -12,6 +12,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
+  const specs: any = product.specs || {};
+  const description =
+    product.description ||
+    specs.description ||
+    specs.features ||
+    specs.details ||
+    null;
+
   const mapped = {
     id: product.id,
     name: product.title || product.name,
@@ -21,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     price: product.price,
     image: product.image,
     gallery: product.gallery || [],
-    description: product.description || "No description provided.",
+    description: description || "No description provided.",
     quantity: product.quantity || 0,
     specs: product.specs || null,
     brand: product.brand || null,

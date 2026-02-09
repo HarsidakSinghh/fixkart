@@ -127,6 +127,10 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
           >
             <View style={styles.typeImage}>
               {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
+              <View style={styles.typeOverlay} />
+              <View style={styles.typeBadge}>
+                <Text style={styles.typeBadgeText}>{item.count}</Text>
+              </View>
             </View>
             <Text style={styles.typeLabel} numberOfLines={2}>
               {item.label}
@@ -153,7 +157,7 @@ const styles = StyleSheet.create({
     marginTop: customerSpacing.lg,
     backgroundColor: customerColors.surface,
     borderRadius: 22,
-    padding: customerSpacing.lg,
+    padding: customerSpacing.md,
     borderWidth: 1,
     borderColor: customerColors.border,
     shadowColor: customerColors.shadow,
@@ -171,19 +175,21 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: customerColors.text,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     marginTop: customerSpacing.sm,
   },
-  heroSubtitle: { color: customerColors.muted, fontSize: 13, marginTop: 6 },
+  heroSubtitle: { color: customerColors.muted, fontSize: 12, marginTop: 6 },
   heroButton: {
-    marginTop: customerSpacing.md,
-    backgroundColor: customerColors.primary,
-    paddingVertical: 10,
-    borderRadius: 12,
+    marginTop: customerSpacing.sm,
+    backgroundColor: customerColors.card,
+    paddingVertical: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: customerColors.border,
   },
-  heroButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+  heroButtonText: { color: customerColors.primary, fontWeight: '700', fontSize: 12 },
   sectionHeader: {
     paddingHorizontal: customerSpacing.lg,
     marginTop: customerSpacing.lg,
@@ -218,6 +224,24 @@ const styles = StyleSheet.create({
     marginBottom: customerSpacing.sm,
   },
   typeImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: customerColors.surface },
+  typeOverlay: {
+    position: 'absolute',
+    inset: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    borderRadius: 12,
+  },
+  typeBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  typeBadgeText: { fontSize: 10, fontWeight: '700', color: customerColors.primary },
   typeLabel: { color: customerColors.text, fontWeight: '700', marginTop: 8, fontSize: 12 },
   typeMeta: { color: customerColors.muted, marginTop: 4, fontSize: 11 },
   typesGrid: { paddingHorizontal: customerSpacing.lg, paddingBottom: 160, paddingTop: customerSpacing.md },

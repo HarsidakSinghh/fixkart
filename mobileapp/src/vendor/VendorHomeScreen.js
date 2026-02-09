@@ -219,94 +219,42 @@ export default function VendorHomeScreen({ canAdd, status }) {
 
   return (
     <View style={styles.container}>
-      <View>
-        <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>Catalog</Text>
-          <Text style={styles.heroSubtitle}>
-            {activeType ? `Products under ${activeType}` : 'Pick a type to add your inventory.'}
-          </Text>
-          <View style={[styles.heroBadge, styles.heroBadgeSingle]}>
-            <Text style={styles.heroBadgeText}>Status</Text>
-            <Text style={styles.heroBadgeValue}>{status}</Text>
-          </View>
-        </View>
-
-        {!canAdd ? (
-          <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>Approval Pending</Text>
-            <Text style={styles.bannerText}>You can add products after admin approval.</Text>
-          </View>
-        ) : null}
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryRow}
-        >
-          {categories.map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
-              onPress={() => {
-                setActiveCategory(item);
-                resetTypes();
-              }}
-            >
-              <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <View style={styles.searchWrap}>
-          <TextInput
-            placeholder="Search products to add listing"
-            placeholderTextColor={vendorColors.muted}
-            value={search}
-            onChangeText={(value) => {
-              setSearch(value);
-              if (value.trim()) {
-                setActiveType('');
-              }
-            }}
-            style={styles.searchInput}
-          />
-          {search.trim() ? (
-            <TouchableOpacity style={styles.clearBtn} onPress={resetTypes}>
-              <Text style={styles.clearText}>Clear</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {activeType && !search.trim() ? (
-          <View style={styles.activeTypeRow}>
-            <TouchableOpacity onPress={resetTypes}>
-              <Text style={styles.backText}>← All types</Text>
-            </TouchableOpacity>
-            <Text style={styles.activeTypeLabel}>{activeType}</Text>
-          </View>
-        ) : null}
-      </View>
-
       <FlatList
-        key={showProducts ? 'products' : 'types'}
         data={showProducts ? catalog : types}
         keyExtractor={(item) => item.id || item.label}
-        numColumns={showProducts ? 1 : 2}
-        columnWrapperStyle={showProducts ? undefined : styles.typeRow}
+        numColumns={2}
+        columnWrapperStyle={styles.typeRow}
         contentContainerStyle={styles.productList}
-        renderItem={showProducts ? renderCatalogItem : ({ item }) => (
-          <TouchableOpacity style={styles.typeCard} onPress={() => openType(item.label)}>
-            <View style={styles.typeImage}>
-              {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
+        renderItem={({ item }) =>
+          showProducts ? (
+            <View style={styles.productGridCard}>
+              <Image source={{ uri: item.image }} style={styles.productGridImage} />
+              <Text style={styles.productGridTitle} numberOfLines={2}>
+                {item.title || item.name}
+              </Text>
+              <Text style={styles.productGridMeta} numberOfLines={1}>
+                {item.subCategory || item.category}
+              </Text>
+              <TouchableOpacity
+                style={[styles.productGridButton, !canAdd && styles.addButtonDisabled]}
+                onPress={() => canAdd && openModal(item)}
+                disabled={!canAdd}
+              >
+                <Text style={styles.productGridText}>{canAdd ? 'Add' : 'Locked'}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.typeLabel} numberOfLines={2}>{item.label}</Text>
-            <TouchableOpacity style={styles.typeAction} onPress={() => openType(item.label)}>
-              <Text style={styles.typeActionText}>Add listing</Text>
+          ) : (
+            <TouchableOpacity style={styles.typeCard} onPress={() => openType(item.label)}>
+              <View style={styles.typeImage}>
+                {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
+              </View>
+              <Text style={styles.typeLabel} numberOfLines={2}>{item.label}</Text>
+              <TouchableOpacity style={styles.typeAction} onPress={() => openType(item.label)}>
+                <Text style={styles.typeActionText}>Add listing</Text>
+              </TouchableOpacity>
             </TouchableOpacity>
-          </TouchableOpacity>
-        )}
+          )
+        }
         ListEmptyComponent={
           (showProducts && !loading) || (!showProducts && !typesLoading) ? (
             <View style={styles.loadingWrap}>
@@ -321,6 +269,78 @@ export default function VendorHomeScreen({ canAdd, status }) {
               <Text style={styles.loadingText}>{showProducts ? 'Loading products…' : 'Loading types…'}</Text>
             </View>
           ) : null
+        }
+        ListHeaderComponent={
+          <View>
+            <View style={styles.heroCard}>
+              <Text style={styles.heroTitle}>Catalog</Text>
+              <Text style={styles.heroSubtitle}>
+                {activeType ? `Products under ${activeType}` : 'Pick a type to add your inventory.'}
+              </Text>
+              <View style={[styles.heroBadge, styles.heroBadgeSingle]}>
+                <Text style={styles.heroBadgeText}>Status</Text>
+                <Text style={styles.heroBadgeValue}>{status}</Text>
+              </View>
+            </View>
+
+            {!canAdd ? (
+              <View style={styles.banner}>
+                <Text style={styles.bannerTitle}>Approval Pending</Text>
+                <Text style={styles.bannerText}>You can add products after admin approval.</Text>
+              </View>
+            ) : null}
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRow}
+            >
+              {categories.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
+                  onPress={() => {
+                    setActiveCategory(item);
+                    resetTypes();
+                  }}
+                >
+                  <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.searchWrap}>
+              <TextInput
+                placeholder="Search products to add listing"
+                placeholderTextColor={vendorColors.muted}
+                value={search}
+                onChangeText={(value) => {
+                  setSearch(value);
+                  if (value.trim()) {
+                    setActiveType('');
+                  }
+                }}
+                style={styles.searchInput}
+              />
+              {search.trim() ? (
+                <TouchableOpacity style={styles.clearBtn} onPress={resetTypes}>
+                  <Text style={styles.clearText}>Clear</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {activeType && !search.trim() ? (
+              <View style={styles.activeTypeRow}>
+                <TouchableOpacity onPress={resetTypes}>
+                  <Text style={styles.backText}>← All types</Text>
+                </TouchableOpacity>
+                <Text style={styles.activeTypeLabel}>{activeType}</Text>
+              </View>
+            ) : null}
+
+          </View>
         }
       />
 
@@ -507,6 +527,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeActionText: { color: '#fff', fontWeight: '700', fontSize: 11 },
+  productGridCard: {
+    flex: 1,
+    backgroundColor: vendorColors.card,
+    borderRadius: 16,
+    padding: vendorSpacing.sm,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    marginBottom: vendorSpacing.sm,
+  },
+  productGridImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: vendorColors.surface },
+  productGridTitle: { color: vendorColors.text, fontWeight: '700', marginTop: 8, fontSize: 12 },
+  productGridMeta: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
+  productGridButton: {
+    marginTop: 8,
+    backgroundColor: vendorColors.primary,
+    borderRadius: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  productGridText: { color: '#fff', fontWeight: '700', fontSize: 11 },
   productCard: {
     backgroundColor: vendorColors.card,
     borderRadius: 16,

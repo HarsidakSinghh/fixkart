@@ -134,7 +134,9 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
                     <Text style={styles.orderId}>Order #{item.id.slice(-6).toUpperCase()}</Text>
                     <Text style={styles.orderDate}>{new Date(item.createdAt).toDateString()}</Text>
                   </View>
-                <StatusPill label={item.status} tone={statusTone(item.status)} />
+                <View style={styles.statusWrap}>
+                  <StatusPill label={item.status} tone={statusTone(item.status)} />
+                </View>
                 </View>
 
                 <View style={styles.amountRow}>
@@ -208,6 +210,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: customerColors.text },
   subtitle: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
   list: { paddingHorizontal: customerSpacing.lg, paddingBottom: customerSpacing.lg },
+  statusWrap: { alignSelf: 'flex-start', marginTop: 2 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: customerColors.muted },
   emptyWrap: { alignItems: 'center', marginTop: 40 },

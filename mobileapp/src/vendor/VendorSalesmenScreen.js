@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert } 
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { createVendorSalesman, getVendorSalesmen } from './vendorApi';
 
-export default function VendorSalesmenScreen() {
+export default function VendorSalesmenScreen({ onBack }) {
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', code: '' });
@@ -54,6 +54,11 @@ export default function VendorSalesmenScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.heroCard}>
+        {onBack ? (
+          <TouchableOpacity onPress={onBack}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+        ) : null}
         <Text style={styles.title}>Salesmen</Text>
         <Text style={styles.subtitle}>Create and manage your field team</Text>
       </View>
@@ -127,6 +132,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 20, fontWeight: '800', color: vendorColors.text },
   subtitle: { color: vendorColors.muted, marginTop: 6, fontSize: 12 },
+  backText: { color: vendorColors.primary, fontWeight: '700', marginBottom: vendorSpacing.sm },
   card: {
     marginTop: vendorSpacing.md,
     backgroundColor: vendorColors.card,

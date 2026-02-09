@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getVendorOrders, markVendorOrderReady } from './vendorApi';
 import StatusPill from '../components/StatusPill';
@@ -86,6 +86,14 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
         renderItem={renderOrder}
         refreshing={loading}
         onRefresh={loadOrders}
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={vendorColors.primary} />
+              <Text style={styles.loadingText}>Loading orders…</Text>
+            </View>
+          ) : null
+        }
         ListHeaderComponent={
           <View>
             <View style={styles.heroCard}>
@@ -135,6 +143,8 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 20, fontWeight: '800', color: vendorColors.text },
   heroSubtitle: { color: vendorColors.muted, marginTop: 6, fontSize: 12 },
   list: { padding: vendorSpacing.lg, paddingBottom: 120 },
+  loadingWrap: { alignItems: 'center', paddingVertical: vendorSpacing.md },
+  loadingText: { marginTop: 8, color: vendorColors.muted, fontSize: 12 },
   card: {
     backgroundColor: vendorColors.card,
     borderRadius: 16,

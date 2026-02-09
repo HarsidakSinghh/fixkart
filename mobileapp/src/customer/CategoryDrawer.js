@@ -2,20 +2,21 @@ import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 
-const CATEGORIES = [
-  'All',
-  'Fastening & Joining',
-  'Electrical & Lighting',
-  'Tools & Hardware',
-  'Abrasives',
-  'Flow Control',
-  'Heating & Cooling',
-  'Fabricating',
-  'Lubricating',
-  'Material Handling',
-];
-
 export default function CategoryDrawer({ visible, active, onClose, onSelect }) {
+  const categories = [
+    'All',
+    'Fastening & Joining',
+    'Electrical & Lighting',
+    'Tools & Hardware',
+    'Abrasives',
+    'Flow Control',
+    'Heating & Cooling',
+    'Fabricating',
+    'Lubricating',
+    'Material Handling',
+  ];
+  const list = active && !categories.includes(active) ? [active, ...categories] : categories;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -23,7 +24,7 @@ export default function CategoryDrawer({ visible, active, onClose, onSelect }) {
         <View style={styles.panel}>
           <Text style={styles.title}>Browse Categories</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
-            {CATEGORIES.map((cat) => (
+            {list.map((cat) => (
               <TouchableOpacity
                 key={cat}
                 style={[styles.item, active === cat && styles.itemActive]}

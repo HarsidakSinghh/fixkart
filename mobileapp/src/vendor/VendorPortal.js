@@ -93,7 +93,7 @@ export default function VendorPortal() {
   }
 
   if (showSalesmen) {
-    return <VendorSalesmenScreen />;
+    return <VendorSalesmenScreen onBack={() => setShowSalesmen(false)} />;
   }
 
   return (
@@ -108,17 +108,19 @@ export default function VendorPortal() {
             onPress={() => setActive(tab.key)}
           >
             <View style={styles.tabLabel}>
-              <Feather
-                name={tab.icon}
-                size={16}
-                color={active === tab.key ? '#FFFFFF' : vendorColors.muted}
-              />
+              <View style={styles.iconWrap}>
+                <Feather
+                  name={tab.icon}
+                  size={18}
+                  color={active === tab.key ? '#FFFFFF' : vendorColors.muted}
+                />
+                {tab.key === 'orders' && ordersBadge > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{ordersBadge}</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={[styles.tabText, active === tab.key && styles.tabTextActive]}>{tab.label}</Text>
-              {tab.key === 'orders' && ordersBadge > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{ordersBadge}</Text>
-                </View>
-              ) : null}
             </View>
           </TouchableOpacity>
         ))}
@@ -141,15 +143,21 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingVertical: 6,
     borderRadius: 12,
     alignItems: 'center',
   },
   tabActive: { backgroundColor: vendorColors.primary },
-  tabText: { color: vendorColors.muted, fontWeight: '700', fontSize: 10 },
+  tabText: { color: vendorColors.muted, fontWeight: '700', fontSize: 10, marginTop: 4 },
   tabTextActive: { color: '#FFFFFF' },
-  tabLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabLabel: { alignItems: 'center', gap: 0 },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   badge: {
     minWidth: 18,
     height: 18,
@@ -157,6 +165,9 @@ const styles = StyleSheet.create({
     backgroundColor: vendorColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'absolute',
+    right: -6,
+    top: -6,
   },
   badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
 });

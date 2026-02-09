@@ -13,9 +13,49 @@ export async function PATCH(
 
   const resolved = await params;
   const body = await req.json();
-  const { price, quantity } = body || {};
+  const {
+    price,
+    quantity,
+    title,
+    description,
+    brand,
+    specs,
+    model,
+    mrp,
+    discountedPrice,
+    tieredPricing,
+    hsnCode,
+    returnsPolicy,
+    warrantyPolicy,
+    weight,
+    color,
+    material,
+    size,
+    certifications,
+    features,
+  } = body || {};
 
-  if (typeof price !== "number" && typeof quantity !== "number") {
+  if (
+    typeof price !== "number" &&
+    typeof quantity !== "number" &&
+    !title &&
+    !description &&
+    !brand &&
+    !specs &&
+    !model &&
+    !mrp &&
+    !discountedPrice &&
+    !tieredPricing &&
+    !hsnCode &&
+    !returnsPolicy &&
+    !warrantyPolicy &&
+    !weight &&
+    !color &&
+    !material &&
+    !size &&
+    !certifications &&
+    !features
+  ) {
     return NextResponse.json({ error: "No updates provided" }, { status: 400 });
   }
 
@@ -28,15 +68,54 @@ export async function PATCH(
   }
 
   const nextData: any = {};
+  let requiresReview = false;
   if (typeof price === "number") {
     nextData.price = price;
     if (price !== product.price) {
-      nextData.status = "PENDING";
-      nextData.isPublished = false;
+      requiresReview = true;
     }
   }
   if (typeof quantity === "number") {
     nextData.quantity = quantity;
+  }
+  if (title) {
+    nextData.title = title;
+    requiresReview = true;
+  }
+  if (description) {
+    nextData.description = description;
+    requiresReview = true;
+  }
+  if (brand) {
+    nextData.brand = brand;
+    requiresReview = true;
+  }
+
+  const specPayload = {
+    ...(typeof specs === "object" && specs ? specs : {}),
+    ...(model ? { model } : {}),
+    ...(mrp ? { mrp } : {}),
+    ...(discountedPrice ? { discountedPrice } : {}),
+    ...(tieredPricing ? { tieredPricing } : {}),
+    ...(hsnCode ? { hsnCode } : {}),
+    ...(returnsPolicy ? { returnsPolicy } : {}),
+    ...(warrantyPolicy ? { warrantyPolicy } : {}),
+    ...(weight ? { weight } : {}),
+    ...(color ? { color } : {}),
+    ...(material ? { material } : {}),
+    ...(size ? { size } : {}),
+    ...(certifications ? { certifications } : {}),
+    ...(features ? { features } : {}),
+  };
+
+  if (Object.keys(specPayload).length > 0) {
+    nextData.specs = { ...(product.specs || {}), ...specPayload };
+    requiresReview = true;
+  }
+
+  if (requiresReview) {
+    nextData.status = "PENDING";
+    nextData.isPublished = false;
   }
 
   const updated = await prisma.product.update({

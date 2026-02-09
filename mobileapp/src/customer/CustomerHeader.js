@@ -45,6 +45,9 @@ export default function CustomerHeader({
           onChangeText={onQueryChange}
           style={styles.search}
         />
+        <TouchableOpacity style={styles.filterChip} onPress={onToggleMenu}>
+          <Feather name="filter" size={14} color={customerColors.primary} />
+        </TouchableOpacity>
       </View>
       <View style={styles.categoryRow}>
         <Text style={styles.categoryLabel}>Category</Text>
@@ -117,19 +120,30 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: '#FFFFFF', fontWeight: '700', fontSize: 11 },
   searchWrap: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    backgroundColor: '#F7F9FF',
+    borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 2,
+    paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#E6ECFF',
   },
   search: {
-    paddingHorizontal: customerSpacing.md,
+    flex: 1,
+    paddingHorizontal: 6,
     paddingVertical: 10,
     fontSize: 14,
     color: customerColors.text,
+  },
+  filterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E6ECFF',
   },
   categoryRow: {
     marginTop: customerSpacing.sm,

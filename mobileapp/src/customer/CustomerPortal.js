@@ -135,17 +135,20 @@ export default function CustomerPortal({ onOpenLogin }) {
             onPress={() => setTab(item.key)}
           >
             <View style={styles.tabLabel}>
-              <Feather
-                name={item.icon}
-                size={16}
-                color={tab === item.key ? '#FFFFFF' : customerColors.muted}
-              />
+              <View style={styles.iconWrap}>
+                <Feather
+                  name={item.icon}
+                  size={18}
+                  color={tab === item.key ? customerColors.primary : customerColors.muted}
+                />
+                {item.key === 'orders' && orderBadge > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{orderBadge}</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Text>
-              {item.key === 'orders' && orderBadge > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{orderBadge}</Text>
-                </View>
-              ) : null}
+              {tab === item.key ? <View style={styles.activeLine} /> : null}
             </View>
           </TouchableOpacity>
         ))}
@@ -167,14 +170,28 @@ const styles = StyleSheet.create({
     backgroundColor: customerColors.card,
   },
   tabButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 14,
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
   },
-  tabActive: { backgroundColor: customerColors.primary },
-  tabText: { color: customerColors.muted, fontWeight: '700', fontSize: 12 },
-  tabTextActive: { color: '#FFFFFF' },
-  tabLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabActive: { backgroundColor: 'transparent' },
+  tabText: { color: customerColors.muted, fontWeight: '700', fontSize: 10, marginTop: 4 },
+  tabTextActive: { color: customerColors.primary },
+  tabLabel: { alignItems: 'center' },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeLine: {
+    marginTop: 6,
+    width: 18,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: customerColors.primary,
+  },
   badge: {
     minWidth: 18,
     height: 18,
@@ -182,6 +199,9 @@ const styles = StyleSheet.create({
     backgroundColor: customerColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'absolute',
+    top: -6,
+    right: -6,
   },
   badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
 });

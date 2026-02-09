@@ -1,12 +1,15 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { getStoreProduct } from './storeApi';
 
 export default function ProductDetailScreen({ product, onBack, onLogin }) {
   const { addItem } = useCart();
   const { isAuthenticated } = useAuth();
+  const [detail, setDetail] = useState(product);
+  const [loading, setLoading] = useState(false);
 
   const handleAdd = () => {
     if (!isAuthenticated) {
@@ -16,40 +19,71 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
     addItem(product);
   };
 
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      if (!product?.id) return;
+      if (product?.description) {
+        setDetail(product);
+        return;
+      }
+      try {
+        setLoading(true);
+        const data = await getStoreProduct(product.id);
+        if (mounted) setDetail(data.product || product);
+      } catch (_) {
+        if (mounted) setDetail(product);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [product]);
+
   if (!product) return null;
+  const view = detail || product;
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
       <View style={styles.imageWrap}>
-        <Image source={{ uri: product.image }} style={styles.image} />
+        <Image source={{ uri: view.image }} style={styles.image} />
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.title}>{product.name}</Text>
-        <Text style={styles.meta}>{product.subCategory || product.category}</Text>
+        <Text style={styles.title}>{view.title || view.name}</Text>
+        <Text style={styles.meta}>{view.subCategory || view.category}</Text>
 
         <View style={styles.priceRow}>
-          <Text style={styles.price}>₹{Math.round(product.price || 0)}</Text>
-          <Text style={styles.stock}>{product.quantity > 0 ? 'In stock' : 'Out of stock'}</Text>
+          <Text style={styles.price}>₹{Math.round(view.price || 0)}</Text>
+          <Text style={styles.stock}>{view.quantity > 0 ? 'In stock' : 'Out of stock'}</Text>
         </View>
 
+        <Text style={styles.sectionTitle}>Description</Text>
+        <Text style={styles.description}>
+          {loading ? 'Loading description…' : view.description || view.features || 'No description available yet.'}
+        </Text>
+      </View>
+      </ScrollView>
+      <View style={styles.stickyBar}>
         <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
           <Text style={styles.addText}>Add to Cart</Text>
         </TouchableOpacity>
-
-        <Text style={styles.sectionTitle}>Description</Text>
-        <Text style={styles.description}>{product.description}</Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: customerColors.bg },
+  scrollContent: { paddingBottom: 120 },
   backButton: { padding: customerSpacing.lg },
   backText: { color: customerColors.primary, fontWeight: '700' },
   imageWrap: {
@@ -68,13 +102,28 @@ const styles = StyleSheet.create({
   price: { fontSize: 22, fontWeight: '800', color: customerColors.primary },
   stock: { color: customerColors.success, fontWeight: '700', fontSize: 12 },
   addButton: {
-    marginTop: customerSpacing.lg,
     backgroundColor: customerColors.primary,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   addText: { color: '#FFFFFF', fontWeight: '700' },
   sectionTitle: { marginTop: customerSpacing.xl, fontWeight: '700', color: customerColors.text },
   description: { marginTop: customerSpacing.sm, color: customerColors.muted, lineHeight: 20 },
+  stickyBar: {
+    position: 'absolute',
+    left: customerSpacing.lg,
+    right: customerSpacing.lg,
+    bottom: customerSpacing.lg,
+    backgroundColor: customerColors.card,
+    padding: customerSpacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    shadowColor: customerColors.shadow,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
 });

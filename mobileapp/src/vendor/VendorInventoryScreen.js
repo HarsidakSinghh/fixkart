@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView, TextInput, ActivityIndicator, Modal } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getVendorListings, updateVendorListing } from './vendorApi';
 import StatusPill from '../components/StatusPill';
@@ -17,13 +17,20 @@ export default function VendorInventoryScreen() {
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [drafts, setDrafts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [detailModal, setDetailModal] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);
+  const [detailForm, setDetailForm] = useState({});
 
   const loadListings = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await getVendorListings();
       setListings(data.products || []);
     } catch (error) {
       console.error('Failed to load listings', error);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -88,7 +95,7 @@ export default function VendorInventoryScreen() {
           )}
         </View>
         <StatusPill label={statusLabel(item)} tone={statusTone(item)} />
-        <View style={styles.editRow}>
+        <View style={styles.actionRow}>
           {editingId === item.id ? (
             <>
               <TouchableOpacity
@@ -112,18 +119,47 @@ export default function VendorInventoryScreen() {
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => {
-                setDrafts((prev) => ({
-                  ...prev,
-                  [item.id]: { price: item.price ?? 0, quantity: item.quantity ?? 0 },
-                }));
-                setEditingId(item.id);
-              }}
-            >
-              <Text style={styles.editText}>Edit</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => {
+                  setDrafts((prev) => ({
+                    ...prev,
+                    [item.id]: { price: item.price ?? 0, quantity: item.quantity ?? 0 },
+                  }));
+                  setEditingId(item.id);
+                }}
+              >
+                <Text style={styles.editText}>Quick Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.detailsBtn}
+                onPress={() => {
+                  setDetailItem(item);
+                  setDetailForm({
+                    title: item.title || item.name || '',
+                    description: item.description || '',
+                    brand: item.brand || '',
+                    model: item.specs?.model || '',
+                    color: item.specs?.color || '',
+                    material: item.specs?.material || '',
+                    size: item.specs?.size || '',
+                    weight: item.specs?.weight || '',
+                    certifications: item.specs?.certifications || '',
+                    mrp: item.specs?.mrp || '',
+                    discountedPrice: item.specs?.discountedPrice || '',
+                    tieredPricing: item.specs?.tieredPricing || '',
+                    hsnCode: item.specs?.hsnCode || '',
+                    returnsPolicy: item.specs?.returnsPolicy || '',
+                    warrantyPolicy: item.specs?.warrantyPolicy || '',
+                    features: item.specs?.features || '',
+                  });
+                  setDetailModal(true);
+                }}
+              >
+                <Text style={styles.detailsText}>Edit Details</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -137,6 +173,14 @@ export default function VendorInventoryScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.productList}
         renderItem={renderListing}
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={vendorColors.primary} />
+              <Text style={styles.loadingText}>Loading inventory…</Text>
+            </View>
+          ) : null
+        }
         ListHeaderComponent={
           <View>
             <View style={styles.heroCard}>
@@ -169,6 +213,68 @@ export default function VendorInventoryScreen() {
           </View>
         }
       />
+      <Modal visible={detailModal} animationType="slide" transparent onRequestClose={() => setDetailModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Listing Details</Text>
+            <Text style={styles.modalSubtitle}>{detailItem?.title || detailItem?.name}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {renderInput('Title', 'title')}
+              {renderInput('Description', 'description', true)}
+              {renderInput('Brand', 'brand')}
+              {renderInput('Model', 'model')}
+              {renderInput('Color', 'color')}
+              {renderInput('Material', 'material')}
+              {renderInput('Size', 'size')}
+              {renderInput('Weight', 'weight')}
+              {renderInput('Certifications', 'certifications')}
+              {renderInput('MRP', 'mrp', false, 'numeric')}
+              {renderInput('Discounted Price', 'discountedPrice', false, 'numeric')}
+              {renderInput('Tiered Pricing', 'tieredPricing')}
+              {renderInput('HSN / SAC', 'hsnCode')}
+              {renderInput('Returns Policy', 'returnsPolicy', true)}
+              {renderInput('Warranty Policy', 'warrantyPolicy', true)}
+              {renderInput('Features', 'features', true)}
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setDetailModal(false)}>
+                <Text style={styles.cancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={async () => {
+                  if (!detailItem?.id) return;
+                  const payload = {
+                    title: detailForm.title,
+                    description: detailForm.description,
+                    brand: detailForm.brand,
+                    model: detailForm.model,
+                    color: detailForm.color,
+                    material: detailForm.material,
+                    size: detailForm.size,
+                    weight: detailForm.weight,
+                    certifications: detailForm.certifications,
+                    mrp: detailForm.mrp ? Number(detailForm.mrp) : undefined,
+                    discountedPrice: detailForm.discountedPrice ? Number(detailForm.discountedPrice) : undefined,
+                    tieredPricing: detailForm.tieredPricing,
+                    hsnCode: detailForm.hsnCode,
+                    returnsPolicy: detailForm.returnsPolicy,
+                    warrantyPolicy: detailForm.warrantyPolicy,
+                    features: detailForm.features,
+                  };
+                  const res = await updateVendorListing(detailItem.id, payload);
+                  setListings((prev) =>
+                    prev.map((p) => (p.id === detailItem.id ? { ...p, ...res.product } : p))
+                  );
+                  setDetailModal(false);
+                }}
+              >
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 
@@ -184,6 +290,22 @@ export default function VendorInventoryScreen() {
     if (item.status === 'PENDING') return 'warning';
     if (item.status === 'REJECTED') return 'danger';
     return 'warning';
+  }
+
+  function renderInput(label, key, multiline = false, keyboardType = 'default') {
+    return (
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        <TextInput
+          value={detailForm[key] ?? ''}
+          onChangeText={(value) => setDetailForm((prev) => ({ ...prev, [key]: value }))}
+          style={[styles.input, multiline && styles.inputMultiline]}
+          multiline={multiline}
+          keyboardType={keyboardType}
+          placeholderTextColor={vendorColors.muted}
+        />
+      </View>
+    );
   }
 }
 
@@ -292,7 +414,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: 0,
   },
-  editRow: { flexDirection: 'row', gap: vendorSpacing.sm, marginTop: vendorSpacing.sm },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: vendorSpacing.sm, marginTop: vendorSpacing.sm },
   editBtn: {
     alignSelf: 'flex-start',
     backgroundColor: vendorColors.surface,
@@ -303,6 +425,16 @@ const styles = StyleSheet.create({
     borderColor: vendorColors.border,
   },
   editText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
+  detailsBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: vendorColors.primary,
+    backgroundColor: 'rgba(26, 102, 73, 0.08)',
+  },
+  detailsText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
   saveBtn: {
     alignSelf: 'flex-start',
     backgroundColor: vendorColors.primary,
@@ -320,4 +452,35 @@ const styles = StyleSheet.create({
     borderColor: vendorColors.border,
   },
   cancelText: { color: vendorColors.muted, fontWeight: '700', fontSize: 11 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: vendorColors.card,
+    padding: vendorSpacing.lg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '88%',
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: vendorColors.text },
+  modalSubtitle: { color: vendorColors.muted, marginBottom: vendorSpacing.md },
+  inputGroup: { marginBottom: vendorSpacing.sm },
+  inputLabel: { color: vendorColors.muted, fontSize: 11, marginBottom: 6 },
+  input: {
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: vendorColors.text,
+    backgroundColor: vendorColors.surface,
+  },
+  inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: vendorSpacing.md,
+  },
 });
