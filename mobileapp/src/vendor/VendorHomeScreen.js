@@ -215,16 +215,88 @@ export default function VendorHomeScreen({ canAdd, status }) {
     </View>
   );
 
+  const showProducts = search.trim() || activeType;
+
   return (
     <View style={styles.container}>
+      <View>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroTitle}>Catalog</Text>
+          <Text style={styles.heroSubtitle}>
+            {activeType ? `Products under ${activeType}` : 'Pick a type to add your inventory.'}
+          </Text>
+          <View style={[styles.heroBadge, styles.heroBadgeSingle]}>
+            <Text style={styles.heroBadgeText}>Status</Text>
+            <Text style={styles.heroBadgeValue}>{status}</Text>
+          </View>
+        </View>
+
+        {!canAdd ? (
+          <View style={styles.banner}>
+            <Text style={styles.bannerTitle}>Approval Pending</Text>
+            <Text style={styles.bannerText}>You can add products after admin approval.</Text>
+          </View>
+        ) : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}
+        >
+          {categories.map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
+              onPress={() => {
+                setActiveCategory(item);
+                resetTypes();
+              }}
+            >
+              <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.searchWrap}>
+          <TextInput
+            placeholder="Search products to add listing"
+            placeholderTextColor={vendorColors.muted}
+            value={search}
+            onChangeText={(value) => {
+              setSearch(value);
+              if (value.trim()) {
+                setActiveType('');
+              }
+            }}
+            style={styles.searchInput}
+          />
+          {search.trim() ? (
+            <TouchableOpacity style={styles.clearBtn} onPress={resetTypes}>
+              <Text style={styles.clearText}>Clear</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {activeType && !search.trim() ? (
+          <View style={styles.activeTypeRow}>
+            <TouchableOpacity onPress={resetTypes}>
+              <Text style={styles.backText}>← All types</Text>
+            </TouchableOpacity>
+            <Text style={styles.activeTypeLabel}>{activeType}</Text>
+          </View>
+        ) : null}
+      </View>
+
       <FlatList
-        key={search.trim() ? 'search' : activeType ? 'catalog' : 'types'}
-        data={search.trim() || activeType ? catalog : types}
+        key={showProducts ? 'products' : 'types'}
+        data={showProducts ? catalog : types}
         keyExtractor={(item) => item.id || item.label}
-        numColumns={search.trim() || activeType ? 1 : 2}
-        columnWrapperStyle={search.trim() || activeType ? undefined : styles.typeRow}
+        numColumns={showProducts ? 1 : 2}
+        columnWrapperStyle={showProducts ? undefined : styles.typeRow}
         contentContainerStyle={styles.productList}
-        renderItem={search.trim() || activeType ? renderCatalogItem : ({ item }) => (
+        renderItem={showProducts ? renderCatalogItem : ({ item }) => (
           <TouchableOpacity style={styles.typeCard} onPress={() => openType(item.label)}>
             <View style={styles.typeImage}>
               {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
@@ -235,79 +307,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
             </TouchableOpacity>
           </TouchableOpacity>
         )}
-        ListHeaderComponent={
-          <View>
-            <View style={styles.heroCard}>
-              <Text style={styles.heroTitle}>Catalog</Text>
-              <Text style={styles.heroSubtitle}>
-                {activeType ? `Products under ${activeType}` : 'Pick a type to add your inventory.'}
-              </Text>
-              <View style={[styles.heroBadge, styles.heroBadgeSingle]}>
-                <Text style={styles.heroBadgeText}>Status</Text>
-                <Text style={styles.heroBadgeValue}>{status}</Text>
-              </View>
-            </View>
-
-            {!canAdd ? (
-              <View style={styles.banner}>
-                <Text style={styles.bannerTitle}>Approval Pending</Text>
-                <Text style={styles.bannerText}>You can add products after admin approval.</Text>
-              </View>
-            ) : null}
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryRow}
-            >
-              {categories.map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={[styles.categoryPill, item === activeCategory && styles.categoryPillActive]}
-                  onPress={() => {
-                    setActiveCategory(item);
-                    resetTypes();
-                  }}
-                >
-                  <Text style={[styles.categoryText, item === activeCategory && styles.categoryTextActive]}>
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.searchWrap}>
-              <TextInput
-                placeholder="Search products to add listing"
-                placeholderTextColor={vendorColors.muted}
-                value={search}
-                onChangeText={(value) => {
-                  setSearch(value);
-                  if (value.trim()) {
-                    setActiveType('');
-                  }
-                }}
-                style={styles.searchInput}
-              />
-              {search.trim() ? (
-                <TouchableOpacity style={styles.clearBtn} onPress={resetTypes}>
-                  <Text style={styles.clearText}>Clear</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            {activeType && !search.trim() ? (
-              <View style={styles.activeTypeRow}>
-                <TouchableOpacity onPress={resetTypes}>
-                  <Text style={styles.backText}>← All types</Text>
-                </TouchableOpacity>
-                <Text style={styles.activeTypeLabel}>{activeType}</Text>
-              </View>
-            ) : null}
-          </View>
-        }
         ListEmptyComponent={
-          (activeType && !loading) || (!activeType && !typesLoading) ? (
+          (showProducts && !loading) || (!showProducts && !typesLoading) ? (
             <View style={styles.loadingWrap}>
               <Text style={styles.loadingText}>No items found.</Text>
             </View>
@@ -317,7 +318,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
           loading || typesLoading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator color={vendorColors.primary} />
-              <Text style={styles.loadingText}>{activeType ? 'Loading products…' : 'Loading types…'}</Text>
+              <Text style={styles.loadingText}>{showProducts ? 'Loading products…' : 'Loading types…'}</Text>
             </View>
           ) : null
         }

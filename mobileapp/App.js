@@ -193,6 +193,7 @@ function AppGate() {
   const [showVendorRegister, setShowVendorRegister] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [roleSyncing, setRoleSyncing] = useState(false);
 
   useTokenRefresh();
   usePushNotifications({
@@ -228,7 +229,20 @@ function AppGate() {
     }
   }, [isAuthenticated, isSalesmanAuthenticated]);
 
-  if (isLoading || !portalReady) {
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const target = isAdmin ? 'admin' : isVendor ? 'vendor' : null;
+    if (!target) return;
+    if (portal !== target) {
+      setRoleSyncing(true);
+      setPortalPersist(target);
+      const timer = setTimeout(() => setRoleSyncing(false), 600);
+      return () => clearTimeout(timer);
+    }
+    setRoleSyncing(false);
+  }, [isAuthenticated, isAdmin, isVendor, portal, setPortalPersist]);
+
+  if (isLoading || !portalReady || roleSyncing) {
     return <LoadingScreen />;
   }
 
