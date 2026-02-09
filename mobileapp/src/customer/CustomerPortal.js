@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import CustomerHomeScreen from './CustomerHomeScreen';
@@ -14,6 +14,8 @@ import CustomerSupportHistoryScreen from './CustomerSupportHistoryScreen';
 import CustomerNotificationsScreen from './CustomerNotificationsScreen';
 import NotificationDebugScreen from '../screens/NotificationDebugScreen';
 import CustomerTypeListingsScreen from './CustomerTypeListingsScreen';
+import { useAuth } from '../context/AuthContext';
+import { getCustomerProfile } from './customerApi';
 
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
@@ -23,6 +25,7 @@ const TABS = [
 ];
 
 export default function CustomerPortal({ onOpenLogin }) {
+  const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState('home');
   const [detailProduct, setDetailProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -31,6 +34,8 @@ export default function CustomerPortal({ onOpenLogin }) {
   const [showSupportHistory, setShowSupportHistory] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showPushDebug, setShowPushDebug] = useState(false);
+  const [profileGate, setProfileGate] = useState(false);
+  const [profileChecking, setProfileChecking] = useState(false);
 
   async function refreshOrderBadge() {
     try {
@@ -47,6 +52,35 @@ export default function CustomerPortal({ onOpenLogin }) {
   useEffect(() => {
     refreshOrderBadge();
   }, []);
+
+  const checkProfile = useCallback(async () => {
+    if (!isAuthenticated) {
+      setProfileGate(false);
+      return;
+    }
+    setProfileChecking(true);
+    try {
+      const data = await getCustomerProfile();
+      const profile = data.profile || {};
+      const required = ['fullName', 'phone', 'address', 'city', 'state', 'postalCode'];
+      const incomplete = required.some((k) => !profile?.[k]);
+      if (incomplete) {
+        setProfileGate(true);
+        setTab('profile');
+      } else {
+        setProfileGate(false);
+      }
+    } catch (_) {
+      // Keep user in app if profile fetch fails
+      setProfileGate(false);
+    } finally {
+      setProfileChecking(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    checkProfile();
+  }, [checkProfile]);
 
   if (detailProduct) {
     if (detailProduct?.isType) {
@@ -120,6 +154,23 @@ export default function CustomerPortal({ onOpenLogin }) {
         onOpenSupportHistory={() => setShowSupportHistory(true)}
         onOpenNotifications={() => setShowNotifications(true)}
         onOpenPushDebug={() => setShowPushDebug(true)}
+        forceComplete={profileGate}
+        onCompleted={() => {
+          setProfileGate(false);
+          setTab('home');
+        }}
+      />
+    );
+  }
+
+  if (profileGate) {
+    content = (
+      <CustomerProfileScreen
+        forceComplete
+        onCompleted={() => {
+          setProfileGate(false);
+          setTab('home');
+        }}
       />
     );
   }
@@ -127,6 +178,7 @@ export default function CustomerPortal({ onOpenLogin }) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>{content}</View>
+      {profileGate ? null : (
       <View style={styles.bottomBar}>
         {TABS.map((item) => (
           <TouchableOpacity
@@ -153,6 +205,7 @@ export default function CustomerPortal({ onOpenLogin }) {
           </TouchableOpacity>
         ))}
       </View>
+      )}
     </View>
   );
 }

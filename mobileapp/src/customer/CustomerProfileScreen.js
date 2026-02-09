@@ -5,11 +5,11 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerProfile, updateCustomerProfile } from './customerApi';
 import { useAuth } from '../context/AuthContext';
 
-export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications, onOpenPushDebug }) {
+export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications, onOpenPushDebug, forceComplete = false, onCompleted }) {
   const { isAuthenticated } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(forceComplete);
   const [form, setForm] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [savedBilling, setSavedBilling] = useState(null);
@@ -52,6 +52,12 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
     }
   }, [loadProfile, isAuthenticated]);
 
+  useEffect(() => {
+    if (forceComplete) {
+      setEditing(true);
+    }
+  }, [forceComplete]);
+
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
@@ -84,25 +90,36 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
         <Text style={styles.subtitle}>{profile.email || ''}</Text>
         <Text style={styles.subtitle}>{profile.phone || ''}</Text>
         <View style={styles.heroActions}>
-          <TouchableOpacity style={styles.editBtn} onPress={() => setEditing((prev) => !prev)}>
-            <Text style={styles.editText}>{editing ? 'Cancel' : 'Update Profile'}</Text>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => !forceComplete && setEditing((prev) => !prev)}
+          >
+            <Text style={styles.editText}>
+              {forceComplete ? 'Complete Profile' : editing ? 'Cancel' : 'Update Profile'}
+            </Text>
           </TouchableOpacity>
-          {onOpenSupportHistory ? (
+          {!forceComplete && onOpenSupportHistory ? (
             <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenSupportHistory}>
               <Text style={styles.secondaryText}>Complaints & Refunds</Text>
             </TouchableOpacity>
           ) : null}
-          {onOpenNotifications ? (
+          {!forceComplete && onOpenNotifications ? (
             <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenNotifications}>
               <Text style={styles.secondaryText}>Notifications</Text>
             </TouchableOpacity>
           ) : null}
-          {onOpenPushDebug ? (
+          {!forceComplete && onOpenPushDebug ? (
             <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenPushDebug}>
               <Text style={styles.secondaryText}>Push Debug</Text>
             </TouchableOpacity>
           ) : null}
         </View>
+        {forceComplete ? (
+          <View style={styles.gateBanner}>
+            <Text style={styles.gateTitle}>Complete your profile</Text>
+            <Text style={styles.gateText}>Fill the required details to continue using the app.</Text>
+          </View>
+        ) : null}
       </View>
 
       {editing ? (
@@ -137,8 +154,12 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
                 } catch (_) {
                   // ignore
                 }
-                setEditing(false);
-                Alert.alert('Updated', 'Profile updated successfully.');
+                if (forceComplete && onCompleted) {
+                  onCompleted();
+                } else {
+                  setEditing(false);
+                }
+                Alert.alert('Updated', forceComplete ? 'Profile completed.' : 'Profile updated successfully.');
               } catch (error) {
                 Alert.alert('Error', 'Unable to update profile.');
               }
@@ -254,6 +275,16 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: customerColors.text },
   subtitle: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
   heroActions: { flexDirection: 'row', gap: 10, marginTop: customerSpacing.md, flexWrap: 'wrap' },
+  gateBanner: {
+    marginTop: customerSpacing.md,
+    padding: customerSpacing.md,
+    borderRadius: 14,
+    backgroundColor: customerColors.surface,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  gateTitle: { color: customerColors.text, fontWeight: '700' },
+  gateText: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
   editBtn: {
     marginTop: customerSpacing.md,
     alignSelf: 'flex-start',
