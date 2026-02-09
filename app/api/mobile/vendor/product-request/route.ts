@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     stock,
     returnsPolicy,
     warrantyPolicy,
+    commissionPercent,
   } = body || {};
 
   if (!name || !category || !price) {
@@ -61,6 +62,14 @@ export async function POST(req: Request) {
     hsnCode: hsnCode || null,
     returnsPolicy: returnsPolicy || null,
     warrantyPolicy: warrantyPolicy || null,
+    commissionPercent:
+      typeof commissionPercent === "number"
+        ? commissionPercent
+        : typeof commissionPercent === "string"
+        ? Number(commissionPercent)
+        : typeof specs === "object" && specs && (specs as any).commissionPercent
+        ? (specs as any).commissionPercent
+        : null,
   };
 
   let finalSku = sku || `${base?.sku || base?.name || name}-${guard.userId.slice(-4)}-${Date.now()}`;

@@ -112,6 +112,7 @@ export default function DashboardScreen({ onNavigate }) {
         <SectionHeader title="Order Performance" />
         <View style={styles.grid}>
           <StatCard label="Total Revenue" value={`₹${kpis.totalRevenue || 0}`} color={colors.accent} />
+          <StatCard label="Commission Earned" value={`₹${kpis.totalCommission || 0}`} color={colors.info} />
           <StatCard label="Pending Orders" value={kpis.orderPending || 0} color={colors.warning} />
           <StatCard label="Processing" value={kpis.orderApproved || 0} color={colors.info} />
           <StatCard label="Completed" value={kpis.orderCompleted || 0} color={colors.accent} />

@@ -44,6 +44,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     discountedPrice: '',
     tieredPricing: '',
     hsnCode: '',
+    commissionPercent: '',
     stock: '',
     returnsPolicy: '',
     warrantyPolicy: '',
@@ -116,8 +117,13 @@ export default function VendorHomeScreen({ canAdd, status }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.category || !form.price) {
+    const commissionValue = Number(form.commissionPercent);
+    if (!form.name || !form.category || !form.price || !form.commissionPercent) {
       setMessage('Name, category, and price are required.');
+      return;
+    }
+    if (Number.isNaN(commissionValue) || commissionValue < 5) {
+      setMessage('Commission must be at least 5%.');
       return;
     }
     setSubmitting(true);
@@ -139,6 +145,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
           material: form.material,
           size: form.size,
           certifications: form.certifications,
+          commissionPercent: commissionValue,
         },
         price: Number(form.price),
         mrp: form.mrp,
@@ -335,6 +342,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
               {renderInput('Subcategory', 'subCategory', true)}
               {renderInput('SKU / Part Number', 'sku', true)}
               {renderInput('Base Price', 'price')}
+              {renderInput('Platform Commission (%)', 'commissionPercent')}
               {renderInput('Stock / Availability', 'stock')}
 
               <TouchableOpacity

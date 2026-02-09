@@ -13,6 +13,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   const specs: any = product.specs || {};
+  const commissionPercent = Number(specs.commissionPercent || 0);
+  const displayPrice =
+    commissionPercent > 0 ? Math.round(product.price * (1 + commissionPercent / 100)) : product.price;
   const description =
     product.description ||
     specs.description ||
@@ -26,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     category: product.category,
     subCategory: product.subCategory,
     subSubCategory: product.subSubCategory,
-    price: product.price,
+    price: displayPrice,
     image: product.image,
     gallery: product.gallery || [],
     description: description || "No description provided.",

@@ -86,7 +86,11 @@ export async function POST(req: Request) {
       throw new Error(`Insufficient stock for ${product.title || product.name}`);
     }
 
-    const price = Number(product.price || 0);
+    const specs: any = product.specs || {};
+    const commissionPercent = Number(specs.commissionPercent || 0);
+    const basePrice = Number(product.price || 0);
+    const price =
+      commissionPercent > 0 ? Math.round(basePrice * (1 + commissionPercent / 100)) : basePrice;
     totalAmount += price * quantity;
 
     return {

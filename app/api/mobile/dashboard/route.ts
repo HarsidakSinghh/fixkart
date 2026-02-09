@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const [vendorStats, orderStats, revenueResult, recentVendors, recentOrders] =
+  const [vendorStats, orderStats, revenueResult, recentVendors, recentOrders, commissionOrders] =
     await Promise.all([
       prisma.vendorProfile.groupBy({
         by: ["status"],
@@ -44,6 +44,13 @@ export async function GET(req: Request) {
         },
         select: { createdAt: true, totalAmount: true },
       }),
+      prisma.order.findMany({
+        where: { status: { not: "REJECTED" } },
+        select: {
+          items: { include: { product: true } },
+        },
+        take: 200,
+      }),
     ]);
 
   const getCount = (arr: any[], status: string) =>
@@ -58,6 +65,17 @@ export async function GET(req: Request) {
   const orderApproved = getCount(orderStats, "APPROVED");
   const orderCompleted = getCount(orderStats, "COMPLETED");
   const totalRevenue = revenueResult._sum.totalAmount || 0;
+  let totalCommission = 0;
+  commissionOrders.forEach((order) => {
+    order.items.forEach((item) => {
+      const basePrice = Number(item.product?.price || 0);
+      const specs: any = item.product?.specs || {};
+      const commissionPercent = Number(specs.commissionPercent || 0);
+      if (commissionPercent > 0) {
+        totalCommission += basePrice * (commissionPercent / 100) * item.quantity;
+      }
+    });
+  });
 
   const chartDataMap = new Map<string, number>();
   for (let i = 6; i >= 0; i--) {
@@ -88,6 +106,7 @@ export async function GET(req: Request) {
       vendorApproved,
       vendorPending,
       vendorSuspended,
+      totalCommission: Math.round(totalCommission),
     },
     revenueByDay,
     recentVendors,

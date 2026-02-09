@@ -51,6 +51,9 @@ export async function GET(req: Request) {
 
   const mapped = products.map((p) => {
     const specs: any = p.specs || {};
+    const commissionPercent = Number(specs.commissionPercent || 0);
+    const displayPrice =
+      commissionPercent > 0 ? Math.round(p.price * (1 + commissionPercent / 100)) : p.price;
     const description =
       p.description ||
       specs.description ||
@@ -63,7 +66,7 @@ export async function GET(req: Request) {
       category: p.category,
       subCategory: p.subCategory,
       subSubCategory: p.subSubCategory,
-      price: p.price,
+      price: displayPrice,
       image: p.image,
       gallery: p.gallery || [],
       description: description || "No description provided.",
