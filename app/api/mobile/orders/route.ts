@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCustomer } from "@/lib/customer-guard";
 import { requireAdmin } from "@/lib/admin-guard";
+import { sendNotification } from "@/lib/notifications";
 
 export async function GET(req: Request) {
   const guard = await requireAdmin(req);
@@ -157,6 +158,16 @@ export async function POST(req: Request) {
 
       return order;
     });
+
+    try {
+      await sendNotification("ORDER_PLACED", {
+        toEmail: result.customerEmail || billing.email || guard.email || null,
+        name: billing.fullName,
+        orderId: result.id,
+      });
+    } catch (err) {
+      console.error("Order email failed", err);
+    }
 
     return NextResponse.json({ success: true, orderId: result.id });
   } catch (error: any) {
