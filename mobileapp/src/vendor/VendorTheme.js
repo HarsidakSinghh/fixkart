@@ -1,13 +1,13 @@
 export const vendorColors = {
-  bg: '#F5F7FB',
-  primary: '#0F5132',
-  primaryDark: '#0B3D25',
+  bg: '#F6FAFF',
+  primary: '#265998',
+  primaryDark: '#1D477A',
   accent: '#F4B740',
   text: '#0F172A',
-  muted: '#64748B',
+  muted: '#6B7A90',
   card: '#FFFFFF',
-  border: '#E2E8F0',
-  surface: '#EEF2F6',
+  border: '#DCE6F3',
+  surface: '#EEF4FB',
   shadow: 'rgba(15, 23, 42, 0.08)',
 };
 

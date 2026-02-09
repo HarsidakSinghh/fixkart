@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F6FAFF"
     },
     "ios": {
       "supportsTablet": true,
@@ -24,7 +24,7 @@
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#F6FAFF"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.fixkart.mobile"
