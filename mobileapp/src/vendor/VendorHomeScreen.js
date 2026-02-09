@@ -12,15 +12,15 @@ import {
   ScrollView,
 } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { getPublicCategories, submitVendorProduct, getVendorCatalogProducts, getVendorTypes } from './vendorApi';
+import { submitVendorProduct } from './vendorApi';
+import { VENDOR_INVENTORY } from '../data/vendorInventory';
 
 export default function VendorHomeScreen({ canAdd, status }) {
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState('');
   const [types, setTypes] = useState([]);
   const [activeType, setActiveType] = useState('');
-  const [catalog, setCatalog] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [typesLoading, setTypesLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -52,61 +52,19 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [message, setMessage] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const loadCategories = useCallback(async () => {
-    try {
-      const data = await getPublicCategories();
-      const list = data.categories || [];
-      const merged = ['All', ...list];
-      setCategories(merged);
-      if (!activeCategory && merged.length > 0) {
-        setActiveCategory('All');
-      }
-    } catch (error) {
-      console.error('Failed to load categories', error);
+  const loadCategories = useCallback(() => {
+    const titles = VENDOR_INVENTORY.map((cat) => cat.title);
+    const merged = ['All', ...titles];
+    setCategories(merged);
+    if (!activeCategory && merged.length > 0) {
+      setActiveCategory('All');
     }
+    setTypesLoading(false);
   }, [activeCategory]);
-
-  const loadTypes = useCallback(async () => {
-    if (!activeCategory) return;
-    setTypesLoading(true);
-    try {
-      const data = await getVendorTypes(activeCategory === 'All' ? '' : activeCategory);
-      setTypes(data.types || []);
-    } catch (error) {
-      console.error('Failed to load types', error);
-    } finally {
-      setTypesLoading(false);
-    }
-  }, [activeCategory]);
-
-  const loadCatalog = useCallback(async () => {
-    if (!activeCategory || (!activeType && !search.trim())) return;
-    setLoading(true);
-    try {
-      const data = await getVendorCatalogProducts({
-        category: activeCategory === 'All' ? '' : activeCategory,
-        subCategory: activeType,
-        query: search.trim(),
-      });
-      setCatalog(data.products || []);
-    } catch (error) {
-      console.error('Failed to load products', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeCategory, activeType, search]);
 
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
-
-  useEffect(() => {
-    loadTypes();
-  }, [loadTypes]);
-
-  useEffect(() => {
-    loadCatalog();
-  }, [loadCatalog]);
 
   const openModal = (product) => {
     const autoSku = product.sku || `${product.name || 'sku'}-${Date.now()}`;
@@ -139,15 +97,22 @@ export default function VendorHomeScreen({ canAdd, status }) {
     setModalOpen(true);
   };
 
-  const openType = (label) => {
+  const openType = (item) => {
     setSearch('');
-    setActiveType(label);
+    setActiveType(item.label);
+    openModal({
+      id: null,
+      name: item.label,
+      title: item.label,
+      category: item.category,
+      subCategory: item.label,
+      image: item.image,
+    });
   };
 
   const resetTypes = () => {
     setActiveType('');
     setSearch('');
-    setCatalog([]);
   };
 
   const handleSubmit = async () => {
@@ -158,7 +123,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
     setSubmitting(true);
     try {
       await submitVendorProduct({
-        baseProductId: selectedProduct.id,
+        baseProductId: selectedProduct.id || null,
+        imageUrl: selectedProduct.image || '',
         name: form.name,
         category: form.category,
         subCategory: form.subCategory,
@@ -216,12 +182,42 @@ export default function VendorHomeScreen({ canAdd, status }) {
   );
 
   const showProducts = search.trim() || activeType;
+  const inventoryTypes = useMemo(() => {
+    const baseUrl = process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL || 'https://fixkart-main.vercel.app';
+    const normalizePath = (path) => {
+      if (!path) return '';
+      const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
+      const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+      return encodeURI(normalized);
+    };
+    const selectedCategories =
+      activeCategory && activeCategory !== 'All'
+        ? VENDOR_INVENTORY.filter((cat) => cat.title === activeCategory)
+        : VENDOR_INVENTORY;
+    const types = [];
+    selectedCategories.forEach((cat) => {
+      cat.items.forEach((item) => {
+        types.push({
+          id: `${cat.title}-${item.name}`,
+          label: item.name,
+          category: cat.title,
+          image: item.imagePath ? `${baseUrl}${normalizePath(item.imagePath)}` : '',
+        });
+      });
+    });
+    return types;
+  }, [activeCategory]);
+  const filteredTypes = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return inventoryTypes;
+    return inventoryTypes.filter((item) => item.label.toLowerCase().includes(term));
+  }, [inventoryTypes, search]);
   const gridData = useMemo(() => {
-    const base = showProducts ? catalog : types;
+    const base = filteredTypes;
     if (!base || base.length === 0) return [];
     if (base.length % 2 === 0) return base;
     return [...base, { id: '__spacer__', spacer: true }];
-  }, [showProducts, catalog, types]);
+  }, [filteredTypes]);
 
   return (
     <View style={styles.container}>
@@ -234,48 +230,31 @@ export default function VendorHomeScreen({ canAdd, status }) {
         renderItem={({ item }) =>
           item.spacer ? (
             <View style={[styles.typeCard, styles.typeCardSpacer]} />
-          ) : showProducts ? (
-            <View style={styles.productGridCard}>
-              <Image source={{ uri: item.image }} style={styles.productGridImage} />
-              <Text style={styles.productGridTitle} numberOfLines={2}>
-                {item.title || item.name}
-              </Text>
-              <Text style={styles.productGridMeta} numberOfLines={1}>
-                {item.subCategory || item.category}
-              </Text>
-              <TouchableOpacity
-                style={[styles.productGridButton, !canAdd && styles.addButtonDisabled]}
-                onPress={() => canAdd && openModal(item)}
-                disabled={!canAdd}
-              >
-                <Text style={styles.productGridText}>{canAdd ? 'Add' : 'Locked'}</Text>
-              </TouchableOpacity>
-            </View>
           ) : (
-            <TouchableOpacity style={styles.typeCard} onPress={() => openType(item.label)}>
+            <TouchableOpacity style={styles.typeCard} onPress={() => openType(item)}>
               <View style={styles.typeImage}>
                 {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
                 <View style={styles.typeImageOverlay} />
               </View>
               <Text style={styles.typeLabel} numberOfLines={2}>{item.label}</Text>
-              <TouchableOpacity style={styles.typeAction} onPress={() => openType(item.label)}>
+              <TouchableOpacity style={styles.typeAction} onPress={() => openType(item)}>
                 <Text style={styles.typeActionText}>Add listing</Text>
               </TouchableOpacity>
             </TouchableOpacity>
           )
         }
         ListEmptyComponent={
-          (showProducts && !loading) || (!showProducts && !typesLoading) ? (
+          !typesLoading ? (
             <View style={styles.loadingWrap}>
               <Text style={styles.loadingText}>No items found.</Text>
             </View>
           ) : null
         }
         ListFooterComponent={
-          loading || typesLoading ? (
+          typesLoading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator color={vendorColors.primary} />
-              <Text style={styles.loadingText}>{showProducts ? 'Loading products…' : 'Loading types…'}</Text>
+              <Text style={styles.loadingText}>Loading types…</Text>
             </View>
           ) : null
         }
@@ -284,7 +263,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
             <View style={styles.heroCard}>
               <Text style={styles.heroTitle}>Catalog</Text>
               <Text style={styles.heroSubtitle}>
-                {activeType ? `Products under ${activeType}` : 'Pick a type to add your inventory.'}
+                {'Pick a product type to add your inventory.'}
               </Text>
               <View style={[styles.heroBadge, styles.heroBadgeSingle]}>
                 <Text style={styles.heroBadgeText}>Status</Text>
@@ -339,15 +318,6 @@ export default function VendorHomeScreen({ canAdd, status }) {
                 </TouchableOpacity>
               ) : null}
             </View>
-
-            {activeType && !search.trim() ? (
-              <View style={styles.activeTypeRow}>
-                <TouchableOpacity onPress={resetTypes}>
-                  <Text style={styles.backText}>← All types</Text>
-                </TouchableOpacity>
-                <Text style={styles.activeTypeLabel}>{activeType}</Text>
-              </View>
-            ) : null}
 
           </View>
         }

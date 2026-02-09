@@ -11,6 +11,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const {
     baseProductId,
+    imageUrl,
     name,
     category,
     subCategory,
@@ -30,16 +31,21 @@ export async function POST(req: Request) {
     warrantyPolicy,
   } = body || {};
 
-  if (!baseProductId || !name || !category || !price) {
+  if (!name || !category || !price) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const base = await prisma.product.findUnique({ where: { id: baseProductId } });
-  if (!base) {
+  const base = baseProductId
+    ? await prisma.product.findUnique({ where: { id: baseProductId } })
+    : null;
+  if (baseProductId && !base) {
     return NextResponse.json({ error: "Base product not found" }, { status: 404 });
   }
+  if (!base && !imageUrl) {
+    return NextResponse.json({ error: "Missing imageUrl for listing" }, { status: 400 });
+  }
 
-  const slugBase = (base.slug || base.name || name)
+  const slugBase = (base?.slug || base?.name || name)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
@@ -57,7 +63,7 @@ export async function POST(req: Request) {
     warrantyPolicy: warrantyPolicy || null,
   };
 
-  let finalSku = sku || `${base.sku || base.name}-${guard.userId.slice(-4)}-${Date.now()}`;
+  let finalSku = sku || `${base?.sku || base?.name || name}-${guard.userId.slice(-4)}-${Date.now()}`;
   // Ensure SKU uniqueness
   const existingSku = await prisma.product.findUnique({ where: { sku: finalSku } });
   if (existingSku) {
@@ -70,18 +76,18 @@ export async function POST(req: Request) {
       name,
       title: name,
       slug,
-      description: description || base.description,
+      description: description || base?.description || null,
       category,
       subCategory,
-      subSubCategory: base.subSubCategory || null,
-      image: base.image,
-      imagePath: base.imagePath,
-      gallery: base.gallery || [],
+      subSubCategory: base?.subSubCategory || null,
+      image: base?.image || imageUrl,
+      imagePath: base?.imagePath || null,
+      gallery: base?.gallery || [],
       price: Number(price),
       quantity: stock ? Number(stock) : 0,
       sku: finalSku,
       specs: combinedSpecs,
-      brand: brand || base.brand || null,
+      brand: brand || base?.brand || null,
       status: "PENDING",
       isPublished: false,
       isFeatured: false,
