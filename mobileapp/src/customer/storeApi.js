@@ -7,7 +7,7 @@ export async function getStoreProducts({ query = '', category = '', subCategory 
   if (!BASE_URL) {
     throw new Error('Missing API base URL');
   }
-  const cacheKey = `store:products:${query}:${category}`;
+  const cacheKey = `store:products:v2:${query}:${category}:${subCategory}`;
   const cached = getCache(cacheKey);
   if (cached) return cached;
   const params = new URLSearchParams();

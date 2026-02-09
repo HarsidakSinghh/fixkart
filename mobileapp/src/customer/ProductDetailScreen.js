@@ -16,7 +16,7 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
       onLogin();
       return;
     }
-    addItem(product);
+    addItem(detail || product);
   };
 
   useEffect(() => {

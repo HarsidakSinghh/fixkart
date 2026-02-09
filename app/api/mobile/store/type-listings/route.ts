@@ -33,16 +33,22 @@ export async function GET(req: Request) {
     : [];
   const vendorMap = new Map(vendors.map((v) => [v.userId, v.companyName || v.fullName || "Vendor"]));
 
-  const mapped = products.map((p) => ({
-    id: p.id,
-    name: p.title || p.name,
-    category: p.category,
-    subCategory: p.subCategory,
-    price: p.price,
-    image: p.image,
-    quantity: p.quantity || 0,
-    vendorName: vendorMap.get(p.vendorId) || "Vendor",
-  }));
+  const mapped = products.map((p) => {
+    const specs: any = p.specs || {};
+    const commissionPercent = Number(specs.commissionPercent || 0);
+    const displayPrice =
+      commissionPercent > 0 ? Math.round(p.price * (1 + commissionPercent / 100)) : p.price;
+    return {
+      id: p.id,
+      name: p.title || p.name,
+      category: p.category,
+      subCategory: p.subCategory,
+      price: displayPrice,
+      image: p.image,
+      quantity: p.quantity || 0,
+      vendorName: vendorMap.get(p.vendorId) || "Vendor",
+    };
+  });
 
   return NextResponse.json({ listings: mapped });
 }
