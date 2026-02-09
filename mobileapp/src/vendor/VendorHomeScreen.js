@@ -22,6 +22,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typesLoading, setTypesLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [form, setForm] = useState({
@@ -79,12 +80,13 @@ export default function VendorHomeScreen({ canAdd, status }) {
   }, [activeCategory]);
 
   const loadCatalog = useCallback(async () => {
-    if (!activeCategory || !activeType) return;
+    if (!activeCategory || (!activeType && !search.trim())) return;
     setLoading(true);
     try {
       const data = await getVendorCatalogProducts({
         category: activeCategory === 'All' ? '' : activeCategory,
         subCategory: activeType,
+        query: search.trim(),
       });
       setCatalog(data.products || []);
     } catch (error) {
@@ -92,7 +94,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory, activeType]);
+  }, [activeCategory, activeType, search]);
 
   useEffect(() => {
     loadCategories();
@@ -138,11 +140,13 @@ export default function VendorHomeScreen({ canAdd, status }) {
   };
 
   const openType = (label) => {
+    setSearch('');
     setActiveType(label);
   };
 
   const resetTypes = () => {
     setActiveType('');
+    setSearch('');
     setCatalog([]);
   };
 
@@ -214,10 +218,13 @@ export default function VendorHomeScreen({ canAdd, status }) {
   return (
     <View style={styles.container}>
       <FlatList
-        data={activeType ? catalog : types}
+        key={search.trim() ? 'search' : activeType ? 'catalog' : 'types'}
+        data={search.trim() || activeType ? catalog : types}
         keyExtractor={(item) => item.id || item.label}
+        numColumns={search.trim() || activeType ? 1 : 2}
+        columnWrapperStyle={search.trim() || activeType ? undefined : styles.typeRow}
         contentContainerStyle={styles.productList}
-        renderItem={activeType ? renderCatalogItem : ({ item }) => (
+        renderItem={search.trim() || activeType ? renderCatalogItem : ({ item }) => (
           <TouchableOpacity style={styles.typeCard} onPress={() => openType(item.label)}>
             <View style={styles.typeImage}>
               {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
@@ -269,7 +276,27 @@ export default function VendorHomeScreen({ canAdd, status }) {
               ))}
             </ScrollView>
 
-            {activeType ? (
+            <View style={styles.searchWrap}>
+              <TextInput
+                placeholder="Search products to add listing"
+                placeholderTextColor={vendorColors.muted}
+                value={search}
+                onChangeText={(value) => {
+                  setSearch(value);
+                  if (value.trim()) {
+                    setActiveType('');
+                  }
+                }}
+                style={styles.searchInput}
+              />
+              {search.trim() ? (
+                <TouchableOpacity style={styles.clearBtn} onPress={resetTypes}>
+                  <Text style={styles.clearText}>Clear</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {activeType && !search.trim() ? (
               <View style={styles.activeTypeRow}>
                 <TouchableOpacity onPress={resetTypes}>
                   <Text style={styles.backText}>← All types</Text>
@@ -422,6 +449,31 @@ const styles = StyleSheet.create({
   categoryPillActive: { backgroundColor: vendorColors.primary, borderColor: vendorColors.primary },
   categoryText: { color: vendorColors.muted, fontWeight: '600', fontSize: 12 },
   categoryTextActive: { color: '#FFFFFF' },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: vendorSpacing.lg,
+    marginTop: vendorSpacing.sm,
+    backgroundColor: vendorColors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    paddingHorizontal: vendorSpacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    color: vendorColors.text,
+  },
+  clearBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: vendorColors.surface,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+  },
+  clearText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
   activeTypeRow: {
     marginHorizontal: vendorSpacing.lg,
     marginTop: vendorSpacing.sm,
@@ -434,8 +486,9 @@ const styles = StyleSheet.create({
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: vendorColors.muted },
   productList: { padding: vendorSpacing.lg, paddingBottom: 120, paddingTop: 0 },
+  typeRow: { justifyContent: 'space-between', gap: 12 },
   typeCard: {
-    width: '48%',
+    flex: 1,
     backgroundColor: vendorColors.card,
     borderRadius: 16,
     padding: vendorSpacing.sm,

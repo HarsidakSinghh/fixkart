@@ -11,6 +11,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category") || undefined;
   const subCategory = searchParams.get("subCategory") || undefined;
+  const query = searchParams.get("query") || undefined;
   const includeAll = searchParams.get("all") === "1";
 
   const whereClause: any = {};
@@ -21,8 +22,19 @@ export async function GET(req: Request) {
   if (category) {
     whereClause.category = category;
   }
+  if (query) {
+    const needle = { contains: query, mode: "insensitive" };
+    whereClause.OR = [
+      ...(whereClause.OR || []),
+      { name: needle },
+      { title: needle },
+      { subCategory: needle },
+      { subSubCategory: needle },
+    ];
+  }
   if (subCategory) {
     whereClause.OR = [
+      ...(whereClause.OR || []),
       { subSubCategory: { contains: subCategory, mode: "insensitive" } },
       { subCategory: { contains: subCategory, mode: "insensitive" } },
       { name: { contains: subCategory, mode: "insensitive" } },
