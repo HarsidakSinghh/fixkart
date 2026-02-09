@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
 import { endVisit } from './salesmanApi';
 
-const OUTCOMES = ['Order Placed', 'Follow-up Required', 'Not Interested'];
-
-export default function SalesmanVisitScreen({ beat, onBack }) {
+export default function SalesmanManualVisitScreen({ onBack }) {
+  const [companyName, setCompanyName] = useState('');
+  const [address, setAddress] = useState('');
   const [note, setNote] = useState('');
-  const [outcome, setOutcome] = useState(OUTCOMES[0]);
   const [photoData, setPhotoData] = useState('');
 
   const pickPhoto = async () => {
@@ -16,21 +15,24 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
       quality: 0.7,
       base64: true,
     });
-
     if (result.canceled) return;
     const asset = result.assets?.[0];
     if (!asset?.base64) return;
     setPhotoData(`data:image/jpeg;base64,${asset.base64}`);
   };
 
-  const handleEnd = async () => {
+  const handleSubmit = async () => {
+    if (!companyName || !address) {
+      Alert.alert('Missing info', 'Company name and address are required.');
+      return;
+    }
     await endVisit({
-      customerId: beat.id,
-      outcome,
+      customerId: null,
+      outcome: 'Manual Visit',
       note,
       imageBase64: photoData || null,
-      companyName: beat.name,
-      companyAddress: beat.address,
+      companyName,
+      companyAddress: address,
     });
     onBack();
   };
@@ -41,40 +43,45 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>{beat.name}</Text>
-      <Text style={styles.subtitle}>{beat.city} • {beat.address}</Text>
+      <Text style={styles.title}>Manual Visit</Text>
+      <Text style={styles.subtitle}>Log a visit that wasn’t assigned</Text>
 
-      <Text style={styles.label}>Visit Outcome</Text>
-      <View style={styles.outcomeRow}>
-        {OUTCOMES.map((item) => (
-          <TouchableOpacity
-            key={item}
-            style={[styles.outcomeChip, outcome === item && styles.outcomeChipActive]}
-            onPress={() => setOutcome(item)}
-          >
-            <Text style={[styles.outcomeText, outcome === item && styles.outcomeTextActive]}>{item}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Notes</Text>
+      <Text style={styles.label}>Company Name</Text>
       <TextInput
         style={styles.input}
-        value={note}
-        onChangeText={setNote}
-        placeholder="Capture visit notes..."
+        value={companyName}
+        onChangeText={setCompanyName}
+        placeholder="Company name"
+        placeholderTextColor={salesmanColors.muted}
+      />
+
+      <Text style={styles.label}>Address</Text>
+      <TextInput
+        style={[styles.input, styles.inputNote]}
+        value={address}
+        onChangeText={setAddress}
+        placeholder="Address"
         placeholderTextColor={salesmanColors.muted}
         multiline
       />
 
-      <Text style={styles.label}>Visit Photo (optional)</Text>
+      <Text style={styles.label}>Notes (optional)</Text>
+      <TextInput
+        style={[styles.input, styles.inputNote]}
+        value={note}
+        onChangeText={setNote}
+        placeholder="Notes"
+        placeholderTextColor={salesmanColors.muted}
+        multiline
+      />
+
       <TouchableOpacity style={styles.photoBtn} onPress={pickPhoto}>
         <Text style={styles.photoText}>{photoData ? 'Replace Photo' : 'Upload Photo'}</Text>
       </TouchableOpacity>
       {photoData ? <Image source={{ uri: photoData }} style={styles.preview} /> : null}
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleEnd}>
-        <Text style={styles.submitText}>End Visit</Text>
+      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <Text style={styles.submitText}>Save Visit</Text>
       </TouchableOpacity>
     </View>
   );
@@ -86,30 +93,18 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: salesmanColors.text, marginTop: salesmanSpacing.md },
   subtitle: { color: salesmanColors.muted, marginTop: 4 },
   label: { marginTop: salesmanSpacing.lg, fontWeight: '700', color: salesmanColors.text },
-  outcomeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  outcomeChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: salesmanColors.border,
-    backgroundColor: salesmanColors.card,
-  },
-  outcomeChipActive: { backgroundColor: salesmanColors.primary },
-  outcomeText: { color: salesmanColors.muted, fontSize: 11, fontWeight: '600' },
-  outcomeTextActive: { color: '#FFFFFF' },
   input: {
     marginTop: 8,
     borderWidth: 1,
     borderColor: salesmanColors.border,
     borderRadius: 12,
     padding: salesmanSpacing.md,
-    minHeight: 120,
     color: salesmanColors.text,
     backgroundColor: salesmanColors.card,
   },
+  inputNote: { minHeight: 90 },
   photoBtn: {
-    marginTop: 10,
+    marginTop: 12,
     borderWidth: 1,
     borderColor: salesmanColors.border,
     borderRadius: 12,

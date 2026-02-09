@@ -26,9 +26,9 @@ export async function GET(req: Request) {
 
   const logs = await db
     .collection("TrackingLog")
-    .find({ salesmanId: String(salesman._id), imageUrl: { $ne: null } })
+    .find({ salesmanId: String(salesman._id) })
     .sort({ createdAt: -1 })
-    .limit(20)
+    .limit(3)
     .toArray();
 
   return NextResponse.json({
@@ -38,6 +38,8 @@ export async function GET(req: Request) {
       note: log.note || "",
       customerId: log.customerId || null,
       imageUrl: log.imageUrl || null,
+      companyName: log.companyName || null,
+      companyAddress: log.companyAddress || null,
     })),
   });
 }

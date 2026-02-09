@@ -211,3 +211,15 @@ export async function getSalesmanVisits(salesmanId) {
   const data = await authFetch(`/api/mobile/vendor/salesmen/visits?salesmanId=${salesmanId}`);
   return data.visits || [];
 }
+
+export async function getSalesmanAssignments(salesmanId) {
+  const data = await authFetch(`/api/mobile/vendor/salesmen/assign?salesmanId=${salesmanId}`);
+  return data.assignments || [];
+}
+
+export async function createSalesmanAssignment(payload) {
+  return authFetch('/api/mobile/vendor/salesmen/assign', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

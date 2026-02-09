@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { customerId, outcome, note, lat, lng, imageBase64 } = body || {};
+  const { customerId, outcome, note, lat, lng, imageBase64, companyName, companyAddress } = body || {};
 
   let imageUrl: string | null = null;
   if (imageBase64 && typeof imageBase64 === "string") {
@@ -33,6 +33,8 @@ export async function POST(req: Request) {
     event: "VISIT_END",
     customerId: customerId || null,
     note: outcome ? `${outcome}${note ? ` - ${note}` : ""}` : note || null,
+    companyName: companyName || null,
+    companyAddress: companyAddress || null,
     lat: typeof lat === "number" ? lat : null,
     lng: typeof lng === "number" ? lng : null,
     imageUrl,

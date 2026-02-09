@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Modal, Image, ScrollView } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { createVendorSalesman, getVendorSalesmen, getSalesmanVisits } from './vendorApi';
+import { createVendorSalesman, getVendorSalesmen, getSalesmanVisits, getSalesmanAssignments, createSalesmanAssignment } from './vendorApi';
 
 export default function VendorSalesmenScreen({ onBack }) {
   const [salesmen, setSalesmen] = useState([]);
@@ -12,6 +12,11 @@ export default function VendorSalesmenScreen({ onBack }) {
   const [visitLoading, setVisitLoading] = useState(false);
   const [visitSalesman, setVisitSalesman] = useState(null);
   const [visits, setVisits] = useState([]);
+  const [assignModal, setAssignModal] = useState(false);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignSalesman, setAssignSalesman] = useState(null);
+  const [assignments, setAssignments] = useState([]);
+  const [assignForm, setAssignForm] = useState({ companyName: '', address: '', note: '' });
 
   const loadSalesmen = useCallback(async () => {
     setLoading(true);
@@ -66,6 +71,45 @@ export default function VendorSalesmenScreen({ onBack }) {
       setVisits([]);
     } finally {
       setVisitLoading(false);
+    }
+  };
+
+  const openAssign = async (salesman) => {
+    setAssignSalesman(salesman);
+    setAssignModal(true);
+    setAssignLoading(true);
+    setAssignForm({ companyName: '', address: '', note: '' });
+    try {
+      const data = await getSalesmanAssignments(salesman.id);
+      setAssignments(data);
+    } catch (error) {
+      setAssignments([]);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!assignForm.companyName || !assignForm.address) {
+      Alert.alert('Missing info', 'Company name and address are required.');
+      return;
+    }
+    setAssignLoading(true);
+    try {
+      await createSalesmanAssignment({
+        salesmanId: assignSalesman.id,
+        companyName: assignForm.companyName,
+        address: assignForm.address,
+        note: assignForm.note,
+      });
+      const data = await getSalesmanAssignments(assignSalesman.id);
+      setAssignments(data);
+      setAssignForm({ companyName: '', address: '', note: '' });
+      Alert.alert('Assigned', 'Visit assigned to salesman.');
+    } catch (error) {
+      Alert.alert('Failed', 'Could not assign visit.');
+    } finally {
+      setAssignLoading(false);
     }
   };
 
@@ -130,7 +174,10 @@ export default function VendorSalesmenScreen({ onBack }) {
                 <Text style={styles.codeText}>{item.code}</Text>
               </View>
               <TouchableOpacity style={styles.linkBtn} onPress={() => openVisits(item)}>
-                <Text style={styles.linkText}>View Visits</Text>
+                <Text style={styles.linkText}>Recent Visits</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.linkBtn} onPress={() => openAssign(item)}>
+                <Text style={styles.linkText}>Assign Visit</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -160,13 +207,78 @@ export default function VendorSalesmenScreen({ onBack }) {
                       <Image source={{ uri: visit.imageUrl }} style={styles.visitImage} />
                     ) : null}
                     <View style={styles.visitMeta}>
-                      <Text style={styles.visitNote}>{visit.note || 'Visit completed'}</Text>
+                      <Text style={styles.visitNote}>{visit.companyName || 'Visit completed'}</Text>
+                      {visit.companyAddress ? (
+                        <Text style={styles.visitAddress}>{visit.companyAddress}</Text>
+                      ) : null}
+                      {visit.note ? (
+                        <Text style={styles.visitSubnote}>{visit.note}</Text>
+                      ) : null}
                       <Text style={styles.visitDate}>{new Date(visit.createdAt).toLocaleString()}</Text>
                     </View>
                   </View>
                 ))
               ) : (
-                <Text style={styles.emptyText}>No visit photos yet.</Text>
+                <Text style={styles.emptyText}>No visits logged yet.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={assignModal} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Assign Visit</Text>
+              <TouchableOpacity onPress={() => setAssignModal(false)}>
+                <Text style={styles.linkText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>{assignSalesman?.name || 'Salesman'}</Text>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Company</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Company name"
+                placeholderTextColor={vendorColors.muted}
+                value={assignForm.companyName}
+                onChangeText={(v) => setAssignForm((prev) => ({ ...prev, companyName: v }))}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Address"
+                placeholderTextColor={vendorColors.muted}
+                value={assignForm.address}
+                onChangeText={(v) => setAssignForm((prev) => ({ ...prev, address: v }))}
+              />
+              <TextInput
+                style={[styles.input, styles.inputNote]}
+                placeholder="Note (optional)"
+                placeholderTextColor={vendorColors.muted}
+                value={assignForm.note}
+                onChangeText={(v) => setAssignForm((prev) => ({ ...prev, note: v }))}
+                multiline
+              />
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleAssign} disabled={assignLoading}>
+                <Text style={styles.primaryText}>{assignLoading ? 'Assigning…' : 'Assign Visit'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.listTitle}>Recent Assignments</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {assignLoading ? (
+                <Text style={styles.emptyText}>Loading assignments…</Text>
+              ) : assignments.length ? (
+                assignments.map((item) => (
+                  <View key={item.id} style={styles.assignCard}>
+                    <Text style={styles.assignTitle}>{item.companyName}</Text>
+                    <Text style={styles.assignMeta}>{item.address}</Text>
+                    {item.note ? <Text style={styles.assignNote}>{item.note}</Text> : null}
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>No assignments yet.</Text>
               )}
             </ScrollView>
           </View>
@@ -208,6 +320,7 @@ const styles = StyleSheet.create({
     backgroundColor: vendorColors.card,
     marginBottom: vendorSpacing.sm,
   },
+  inputNote: { minHeight: 80 },
   primaryBtn: {
     backgroundColor: vendorColors.primary,
     paddingVertical: 12,
@@ -269,5 +382,18 @@ const styles = StyleSheet.create({
   visitImage: { width: '100%', height: 180 },
   visitMeta: { padding: vendorSpacing.md },
   visitNote: { color: vendorColors.text, fontWeight: '700' },
+  visitAddress: { color: vendorColors.muted, fontSize: 12, marginTop: 4 },
+  visitSubnote: { color: vendorColors.muted, fontSize: 12, marginTop: 4 },
   visitDate: { color: vendorColors.muted, fontSize: 12, marginTop: 6 },
+  assignCard: {
+    backgroundColor: vendorColors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    padding: vendorSpacing.md,
+    marginBottom: vendorSpacing.sm,
+  },
+  assignTitle: { color: vendorColors.text, fontWeight: '700' },
+  assignMeta: { color: vendorColors.muted, fontSize: 12, marginTop: 4 },
+  assignNote: { color: vendorColors.muted, fontSize: 12, marginTop: 4 },
 });

@@ -4,7 +4,7 @@ import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
 import { getSalesmanDashboard, getSalesmanBeats, startDay, endDay, startVisit } from './salesmanApi';
 import { useAuth } from '../context/AuthContext';
 
-export default function SalesmanDashboardScreen({ onOpenVisit }) {
+export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
   const [status, setStatus] = useState('NOT_STARTED');
   const [stats, setStats] = useState({});
   const [beats, setBeats] = useState([]);
@@ -44,9 +44,16 @@ export default function SalesmanDashboardScreen({ onOpenVisit }) {
           <Text style={styles.title}>Salesman Home</Text>
           <Text style={styles.subtitle}>Plan your day and log visits</Text>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={clearSession}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {onOpenManual ? (
+            <TouchableOpacity style={styles.manualButton} onPress={onOpenManual}>
+              <Text style={styles.manualText}>Manual Visit</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity style={styles.logoutButton} onPress={clearSession}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.dayCard}>
@@ -94,6 +101,7 @@ export default function SalesmanDashboardScreen({ onOpenVisit }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.beatName}>{item.name}</Text>
               <Text style={styles.beatMeta}>{item.city} • {item.address}</Text>
+              {item.note ? <Text style={styles.beatNote}>{item.note}</Text> : null}
             </View>
             <TouchableOpacity style={styles.visitButton} onPress={() => handleStartVisit(item)}>
               <Text style={styles.visitText}>Start Visit</Text>
@@ -108,6 +116,16 @@ export default function SalesmanDashboardScreen({ onOpenVisit }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: salesmanColors.bg, padding: salesmanSpacing.lg },
   header: { marginBottom: salesmanSpacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  manualButton: {
+    backgroundColor: salesmanColors.card,
+    borderWidth: 1,
+    borderColor: salesmanColors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  manualText: { color: salesmanColors.primary, fontWeight: '700', fontSize: 12 },
   title: { fontSize: 20, fontWeight: '800', color: salesmanColors.text },
   subtitle: { color: salesmanColors.muted, marginTop: 4 },
   logoutButton: {
@@ -162,6 +180,7 @@ const styles = StyleSheet.create({
   },
   beatName: { color: salesmanColors.text, fontWeight: '700' },
   beatMeta: { color: salesmanColors.muted, fontSize: 12, marginTop: 4 },
+  beatNote: { color: salesmanColors.muted, fontSize: 11, marginTop: 4 },
   visitButton: { backgroundColor: salesmanColors.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: salesmanColors.border },
   visitText: { color: salesmanColors.primary, fontWeight: '700', fontSize: 11 },
 });
