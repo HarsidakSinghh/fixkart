@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Modal, Image, ScrollView } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { createVendorSalesman, getVendorSalesmen } from './vendorApi';
+import { createVendorSalesman, getVendorSalesmen, getSalesmanVisits } from './vendorApi';
 
 export default function VendorSalesmenScreen({ onBack }) {
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', code: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [visitModal, setVisitModal] = useState(false);
+  const [visitLoading, setVisitLoading] = useState(false);
+  const [visitSalesman, setVisitSalesman] = useState(null);
+  const [visits, setVisits] = useState([]);
 
   const loadSalesmen = useCallback(async () => {
     setLoading(true);
@@ -48,6 +52,20 @@ export default function VendorSalesmenScreen({ onBack }) {
       Alert.alert('Failed', 'Unable to add salesman.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openVisits = async (salesman) => {
+    setVisitSalesman(salesman);
+    setVisitModal(true);
+    setVisitLoading(true);
+    try {
+      const data = await getSalesmanVisits(salesman.id);
+      setVisits(data);
+    } catch (error) {
+      setVisits([]);
+    } finally {
+      setVisitLoading(false);
     }
   };
 
@@ -107,8 +125,13 @@ export default function VendorSalesmenScreen({ onBack }) {
               <Text style={styles.name}>{item.name || 'Unnamed'}</Text>
               <Text style={styles.meta}>{item.phone}</Text>
             </View>
-            <View style={styles.codePill}>
-              <Text style={styles.codeText}>{item.code}</Text>
+            <View style={styles.rightCol}>
+              <View style={styles.codePill}>
+                <Text style={styles.codeText}>{item.code}</Text>
+              </View>
+              <TouchableOpacity style={styles.linkBtn} onPress={() => openVisits(item)}>
+                <Text style={styles.linkText}>View Visits</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -116,6 +139,39 @@ export default function VendorSalesmenScreen({ onBack }) {
           !loading ? <Text style={styles.emptyText}>No salesmen yet.</Text> : null
         }
       />
+
+      <Modal visible={visitModal} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Visit Proofs</Text>
+              <TouchableOpacity onPress={() => setVisitModal(false)}>
+                <Text style={styles.linkText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>{visitSalesman?.name || 'Salesman'}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {visitLoading ? (
+                <Text style={styles.emptyText}>Loading visits…</Text>
+              ) : visits.length ? (
+                visits.map((visit) => (
+                  <View key={visit.id} style={styles.visitCard}>
+                    {visit.imageUrl ? (
+                      <Image source={{ uri: visit.imageUrl }} style={styles.visitImage} />
+                    ) : null}
+                    <View style={styles.visitMeta}>
+                      <Text style={styles.visitNote}>{visit.note || 'Visit completed'}</Text>
+                      <Text style={styles.visitDate}>{new Date(visit.createdAt).toLocaleString()}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>No visit photos yet.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -172,6 +228,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  rightCol: { alignItems: 'flex-end', gap: 8 },
   name: { color: vendorColors.text, fontWeight: '700' },
   meta: { color: vendorColors.muted, fontSize: 12, marginTop: 4 },
   codePill: {
@@ -183,5 +240,34 @@ const styles = StyleSheet.create({
     borderColor: vendorColors.border,
   },
   codeText: { color: vendorColors.primary, fontWeight: '700' },
+  linkBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  linkText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
   emptyText: { color: vendorColors.muted, textAlign: 'center', marginTop: vendorSpacing.md },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: vendorColors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: vendorSpacing.lg,
+    maxHeight: '80%',
+  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: vendorColors.text },
+  modalSubtitle: { color: vendorColors.muted, marginTop: 6, marginBottom: vendorSpacing.md },
+  visitCard: {
+    backgroundColor: vendorColors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    marginBottom: vendorSpacing.md,
+    overflow: 'hidden',
+  },
+  visitImage: { width: '100%', height: 180 },
+  visitMeta: { padding: vendorSpacing.md },
+  visitNote: { color: vendorColors.text, fontWeight: '700' },
+  visitDate: { color: vendorColors.muted, fontSize: 12, marginTop: 6 },
 });

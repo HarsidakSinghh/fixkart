@@ -29,6 +29,20 @@ export function SkeletonList({ count = 4 }) {
   );
 }
 
+export function EmptyState({ title, message, actionLabel, onAction }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title}>{title || "No data yet"}</Text>
+      <Text style={styles.message}>{message || "You're all caught up."}</Text>
+      {actionLabel && onAction ? (
+        <TouchableOpacity style={styles.button} onPress={onAction}>
+          <Text style={styles.buttonText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,

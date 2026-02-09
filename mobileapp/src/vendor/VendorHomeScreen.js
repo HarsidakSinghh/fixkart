@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -216,17 +216,25 @@ export default function VendorHomeScreen({ canAdd, status }) {
   );
 
   const showProducts = search.trim() || activeType;
+  const gridData = useMemo(() => {
+    const base = showProducts ? catalog : types;
+    if (!base || base.length === 0) return [];
+    if (base.length % 2 === 0) return base;
+    return [...base, { id: '__spacer__', spacer: true }];
+  }, [showProducts, catalog, types]);
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={showProducts ? catalog : types}
-        keyExtractor={(item) => item.id || item.label}
+        data={gridData}
+        keyExtractor={(item, index) => item.id || item.label || `spacer-${index}`}
         numColumns={2}
         columnWrapperStyle={styles.typeRow}
         contentContainerStyle={styles.productList}
         renderItem={({ item }) =>
-          showProducts ? (
+          item.spacer ? (
+            <View style={[styles.typeCard, styles.typeCardSpacer]} />
+          ) : showProducts ? (
             <View style={styles.productGridCard}>
               <Image source={{ uri: item.image }} style={styles.productGridImage} />
               <Text style={styles.productGridTitle} numberOfLines={2}>
@@ -247,6 +255,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
             <TouchableOpacity style={styles.typeCard} onPress={() => openType(item.label)}>
               <View style={styles.typeImage}>
                 {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
+                <View style={styles.typeImageOverlay} />
               </View>
               <Text style={styles.typeLabel} numberOfLines={2}>{item.label}</Text>
               <TouchableOpacity style={styles.typeAction} onPress={() => openType(item.label)}>
@@ -516,8 +525,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: vendorColors.border,
     marginBottom: vendorSpacing.sm,
+    minHeight: 170,
+    justifyContent: 'space-between',
   },
-  typeImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: vendorColors.surface },
+  typeCardSpacer: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  typeImage: {
+    width: '100%',
+    height: 90,
+    borderRadius: 12,
+    backgroundColor: vendorColors.surface,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  typeImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    borderRadius: 12,
+  },
   typeLabel: { color: vendorColors.text, fontWeight: '700', marginTop: 8, fontSize: 12 },
   typeAction: {
     marginTop: 8,

@@ -56,11 +56,11 @@ export default function VendorInventoryScreen() {
 
   const renderListing = ({ item }) => (
     <View style={styles.listingCard}>
+      <View style={[styles.statusStripe, { backgroundColor: statusStripe(item) }]} />
       <Image source={{ uri: item.image }} style={styles.listingImage} />
-      <View style={{ flex: 1 }}>
+      <View style={styles.listingBody}>
         <Text style={styles.productName}>{item.title || item.name}</Text>
-        <Text style={styles.productMeta}>{item.subCategory || item.category}</Text>
-        <Text style={styles.productSku}>SKU: {item.sku || 'N/A'}</Text>
+        <Text style={styles.productSku} numberOfLines={1}>SKU: {item.sku || 'N/A'}</Text>
         {typeof item.quantity === 'number' && item.quantity > 0 && item.quantity <= 5 ? (
           <View style={styles.lowStockPill}>
             <Text style={styles.lowStockText}>Only {item.quantity} left</Text>
@@ -89,12 +89,11 @@ export default function VendorInventoryScreen() {
           ) : (
             <>
               <Metric label="Stock" value={item.quantity ?? '—'} />
-              <Metric label="Sold" value={item.sold ?? 0} />
               <Metric label="Price" value={item.price ? `₹${item.price}` : '—'} />
             </>
           )}
         </View>
-        <StatusPill label={statusLabel(item)} tone={statusTone(item)} />
+        <StatusPill label={statusLabel(item)} tone={statusTone(item)} compact />
         <View style={styles.actionRow}>
           {editingId === item.id ? (
             <>
@@ -292,6 +291,13 @@ export default function VendorInventoryScreen() {
     return 'warning';
   }
 
+  function statusStripe(item) {
+    if (item.status === 'APPROVED' && item.isPublished) return '#2F9E6F';
+    if (item.status === 'PENDING') return '#F0B429';
+    if (item.status === 'REJECTED') return '#E05252';
+    return '#F0B429';
+  }
+
   function renderInput(label, key, multiline = false, keyboardType = 'default') {
     return (
       <View style={styles.inputGroup}>
@@ -375,6 +381,7 @@ const styles = StyleSheet.create({
   categoryTextActive: { color: '#FFFFFF' },
   productList: { padding: vendorSpacing.lg, paddingBottom: 120, paddingTop: 0 },
   listingCard: {
+    position: 'relative',
     backgroundColor: vendorColors.card,
     borderRadius: 16,
     padding: vendorSpacing.md,
@@ -384,13 +391,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: vendorSpacing.md,
   },
-  listingImage: { width: 70, height: 70, borderRadius: 12, backgroundColor: vendorColors.surface },
-  productName: { color: vendorColors.text, fontWeight: '700' },
-  productMeta: { color: vendorColors.muted, marginTop: 4, fontSize: 12 },
-  productSku: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
+  statusStripe: {
+    position: 'absolute',
+    left: 0,
+    top: 10,
+    bottom: 10,
+    width: 4,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+  },
+  listingImage: { width: 60, height: 60, borderRadius: 12, backgroundColor: vendorColors.surface },
+  listingBody: { flex: 1, gap: 6 },
+  productName: { color: vendorColors.text, fontWeight: '700', fontSize: 13 },
+  productSku: { color: vendorColors.muted, fontSize: 11 },
   lowStockPill: {
     alignSelf: 'flex-start',
-    marginTop: 6,
+    marginTop: 2,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
@@ -399,7 +415,7 @@ const styles = StyleSheet.create({
     borderColor: '#8C5B2D',
   },
   lowStockText: { color: '#F5C391', fontSize: 10, fontWeight: '700' },
-  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
+  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   metricCard: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -414,7 +430,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: 0,
   },
-  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: vendorSpacing.sm, marginTop: vendorSpacing.sm },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: vendorSpacing.sm, marginTop: 6 },
   editBtn: {
     alignSelf: 'flex-start',
     backgroundColor: vendorColors.surface,

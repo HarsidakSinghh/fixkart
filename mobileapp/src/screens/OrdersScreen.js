@@ -4,10 +4,9 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, StatCard } from "../components/Ui";
 import { colors, spacing } from "../theme";
 import { useAsyncList } from "../services/useAsyncList";
-import { ErrorState } from "../components/StateViews";
+import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import { getOrders, getDashboard, updateOrderStatus } from "../services/api";
 import { ActionRow } from "../components/Ui";
-import SkeletonCard from "../components/SkeletonCard";
 import StatusPill from "../components/StatusPill";
 
 export default function OrdersScreen() {
@@ -22,7 +21,7 @@ export default function OrdersScreen() {
     return data.orders;
   }, []);
 
-  const { items, setItems, error, refresh } = useAsyncList(fetchOrders, []);
+  const { items, setItems, error, refresh, loading } = useAsyncList(fetchOrders, []);
 
   React.useEffect(() => {
     let mounted = true;
@@ -52,13 +51,16 @@ export default function OrdersScreen() {
       </View>
 
       <SectionHeader title="Latest Orders" actionLabel="Filter" />
+      {loading && items.length === 0 ? <SkeletonList count={3} /> : null}
       {error && items.length === 0 ? (
         <ErrorState message={error} onRetry={refresh} />
-      ) : items.length === 0 ? (
-        <>
-          <SkeletonCard height={120} />
-          <SkeletonCard height={120} />
-        </>
+      ) : !loading && items.length === 0 ? (
+        <EmptyState
+          title="No orders yet"
+          message="New orders will appear here as they come in."
+          actionLabel="Refresh"
+          onAction={refresh}
+        />
       ) : (
         items.map((order) => (
           <RowCard

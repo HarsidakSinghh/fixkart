@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMongoDb } from "@/lib/mongo";
 import { requireSalesman } from "@/lib/salesman-guard";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export async function POST(req: Request) {
   const guard = await requireSalesman(req);
@@ -9,7 +10,22 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { customerId, outcome, note, lat, lng } = body || {};
+  const { customerId, outcome, note, lat, lng, imageBase64 } = body || {};
+
+  let imageUrl: string | null = null;
+  if (imageBase64 && typeof imageBase64 === "string") {
+    try {
+      const base64Data = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+      const buffer = Buffer.from(base64Data, "base64");
+      const result = await uploadToCloudinary(buffer, {
+        folder: "fixkart-visits",
+        resource_type: "image",
+      });
+      imageUrl = result.secure_url;
+    } catch (error) {
+      imageUrl = null;
+    }
+  }
 
   const db = await getMongoDb();
   await db.collection("TrackingLog").insertOne({
@@ -19,6 +35,7 @@ export async function POST(req: Request) {
     note: outcome ? `${outcome}${note ? ` - ${note}` : ""}` : note || null,
     lat: typeof lat === "number" ? lat : null,
     lng: typeof lng === "number" ? lng : null,
+    imageUrl,
     createdAt: new Date(),
   });
 

@@ -176,7 +176,7 @@ function AdminAppContent() {
         {active === "more" ? (
           <MoreScreen routes={moreRoutes} onNavigate={setActive} />
         ) : (
-          <ActiveComponent />
+          <ActiveComponent onNavigate={setActive} />
         )}
       </View>
       <BottomNav tabs={bottomTabs} activeKey={active} onChange={setActive} />

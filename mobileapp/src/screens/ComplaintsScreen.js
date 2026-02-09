@@ -4,7 +4,7 @@ import { ScreenTitle, SectionHeader, RowCard, ActionRow } from "../components/Ui
 import { useAsyncList } from "../services/useAsyncList";
 import { getComplaints, updateComplaintStatus } from "../services/api";
 import { Linking, Text } from "react-native";
-import { ErrorState, SkeletonList } from "../components/StateViews";
+import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import StatusPill from "../components/StatusPill";
 
 export default function ComplaintsScreen() {
@@ -26,6 +26,9 @@ export default function ComplaintsScreen() {
       <SectionHeader title="Open Tickets" actionLabel="Assign" />
       {loading && items.length === 0 ? <SkeletonList count={4} /> : null}
       {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
+      {!loading && !error && items.length === 0 ? (
+        <EmptyState title="No complaints" message="Customer complaints will show here." />
+      ) : null}
       {items.map((item) => (
         <RowCard
           key={item.id}

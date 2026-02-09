@@ -19,6 +19,7 @@ export default function VendorRegisterScreen({ onClose }) {
   const [docType, setDocType] = useState(DOC_TYPES[0]);
   const [docData, setDocData] = useState('');
   const [docName, setDocName] = useState('');
+  const [docMime, setDocMime] = useState('');
   const [photoData, setPhotoData] = useState('');
   const [stage, setStage] = useState('email');
   const [otp, setOtp] = useState('');
@@ -69,8 +70,10 @@ export default function VendorRegisterScreen({ onClose }) {
     const asset = result.assets?.[0];
     if (!asset?.uri) return;
 
+    const mime = asset.mimeType || 'application/octet-stream';
     setDocName(asset.name || 'Document');
-    const dataUrl = await uriToBase64(asset.uri, asset.mimeType || 'application/octet-stream');
+    setDocMime(mime);
+    const dataUrl = await uriToBase64(asset.uri, mime);
     setDocData(dataUrl);
   };
 
@@ -364,6 +367,14 @@ export default function VendorRegisterScreen({ onClose }) {
         <TouchableOpacity style={styles.uploadBtn} onPress={pickDocument}>
           <Text style={styles.uploadText}>{docName ? `Uploaded: ${docName}` : 'Upload Document (PDF/Image)'}</Text>
         </TouchableOpacity>
+        {docData && docMime.startsWith('image/') ? (
+          <Image source={{ uri: docData }} style={styles.preview} />
+        ) : null}
+        {docData && !docMime.startsWith('image/') ? (
+          <View style={styles.docMeta}>
+            <Text style={styles.docMetaText}>Document ready • {docType}</Text>
+          </View>
+        ) : null}
 
         <Text style={styles.sectionTitle}>GPS & Building Photo (Optional)</Text>
         {renderInput('Latitude', 'gpsLat')}
@@ -524,6 +535,15 @@ const styles = StyleSheet.create({
   },
   uploadText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
   preview: { marginTop: vendorSpacing.sm, width: '100%', height: 160, borderRadius: 12 },
+  docMeta: {
+    marginTop: vendorSpacing.sm,
+    padding: vendorSpacing.sm,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.surface,
+  },
+  docMetaText: { color: vendorColors.muted, fontSize: 12, fontWeight: '600' },
   submitBtn: {
     marginTop: vendorSpacing.xl,
     backgroundColor: vendorColors.primary,

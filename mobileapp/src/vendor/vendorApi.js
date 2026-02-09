@@ -206,3 +206,8 @@ export async function createVendorSalesman(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function getSalesmanVisits(salesmanId) {
+  const data = await authFetch(`/api/mobile/vendor/salesmen/visits?salesmanId=${salesmanId}`);
+  return data.visits || [];
+}

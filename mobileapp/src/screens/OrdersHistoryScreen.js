@@ -4,7 +4,7 @@ import { ScreenTitle, SectionHeader, RowCard, Badge } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getOrdersHistory } from "../services/api";
 import { Text } from "react-native";
-import { ErrorState } from "../components/StateViews";
+import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 
 export default function OrdersHistoryScreen() {
   const fetchHistory = useCallback(async () => {
@@ -12,13 +12,17 @@ export default function OrdersHistoryScreen() {
     return data.orders;
   }, []);
 
-  const { items, error, refresh } = useAsyncList(fetchHistory, []);
+  const { items, error, refresh, loading } = useAsyncList(fetchHistory, []);
 
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Orders History" subtitle="Past activity" />
       <SectionHeader title="Archived Orders" />
+      {loading && items.length === 0 ? <SkeletonList count={3} /> : null}
       {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
+      {!loading && !error && items.length === 0 ? (
+        <EmptyState title="No archived orders" message="Completed orders will show here." />
+      ) : null}
       {items.map((order) => (
         <RowCard
           key={order.id}

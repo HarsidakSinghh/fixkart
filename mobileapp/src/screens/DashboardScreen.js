@@ -1,18 +1,23 @@
-import React, { useCallback, useState } from "react";
-import { View, StyleSheet, Text, RefreshControl } from "react-native";
+import React, { useCallback, useState, useEffect } from "react";
+import { View, StyleSheet, Text, RefreshControl, Pressable } from "react-native";
 import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, StatCard, RowCard, Badge } from "../components/Ui";
 import { colors, spacing } from "../theme";
 import { useAsyncList } from "../services/useAsyncList";
-import { getDashboard } from "../services/api";
+import { getDashboard, getInventoryApprovals, getRefunds, getComplaints } from "../services/api";
 import { ErrorState } from "../components/StateViews";
 
-export default function DashboardScreen() {
+export default function DashboardScreen({ onNavigate }) {
   const [dashboard, setDashboard] = useState({
     kpis: null,
     revenueByDay: [],
     recentVendors: [],
     alerts: [],
+  });
+  const [queue, setQueue] = useState({
+    inventory: 0,
+    refunds: 0,
+    complaints: 0,
   });
 
   const [refreshing, setRefreshing] = useState(false);
@@ -25,14 +30,36 @@ export default function DashboardScreen() {
 
   const { loading, error } = useAsyncList(fetchDashboard, []);
 
+  const loadQueue = useCallback(async () => {
+    try {
+      const [inventory, refunds, complaints] = await Promise.all([
+        getInventoryApprovals(),
+        getRefunds(),
+        getComplaints(),
+      ]);
+      setQueue({
+        inventory: inventory.products?.length || 0,
+        refunds: refunds.refunds?.length || 0,
+        complaints: complaints.complaints?.length || 0,
+      });
+    } catch (_) {
+      setQueue({ inventory: 0, refunds: 0, complaints: 0 });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadQueue();
+  }, [loadQueue]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await fetchDashboard();
+      await loadQueue();
     } finally {
       setRefreshing(false);
     }
-  }, [fetchDashboard]);
+  }, [fetchDashboard, loadQueue]);
 
   const kpis = dashboard.kpis || {};
 
@@ -54,6 +81,34 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        <SectionHeader title="Action Queue" />
+        <View style={styles.queueGrid}>
+          <QueueCard
+            label="Pending Vendors"
+            value={kpis.vendorPending || 0}
+            tone="warning"
+            onPress={() => onNavigate && onNavigate("vendors")}
+          />
+          <QueueCard
+            label="Inventory Approvals"
+            value={queue.inventory}
+            tone="warning"
+            onPress={() => onNavigate && onNavigate("inventoryApprovals")}
+          />
+          <QueueCard
+            label="Refund Requests"
+            value={queue.refunds}
+            tone="danger"
+            onPress={() => onNavigate && onNavigate("refunds")}
+          />
+          <QueueCard
+            label="Open Complaints"
+            value={queue.complaints}
+            tone="danger"
+            onPress={() => onNavigate && onNavigate("complaints")}
+          />
+        </View>
+
         <SectionHeader title="Order Performance" />
         <View style={styles.grid}>
           <StatCard label="Total Revenue" value={`₹${kpis.totalRevenue || 0}`} color={colors.accent} />
@@ -73,19 +128,6 @@ export default function DashboardScreen() {
             <Text style={styles.chartEmpty}>No revenue data yet</Text>
           )}
         </View>
-
-        {dashboard.alerts && dashboard.alerts.length > 0 && (
-          <>
-            <SectionHeader title="Attention Queue" />
-            <View style={styles.alertWrap}>
-              {dashboard.alerts.map((alert) => (
-                <View key={alert.id} style={styles.alertCard}>
-                  <Badge text={alert.title} tone={alert.tone || 'warning'} />
-                </View>
-              ))}
-            </View>
-          </>
-        )}
 
         <SectionHeader title="Vendor Overview" />
         <View style={styles.grid}>
@@ -117,6 +159,23 @@ export default function DashboardScreen() {
   );
 }
 
+function QueueCard({ label, value, tone, onPress }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.queueCard, pressed && { opacity: 0.8 }]}>
+      <Text style={styles.queueLabel}>{label}</Text>
+      <Text style={[styles.queueValue, { color: toneColor(tone) }]}>{value}</Text>
+      <Text style={styles.queueHint}>Tap to open</Text>
+    </Pressable>
+  );
+}
+
+function toneColor(tone) {
+  if (tone === "danger") return colors.danger;
+  if (tone === "warning") return colors.warning;
+  if (tone === "success") return colors.success;
+  return colors.info;
+}
+
 function statusTone(status) {
   if (status === "APPROVED") return "success";
   if (status === "PENDING") return "warning";
@@ -128,6 +187,24 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
+  queueGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  queueCard: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    minWidth: 160,
+    flex: 1,
+  },
+  queueLabel: { color: colors.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
+  queueValue: { fontSize: 22, fontWeight: "700", marginTop: 6 },
+  queueHint: { marginTop: 6, fontSize: 11, color: colors.muted },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",

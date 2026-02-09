@@ -3,7 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getProducts, approveProduct, rejectProduct } from "../services/api";
-import { ErrorState } from "../components/StateViews";
+import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 
 export default function ProductsScreen() {
   const fetchProducts = useCallback(async () => {
@@ -11,7 +11,7 @@ export default function ProductsScreen() {
     return data.products;
   }, []);
 
-  const { items, setItems, error, refresh } = useAsyncList(fetchProducts, []);
+  const { items, setItems, error, refresh, loading } = useAsyncList(fetchProducts, []);
 
   async function updateStatus(id, status) {
     if (status === "APPROVED") await approveProduct(id);
@@ -23,7 +23,11 @@ export default function ProductsScreen() {
     <AdminScreenLayout>
       <ScreenTitle title="Products" subtitle="Catalog control" />
       <SectionHeader title="Latest Updates" actionLabel="Add" />
+      {loading && items.length === 0 ? <SkeletonList count={3} /> : null}
       {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
+      {!loading && !error && items.length === 0 ? (
+        <EmptyState title="No products yet" message="Catalog updates will appear here." />
+      ) : null}
       {items.map((item) => (
         <RowCard
           key={item.id}

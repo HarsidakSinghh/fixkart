@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
 import { endVisit } from './salesmanApi';
 
@@ -8,9 +9,22 @@ const OUTCOMES = ['Order Placed', 'Follow-up Required', 'Not Interested'];
 export default function SalesmanVisitScreen({ beat, onBack }) {
   const [note, setNote] = useState('');
   const [outcome, setOutcome] = useState(OUTCOMES[0]);
+  const [photoData, setPhotoData] = useState('');
+
+  const pickPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (!asset?.base64) return;
+    setPhotoData(`data:image/jpeg;base64,${asset.base64}`);
+  };
 
   const handleEnd = async () => {
-    await endVisit({ customerId: beat.id, outcome, note });
+    await endVisit({ customerId: beat.id, outcome, note, imageBase64: photoData || null });
     onBack();
   };
 
@@ -45,6 +59,12 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
         placeholderTextColor={salesmanColors.muted}
         multiline
       />
+
+      <Text style={styles.label}>Visit Photo (optional)</Text>
+      <TouchableOpacity style={styles.photoBtn} onPress={pickPhoto}>
+        <Text style={styles.photoText}>{photoData ? 'Replace Photo' : 'Upload Photo'}</Text>
+      </TouchableOpacity>
+      {photoData ? <Image source={{ uri: photoData }} style={styles.preview} /> : null}
 
       <TouchableOpacity style={styles.submitButton} onPress={handleEnd}>
         <Text style={styles.submitText}>End Visit</Text>
@@ -81,6 +101,17 @@ const styles = StyleSheet.create({
     color: salesmanColors.text,
     backgroundColor: salesmanColors.card,
   },
+  photoBtn: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: salesmanColors.border,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: salesmanColors.card,
+  },
+  photoText: { color: salesmanColors.primary, fontWeight: '700' },
+  preview: { marginTop: 10, width: '100%', height: 180, borderRadius: 12 },
   submitButton: {
     marginTop: salesmanSpacing.lg,
     backgroundColor: salesmanColors.primary,
