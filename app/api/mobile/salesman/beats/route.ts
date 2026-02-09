@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const assignments = await db
     .collection("SalesmanAssignment")
     .find({ salesmanId: String(guard.salesman._id), status: "PENDING" })
-    .sort({ createdAt: -1 })
+    .sort({ visitDate: 1, createdAt: -1 })
     .limit(12)
     .toArray();
 
@@ -24,6 +24,7 @@ export async function GET(req: Request) {
       city: "",
       address: a.address,
       note: a.note || "",
+      visitDate: a.visitDate || null,
       status: "PENDING",
       priority: idx < 3 ? "HIGH" : "MEDIUM",
       source: "ASSIGNED",

@@ -16,7 +16,7 @@ export default function VendorSalesmenScreen({ onBack }) {
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignSalesman, setAssignSalesman] = useState(null);
   const [assignments, setAssignments] = useState([]);
-  const [assignForm, setAssignForm] = useState({ companyName: '', address: '', note: '' });
+  const [assignForm, setAssignForm] = useState({ companyName: '', address: '', note: '', visitDate: '' });
 
   const loadSalesmen = useCallback(async () => {
     setLoading(true);
@@ -78,7 +78,7 @@ export default function VendorSalesmenScreen({ onBack }) {
     setAssignSalesman(salesman);
     setAssignModal(true);
     setAssignLoading(true);
-    setAssignForm({ companyName: '', address: '', note: '' });
+    setAssignForm({ companyName: '', address: '', note: '', visitDate: '' });
     try {
       const data = await getSalesmanAssignments(salesman.id);
       setAssignments(data);
@@ -101,10 +101,11 @@ export default function VendorSalesmenScreen({ onBack }) {
         companyName: assignForm.companyName,
         address: assignForm.address,
         note: assignForm.note,
+        visitDate: assignForm.visitDate,
       });
       const data = await getSalesmanAssignments(assignSalesman.id);
       setAssignments(data);
-      setAssignForm({ companyName: '', address: '', note: '' });
+      setAssignForm({ companyName: '', address: '', note: '', visitDate: '' });
       Alert.alert('Assigned', 'Visit assigned to salesman.');
     } catch (error) {
       Alert.alert('Failed', 'Could not assign visit.');
@@ -247,6 +248,13 @@ export default function VendorSalesmenScreen({ onBack }) {
               />
               <TextInput
                 style={styles.input}
+                placeholder="Visit date (YYYY-MM-DD)"
+                placeholderTextColor={vendorColors.muted}
+                value={assignForm.visitDate}
+                onChangeText={(v) => setAssignForm((prev) => ({ ...prev, visitDate: v }))}
+              />
+              <TextInput
+                style={styles.input}
                 placeholder="Address"
                 placeholderTextColor={vendorColors.muted}
                 value={assignForm.address}
@@ -274,6 +282,7 @@ export default function VendorSalesmenScreen({ onBack }) {
                   <View key={item.id} style={styles.assignCard}>
                     <Text style={styles.assignTitle}>{item.companyName}</Text>
                     <Text style={styles.assignMeta}>{item.address}</Text>
+                    {item.visitDate ? <Text style={styles.assignNote}>Visit: {item.visitDate}</Text> : null}
                     {item.note ? <Text style={styles.assignNote}>{item.note}</Text> : null}
                   </View>
                 ))

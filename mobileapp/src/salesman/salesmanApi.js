@@ -60,6 +60,10 @@ export async function getSalesmanBeats() {
   return authFetch('/api/mobile/salesman/beats');
 }
 
+export async function getSalesmanVisits() {
+  return authFetch('/api/mobile/salesman/visits');
+}
+
 export async function startDay(lat, lng) {
   return authFetch('/api/mobile/salesman/day/start', {
     method: 'POST',

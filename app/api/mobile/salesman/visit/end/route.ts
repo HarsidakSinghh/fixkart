@@ -10,7 +10,17 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { customerId, outcome, note, lat, lng, imageBase64, companyName, companyAddress } = body || {};
+  const {
+    customerId,
+    outcome,
+    note,
+    lat,
+    lng,
+    imageBase64,
+    companyName,
+    companyAddress,
+    followUpDate,
+  } = body || {};
 
   let imageUrl: string | null = null;
   if (imageBase64 && typeof imageBase64 === "string") {
@@ -40,6 +50,20 @@ export async function POST(req: Request) {
     imageUrl,
     createdAt: new Date(),
   });
+
+  if (outcome === "Follow-up Required" && followUpDate) {
+    await db.collection("SalesmanAssignment").insertOne({
+      vendorId: guard.salesman.vendorId,
+      salesmanId: String(guard.salesman._id),
+      companyName: companyName || "Follow-up",
+      address: companyAddress || "",
+      note: note || "",
+      status: "PENDING",
+      visitDate: followUpDate,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

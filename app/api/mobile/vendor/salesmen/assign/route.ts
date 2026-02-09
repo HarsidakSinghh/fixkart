@@ -29,6 +29,7 @@ export async function GET(req: Request) {
       address: a.address,
       note: a.note || "",
       status: a.status || "PENDING",
+      visitDate: a.visitDate || null,
       createdAt: a.createdAt,
     })),
   });
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { salesmanId, companyName, address, note } = body || {};
+  const { salesmanId, companyName, address, note, visitDate } = body || {};
   if (!salesmanId || !companyName || !address) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
     address,
     note: note || "",
     status: "PENDING",
+    visitDate: visitDate || null,
     createdAt: new Date(),
     updatedAt: new Date(),
   });

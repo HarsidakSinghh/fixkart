@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
-import { getSalesmanDashboard, getSalesmanBeats, startDay, endDay, startVisit } from './salesmanApi';
+import { getSalesmanDashboard, getSalesmanBeats, getSalesmanVisits, startDay, endDay, startVisit } from './salesmanApi';
 import { useAuth } from '../context/AuthContext';
 
 export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
   const [status, setStatus] = useState('NOT_STARTED');
   const [stats, setStats] = useState({});
   const [beats, setBeats] = useState([]);
+  const [recentVisits, setRecentVisits] = useState([]);
   const { clearSession } = useAuth();
 
   const loadData = useCallback(async () => {
@@ -16,6 +17,8 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
     setStats(dashboard.stats || {});
     const beatData = await getSalesmanBeats();
     setBeats(beatData.beats || []);
+    const visitsData = await getSalesmanVisits();
+    setRecentVisits(visitsData.visits || []);
   }, []);
 
   useEffect(() => {
@@ -101,6 +104,7 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.beatName}>{item.name}</Text>
               <Text style={styles.beatMeta}>{item.city} • {item.address}</Text>
+              {item.visitDate ? <Text style={styles.beatNote}>Visit: {item.visitDate}</Text> : null}
               {item.note ? <Text style={styles.beatNote}>{item.note}</Text> : null}
             </View>
             <TouchableOpacity style={styles.visitButton} onPress={() => handleStartVisit(item)}>
@@ -109,6 +113,23 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
           </View>
         )}
       />
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Recent Visits</Text>
+        <Text style={styles.sectionHint}>{recentVisits.length}</Text>
+      </View>
+      {recentVisits.map((visit) => (
+        <View key={visit.id} style={styles.visitCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.beatName}>{visit.companyName || 'Visit'}</Text>
+            {visit.companyAddress ? (
+              <Text style={styles.beatMeta}>{visit.companyAddress}</Text>
+            ) : null}
+            {visit.note ? <Text style={styles.beatNote}>{visit.note}</Text> : null}
+          </View>
+          <Text style={styles.visitDate}>{new Date(visit.createdAt).toLocaleDateString()}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -168,6 +189,18 @@ const styles = StyleSheet.create({
   sectionTitle: { fontWeight: '700', color: salesmanColors.text },
   sectionHint: { color: salesmanColors.muted },
   list: { paddingBottom: 80 },
+  visitCard: {
+    backgroundColor: salesmanColors.card,
+    borderRadius: 14,
+    padding: salesmanSpacing.md,
+    borderWidth: 1,
+    borderColor: salesmanColors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: salesmanSpacing.sm,
+  },
+  visitDate: { color: salesmanColors.muted, fontSize: 11 },
   beatCard: {
     backgroundColor: salesmanColors.card,
     borderRadius: 14,

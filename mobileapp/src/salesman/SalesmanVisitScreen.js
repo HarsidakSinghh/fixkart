@@ -10,6 +10,7 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
   const [note, setNote] = useState('');
   const [outcome, setOutcome] = useState(OUTCOMES[0]);
   const [photoData, setPhotoData] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
 
   const pickPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -31,6 +32,7 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
       imageBase64: photoData || null,
       companyName: beat.name,
       companyAddress: beat.address,
+      followUpDate: outcome === 'Follow-up Required' ? followUpDate || null : null,
     });
     onBack();
   };
@@ -66,6 +68,19 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
         placeholderTextColor={salesmanColors.muted}
         multiline
       />
+
+      {outcome === 'Follow-up Required' ? (
+        <>
+          <Text style={styles.label}>Follow-up Date</Text>
+          <TextInput
+            style={styles.input}
+            value={followUpDate}
+            onChangeText={setFollowUpDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={salesmanColors.muted}
+          />
+        </>
+      ) : null}
 
       <Text style={styles.label}>Visit Photo (optional)</Text>
       <TouchableOpacity style={styles.photoBtn} onPress={pickPhoto}>
