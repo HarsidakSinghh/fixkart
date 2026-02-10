@@ -68,7 +68,6 @@ export async function GET(req: Request) {
       image:
         item.image ||
         item.product?.image ||
-        item.product?.imageUrl ||
         item.product?.imagePath ||
         "",
     })),
