@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-guard";
 import { getMongoDb } from "@/lib/mongo";
 import { ObjectId } from "mongodb";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   const guard = await requireAdmin(req);
@@ -27,6 +28,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const vendor = salesman.vendorId
+    ? await prisma.vendorProfile.findUnique({ where: { userId: salesman.vendorId } })
+    : null;
+
   const logs = await db
     .collection("TrackingLog")
     .find({ salesmanId: String(salesman._id) })
@@ -51,6 +56,8 @@ export async function GET(req: Request) {
       currentLat: salesman.currentLat,
       currentLng: salesman.currentLng,
       lastUpdated: salesman.lastUpdated,
+      vendorName: vendor?.companyName || vendor?.fullName || "",
+      vendorId: salesman.vendorId || null,
     },
     stats,
     logs: logs.map((l) => ({

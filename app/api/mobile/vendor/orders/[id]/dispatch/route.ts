@@ -33,6 +33,19 @@ export async function PATCH(
       where: { id: resolved.id },
       include: { order: true },
     });
+    if (item?.orderId) {
+      const orderItems = await prisma.orderItem.findMany({
+        where: { orderId: item.orderId },
+        select: { status: true },
+      });
+      const anyReady = orderItems.some((i) => i.status === "READY");
+      if (anyReady) {
+        await prisma.order.update({
+          where: { id: item.orderId },
+          data: { status: "SHIPPED" },
+        });
+      }
+    }
     if (item?.order?.customerId) {
       await sendPushToUsers(
         [item.order.customerId],
