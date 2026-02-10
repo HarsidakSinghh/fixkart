@@ -35,6 +35,7 @@ export async function GET(req: Request) {
     const addressParts = customer
       ? [customer.address, customer.city, customer.state, customer.postalCode].filter(Boolean)
       : [];
+    const productPrice = typeof item.product?.price === "number" ? item.product.price : null;
     return {
       id: item.id,
       orderId: item.orderId,
@@ -42,6 +43,7 @@ export async function GET(req: Request) {
       dispatchCode: item.dispatchCode || null,
       quantity: item.quantity,
       price: item.price,
+      vendorPrice: productPrice ?? item.price,
       productName: item.productName || item.product?.title || item.product?.name || "Product",
       image: item.image || item.product?.image || null,
       createdAt: item.createdAt.toISOString(),
