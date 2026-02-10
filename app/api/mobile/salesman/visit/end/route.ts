@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getMongoDb } from "@/lib/mongo";
 import { requireSalesman } from "@/lib/salesman-guard";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { ObjectId } from "mongodb";
 
 export async function POST(req: Request) {
   const guard = await requireSalesman(req);
@@ -77,6 +78,18 @@ export async function POST(req: Request) {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+  }
+
+  if (customerId) {
+    try {
+      const assignmentId = new ObjectId(String(customerId));
+      await db.collection("SalesmanAssignment").updateOne(
+        { _id: assignmentId, salesmanId: String(guard.salesman._id) },
+        { $set: { status: "COMPLETED", updatedAt: new Date() } }
+      );
+    } catch (_) {
+      // Not an assignment id, ignore.
+    }
   }
 
   return NextResponse.json({ success: true });
