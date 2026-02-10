@@ -138,7 +138,8 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
     const tableRows: any[] = [];
 
     const total = items.reduce((sum, item) => {
-      const commissionPercent = Number(item.product?.specs?.commissionPercent || 0);
+      const specs = item.product?.specs as any;
+      const commissionPercent = Number(specs?.commissionPercent || 0);
       const basePrice =
         typeof item.product?.price === "number"
           ? item.product.price
