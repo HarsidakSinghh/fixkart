@@ -18,7 +18,9 @@ export default function OrdersScreen() {
 
   const fetchOrders = useCallback(async () => {
     const data = await getOrders();
-    return data.orders;
+    return (data.orders || []).filter(
+      (o) => !["COMPLETED", "DELIVERED"].includes(String(o.status || "").toUpperCase())
+    );
   }, []);
 
   const { items, setItems, error, refresh, loading } = useAsyncList(fetchOrders, []);

@@ -5,7 +5,7 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerProfile, updateCustomerProfile } from './customerApi';
 import { useAuth } from '../context/AuthContext';
 
-export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications, onOpenPushDebug, forceComplete = false, onCompleted }) {
+export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications, onOpenPushDebug, forceComplete = false, onCompleted, onCancel }) {
   const { isAuthenticated } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,6 +98,11 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
               {forceComplete ? 'Complete Profile' : editing ? 'Cancel' : 'Update Profile'}
             </Text>
           </TouchableOpacity>
+          {forceComplete && onCancel ? (
+            <TouchableOpacity style={styles.secondaryBtn} onPress={onCancel}>
+              <Text style={styles.secondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          ) : null}
           {!forceComplete && onOpenSupportHistory ? (
             <TouchableOpacity style={styles.secondaryBtn} onPress={onOpenSupportHistory}>
               <Text style={styles.secondaryText}>Complaints & Refunds</Text>

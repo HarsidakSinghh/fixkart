@@ -9,6 +9,7 @@ import * as WebBrowser from 'expo-web-browser';
 export default function VendorOrdersScreen({ onSwitchToListings }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeCode, setActiveCode] = useState(null);
   const [downloading, setDownloading] = useState(null);
 
@@ -19,9 +20,9 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
       setOrders(data.orders || []);
       try {
         const notifications = (data.orders || []).slice(0, 5).map((order) => ({
-          id: order.id,
+          id: order.orderId,
           title: `Order ${order.status || 'NEW'}`,
-          message: `${order.productName} × ${order.quantity}`,
+          message: `${order.items?.[0]?.productName || 'Order'} • ${order.totals?.totalQty || 0} items`,
           createdAt: order.createdAt,
         }));
         await SecureStore.setItemAsync('vendor_notifications', JSON.stringify(notifications));
@@ -39,12 +40,20 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
     loadOrders();
   }, [loadOrders]);
 
-  const handleDispatch = async (itemId) => {
+  const handleDispatch = async (itemId, orderId) => {
     try {
       const res = await markVendorOrderReady(itemId);
       setActiveCode({ id: itemId, code: res.code });
       setOrders((prev) =>
-        prev.map((item) => (item.id === itemId ? { ...item, status: 'READY', dispatchCode: res.code } : item))
+        prev.map((order) => {
+          if (order.orderId !== orderId) return order;
+          return {
+            ...order,
+            items: order.items.map((item) =>
+              item.id === itemId ? { ...item, status: 'READY', dispatchCode: res.code } : item
+            ),
+          };
+        })
       );
     } catch (error) {
       console.error('Failed to mark dispatch', error);
@@ -67,38 +76,48 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
 
   const renderOrder = ({ item }) => (
     <View style={styles.card}>
-      <Image source={{ uri: item.image }} style={styles.image} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.title}>{item.productName}</Text>
-        <Text style={styles.meta}>Qty: {item.quantity} • Price: ₹{item.price}</Text>
-        <Text style={styles.meta}>Order: {item.orderId}</Text>
-        <Text style={styles.meta}>Customer: {item.customer?.name || 'Customer'}</Text>
-        <Text style={styles.meta}>{item.customer?.phone || ''}</Text>
-        <Text style={styles.meta}>{item.customer?.address || ''}</Text>
-        <View style={{ marginTop: vendorSpacing.sm }}>
-          <StatusPill label={item.status || 'NEW'} tone={statusTone(item.status)} />
+      <View style={styles.orderHeader}>
+        <View>
+          <Text style={styles.orderId}>Order #{item.orderId.slice(-6).toUpperCase()}</Text>
+          <Text style={styles.meta}>Items: {item.totals?.totalQty || 0}</Text>
+          <Text style={styles.meta}>Customer: {item.customer?.name || 'Customer'}</Text>
         </View>
-
-        {item.dispatchCode ? (
-          <View style={styles.codeBadge}>
-            <Text style={styles.codeLabel}>Dispatch Code</Text>
-            <Text style={styles.codeValue}>{item.dispatchCode}</Text>
-          </View>
-        ) : (
-          <TouchableOpacity style={styles.dispatchBtn} onPress={() => handleDispatch(item.id)}>
-            <Text style={styles.dispatchText}>Ready to Dispatch</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={styles.poBtn}
-          onPress={() => handleDownloadPO(item.orderId)}
-          disabled={downloading === item.orderId}
-        >
-          <Text style={styles.poText}>
-            {downloading === item.orderId ? 'Preparing PO…' : 'Download PO'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.orderMetaRight}>
+          <StatusPill label={item.status || 'NEW'} tone={statusTone(item.status)} />
+          <Text style={styles.meta}>Total: ₹{Math.round(item.totals?.vendorTotal || 0)}</Text>
+        </View>
       </View>
+
+      {(item.items || []).map((orderItem) => (
+        <View key={orderItem.id} style={styles.itemRow}>
+          <Image source={{ uri: orderItem.image }} style={styles.image} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>{orderItem.productName}</Text>
+            <Text style={styles.meta}>Qty: {orderItem.quantity} • Price: ₹{orderItem.vendorPrice}</Text>
+            <View style={{ marginTop: vendorSpacing.xs }}>
+              <StatusPill label={orderItem.status || 'NEW'} tone={statusTone(orderItem.status)} />
+            </View>
+          </View>
+          {orderItem.dispatchCode ? (
+            <View style={styles.codeBadge}>
+              <Text style={styles.codeLabel}>Dispatch</Text>
+              <Text style={styles.codeValue}>{orderItem.dispatchCode}</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.dispatchBtn} onPress={() => handleDispatch(orderItem.id, item.orderId)}>
+              <Text style={styles.dispatchText}>Ready</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ))}
+
+      <TouchableOpacity
+        style={styles.poBtn}
+        onPress={() => handleDownloadPO(item.orderId)}
+        disabled={downloading === item.orderId}
+      >
+        <Text style={styles.poText}>{downloading === item.orderId ? 'Preparing PO…' : 'Download PO'}</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -106,11 +125,18 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
     <View style={styles.container}>
       <FlatList
         data={orders}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.orderId}
         contentContainerStyle={styles.list}
         renderItem={renderOrder}
-        refreshing={loading}
-        onRefresh={loadOrders}
+        refreshing={refreshing}
+        onRefresh={async () => {
+          setRefreshing(true);
+          try {
+            await loadOrders();
+          } finally {
+            setRefreshing(false);
+          }
+        }}
         ListFooterComponent={
           loading ? (
             <View style={styles.loadingWrap}>
@@ -177,21 +203,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: vendorColors.border,
     marginBottom: vendorSpacing.md,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: vendorSpacing.sm,
+  },
+  orderId: { color: vendorColors.text, fontWeight: '800' },
+  meta: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
+  orderMetaRight: { alignItems: 'flex-end', gap: 6 },
+  itemRow: {
     flexDirection: 'row',
     gap: vendorSpacing.md,
+    paddingVertical: vendorSpacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: vendorColors.border,
   },
-  image: { width: 70, height: 70, borderRadius: 12, backgroundColor: vendorColors.surface },
+  image: { width: 54, height: 54, borderRadius: 10, backgroundColor: vendorColors.surface },
   title: { color: vendorColors.text, fontWeight: '700' },
-  meta: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
   dispatchBtn: {
-    marginTop: vendorSpacing.sm,
     alignSelf: 'flex-start',
     backgroundColor: vendorColors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   dispatchText: { color: '#FFFFFF', fontWeight: '700', fontSize: 11 },
+  codeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: vendorColors.surface,
+  },
+  codeLabel: { color: vendorColors.muted, fontSize: 10, fontWeight: '600' },
+  codeValue: { color: vendorColors.text, fontSize: 12, fontWeight: '800', marginTop: 2 },
   poBtn: {
     marginTop: vendorSpacing.sm,
     alignSelf: 'flex-start',
@@ -203,16 +250,6 @@ const styles = StyleSheet.create({
     borderColor: vendorColors.border,
   },
   poText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
-  codeBadge: {
-    marginTop: vendorSpacing.sm,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: vendorColors.surface,
-  },
-  codeLabel: { color: vendorColors.muted, fontSize: 10, fontWeight: '600' },
-  codeValue: { color: vendorColors.text, fontSize: 14, fontWeight: '800', marginTop: 2 },
   toast: {
     position: 'absolute',
     left: vendorSpacing.lg,

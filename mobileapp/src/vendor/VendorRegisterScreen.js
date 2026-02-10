@@ -5,7 +5,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getPublicCategories, registerVendorWithToken } from './vendorApi';
 import { useAuth } from '../context/AuthContext';
-import { useSignIn, useSignUp, useAuth as useClerkAuth } from '@clerk/clerk-expo';
+import { useSignIn, useSignUp, useAuth as useClerkAuth, useOAuth, useUser } from '@clerk/clerk-expo';
+import { makeRedirectUri } from 'expo-auth-session';
 
 const DOC_TYPES = ['GST', 'PAN', 'Address Proof'];
 
@@ -14,6 +15,9 @@ export default function VendorRegisterScreen({ onClose }) {
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
   const { signUp, isLoaded: signUpLoaded } = useSignUp();
   const { getToken } = useClerkAuth();
+  const { user } = useUser();
+  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+  const redirectUrl = makeRedirectUri({ scheme: 'fixkart', path: 'redirect' });
   const [categories, setCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [docType, setDocType] = useState(DOC_TYPES[0]);
@@ -21,7 +25,7 @@ export default function VendorRegisterScreen({ onClose }) {
   const [docName, setDocName] = useState('');
   const [docMime, setDocMime] = useState('');
   const [photoData, setPhotoData] = useState('');
-  const [stage, setStage] = useState('email');
+  const [stage, setStage] = useState('login');
   const [otp, setOtp] = useState('');
   const [pendingSignIn, setPendingSignIn] = useState(null);
   const [verifiedEmail, setVerifiedEmail] = useState('');
@@ -48,6 +52,15 @@ export default function VendorRegisterScreen({ onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [otpError, setOtpError] = useState('');
+  const [oauthLoading, setOauthLoading] = useState(false);
+
+  useEffect(() => {
+    const email = user?.primaryEmailAddress?.emailAddress;
+    if (email && !verifiedEmail) {
+      setVerifiedEmail(email);
+      setForm((prev) => ({ ...prev, contactEmail: email }));
+    }
+  }, [user, verifiedEmail]);
 
   useEffect(() => {
     getPublicCategories().then((data) => setCategories(data.categories || [])).catch(() => {});
@@ -236,11 +249,42 @@ export default function VendorRegisterScreen({ onClose }) {
     }
   }, [pendingSignIn, otp, setActive, getToken, saveSession]);
 
+  const handleGoogleLogin = useCallback(async () => {
+    setOauthLoading(true);
+    try {
+      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow({
+        redirectUrl,
+        useProxy: false,
+      });
+      if (!createdSessionId) {
+        Alert.alert('Error', 'Google sign-in failed.');
+        return;
+      }
+      const activate = setOAuthActive || setActive;
+      await activate({ session: createdSessionId });
+      const token = await getTokenWithRetry(getToken);
+      if (!token) {
+        Alert.alert('Error', 'Failed to retrieve session token.');
+        return;
+      }
+      const email = user?.primaryEmailAddress?.emailAddress || form.contactEmail;
+      setVerifiedToken(token);
+      setVerifiedEmail(email || '');
+      setForm((prev) => ({ ...prev, contactEmail: email || prev.contactEmail }));
+      await saveSession({ id: user?.id, email: email || '', isAdmin: false }, token, false);
+      setStage('verified');
+    } catch (error) {
+      const message = error?.errors?.[0]?.message || error?.message || 'Google sign-in failed.';
+      Alert.alert('Error', message);
+    } finally {
+      setOauthLoading(false);
+    }
+  }, [startOAuthFlow, redirectUrl, setActive, getToken, user, form.contactEmail, saveSession]);
+
   const handleSubmit = async () => {
-    const email = form.contactEmail.trim().toLowerCase();
-    if (!(isAuthenticated || (verifiedEmail && verifiedEmail === email))) {
-      console.log('[VendorRegister] Submit blocked, verifiedEmail:', verifiedEmail, 'email:', email);
-      Alert.alert('Verify Email', 'Please verify your email with OTP first.');
+    const email = (form.contactEmail || verifiedEmail || '').trim().toLowerCase();
+    if (!verifiedToken) {
+      Alert.alert('Sign in required', 'Please sign in with Google to continue.');
       return;
     }
     if (!form.businessName || !form.contactName || !form.contactPhone || !email) {
@@ -264,8 +308,8 @@ export default function VendorRegisterScreen({ onClose }) {
       const token = verifiedToken || (await getTokenWithRetry(getToken));
       console.log('[VendorRegister] Submit token length:', token ? token.length : 0);
       if (!token) {
-        Alert.alert('Error', 'Could not authenticate. Please verify OTP again.');
-        setStage('email');
+        Alert.alert('Error', 'Could not authenticate. Please sign in again.');
+        setStage('login');
         return;
       }
       await registerVendorWithToken(token, payload);
@@ -289,35 +333,18 @@ export default function VendorRegisterScreen({ onClose }) {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.noticeBox}>
-          <Text style={styles.noticeText}>Verify your email with OTP before submitting the registration.</Text>
+          <Text style={styles.noticeText}>Sign in with Google to continue vendor registration.</Text>
         </View>
-        {renderInput('Contact Email (OTP)', 'contactEmail', verifiedEmail ? true : false)}
-        {stage === 'email' ? (
-          <View style={styles.otpRow}>
-            <TouchableOpacity style={styles.noticeBtn} onPress={sendOtp} disabled={verifying}>
-              <Text style={styles.noticeBtnText}>{verifying ? 'Sending…' : 'Send OTP'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : stage === 'code' ? (
-          <View style={styles.otpRow}>
-            <TextInput
-              style={styles.otpInput}
-              value={otp}
-              onChangeText={setOtp}
-              placeholder="Enter OTP"
-              keyboardType="number-pad"
-              placeholderTextColor={vendorColors.muted}
-            />
-            <TouchableOpacity style={styles.noticeBtn} onPress={verifyOtp} disabled={verifying}>
-              <Text style={styles.noticeBtnText}>{verifying ? 'Verifying…' : 'Verify'}</Text>
-            </TouchableOpacity>
-          </View>
+        {stage !== 'verified' ? (
+          <TouchableOpacity style={styles.noticeBtn} onPress={handleGoogleLogin} disabled={oauthLoading}>
+            <Text style={styles.noticeBtnText}>{oauthLoading ? 'Signing in…' : 'Continue with Google'}</Text>
+          </TouchableOpacity>
         ) : (
           <View style={styles.verifiedRow}>
-            <Text style={styles.verifiedText}>Email verified</Text>
+            <Text style={styles.verifiedText}>Signed in as {verifiedEmail || 'vendor'}</Text>
           </View>
         )}
-        {!!otpError && <Text style={styles.otpError}>{otpError}</Text>}
+        {renderInput('Contact Email', 'contactEmail', true)}
         {renderInput('Legal / Business Name', 'businessName')}
         {renderInput('GSTIN', 'gstNumber')}
         {renderInput('PAN', 'panNumber')}

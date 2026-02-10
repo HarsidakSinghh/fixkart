@@ -9,3 +9,8 @@ export async function getSalesmanDetail(id) {
   const data = await authenticatedFetch(`/api/mobile/salesman-admin/detail?id=${id}`);
   return data;
 }
+
+export async function getSalesmanTrack(id) {
+  const data = await authenticatedFetch(`/api/mobile/salesman-admin/track?salesmanId=${id}`);
+  return data;
+}

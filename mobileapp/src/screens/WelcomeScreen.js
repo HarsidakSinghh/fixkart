@@ -1,12 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { colors } from "../theme";
 
 export default function WelcomeScreen({ onLogin, onContinue }) {
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
-        <Text style={styles.brand}>FIXKART</Text>
+        <Image source={require("../../assets/logo1.png")} style={styles.brandImage} />
         <Text style={styles.title}>Welcome</Text>
         <Text style={styles.subtitle}>
           B2B procurement and operations in one place.
@@ -46,6 +46,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 2,
     fontSize: 18,
+  },
+  brandImage: {
+    width: 130,
+    height: 32,
+    resizeMode: "contain",
   },
   title: {
     marginTop: 20,

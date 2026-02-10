@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import UserHeader from '../components/UserHeader';
 import VendorHomeScreen from './VendorHomeScreen';
+import VendorStatsScreen from './VendorStatsScreen';
 import VendorInventoryScreen from './VendorInventoryScreen';
 import VendorProfileScreen from './VendorProfileScreen';
 import VendorOrdersScreen from './VendorOrdersScreen';
@@ -14,7 +15,8 @@ import VendorSalesmenScreen from './VendorSalesmenScreen';
 import { getVendorProfile, getVendorOrders } from './vendorApi';
 
 const TABS = [
-  { key: 'home', label: 'Home', icon: 'home' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'bar-chart-2' },
+  { key: 'listings', label: 'Listings', icon: 'grid' },
   { key: 'inventory', label: 'Inventory', icon: 'box' },
   { key: 'orders', label: 'Orders', icon: 'shopping-bag' },
   { key: 'complaints', label: 'Support', icon: 'help-circle' },
@@ -22,7 +24,7 @@ const TABS = [
 ];
 
 export default function VendorPortal() {
-  const [active, setActive] = useState('home');
+  const [active, setActive] = useState('dashboard');
   const [status, setStatus] = useState('PENDING');
   const [ordersBadge, setOrdersBadge] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -65,7 +67,9 @@ export default function VendorPortal() {
   }
 
   let content = null;
-  if (active === 'home') {
+  if (active === 'dashboard') {
+    content = <VendorStatsScreen />;
+  } else if (active === 'listings') {
     content = <VendorHomeScreen canAdd={status === 'APPROVED'} status={status} />;
   } else if (active === 'inventory') {
     content = <VendorInventoryScreen />;

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, ActivityIndicator, Text } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Text, Image } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { colors } from "./src/theme";
 import { customerColors } from "./src/customer/CustomerTheme";
@@ -34,11 +34,15 @@ import SalesmenScreen from "./src/screens/SalesmenScreen";
 import VendorRegisterScreen from "./src/vendor/VendorRegisterScreen";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-function LoadingScreen() {
+function LoadingScreen({ message = "Loading FixKart...", showLogo = false }) {
   return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.loadingText}>Loading FixKart...</Text>
+      {showLogo ? (
+        <Image source={require("./assets/logo1.png")} style={styles.loadingLogo} />
+      ) : (
+        <ActivityIndicator size="large" color={colors.primary} />
+      )}
+      <Text style={styles.loadingText}>{message}</Text>
     </View>
   );
 }
@@ -194,6 +198,7 @@ function AppGate() {
   const [showSplash, setShowSplash] = useState(true);
   const [showWelcome, setShowWelcome] = useState(true);
   const [roleSyncing, setRoleSyncing] = useState(false);
+  const [postLoginWait, setPostLoginWait] = useState(false);
 
   useTokenRefresh();
   usePushNotifications({
@@ -242,8 +247,13 @@ function AppGate() {
     setRoleSyncing(false);
   }, [isAuthenticated, isAdmin, isVendor, portal, setPortalPersist]);
 
-  if (isLoading || !portalReady || roleSyncing) {
-    return <LoadingScreen />;
+  if (isLoading || !portalReady || roleSyncing || postLoginWait) {
+    return (
+      <LoadingScreen
+        message={postLoginWait ? "Signing you in..." : "Preparing your workspace..."}
+        showLogo={postLoginWait}
+      />
+    );
   }
 
   let content = null;
@@ -253,7 +263,7 @@ function AppGate() {
     safeBg = colors.bg;
     content = (
       <View style={styles.splash}>
-        <Text style={styles.splashBrand}>FIXKART</Text>
+        <Image source={require("./assets/logo1.png")} style={styles.splashLogo} />
         <Text style={styles.splashTag}>Industrial Supply, Simplified.</Text>
       </View>
     );
@@ -290,8 +300,12 @@ function AppGate() {
         onLoginSuccess={(selectedRole) => {
           setShowLogin(false);
           setRoleSyncing(true);
+          setPostLoginWait(true);
           setPortalPersist(selectedRole || loginMode || 'customer');
-          setTimeout(() => setRoleSyncing(false), 1500);
+          setTimeout(() => {
+            setRoleSyncing(false);
+            setPostLoginWait(false);
+          }, 4000);
         }}
       />
     );
@@ -392,6 +406,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 16,
   },
+  loadingLogo: {
+    width: 160,
+    height: 44,
+    resizeMode: "contain",
+  },
   splash: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -403,6 +422,11 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "900",
     letterSpacing: 4,
+  },
+  splashLogo: {
+    width: 180,
+    height: 48,
+    resizeMode: "contain",
   },
   splashTag: {
     marginTop: 10,

@@ -127,11 +127,12 @@ export async function getDashboard() {
   }
 }
 
-export async function getOrders(status = "PENDING") {
+export async function getOrders(status) {
   if (USE_MOCK) return { orders: ordersMock };
 
   try {
-    const data = await cachedFetch(`/api/mobile/orders?status=${status}`, {}, 30000);
+    const query = status ? `?status=${status}` : "";
+    const data = await cachedFetch(`/api/mobile/orders${query}`, {}, 30000);
     return {
       orders: data.orders.map((o) => ({
         id: o.id,
@@ -165,18 +166,46 @@ export async function getOrdersHistory() {
     return {
       orders: data.orders.map((o) => ({
         id: o.id,
-        customer: o.customerName,
-        amount: String(Math.round(o.totalAmount || 0)),
+        customer: o.customerName || o.customer || "Unknown",
+        customerName: o.customerName,
+        customerEmail: o.customerEmail,
+        customerPhone: o.customerPhone,
+        amount: String(Math.round(o.totalAmount || o.amount || 0)),
+        totalAmount: o.totalAmount || o.amount || 0,
         status: o.status,
         city: o.city || "-",
         createdAt: o.createdAt,
         itemsCount: Array.isArray(o.items) ? o.items.length : 0,
+        items: (o.items || []).map((item) => ({
+          ...item,
+          image:
+            item.image ||
+            item.product?.image ||
+            item.product?.imageUrl ||
+            item.product?.imagePath ||
+            "",
+        })),
+        purchaseOrders: o.purchaseOrders || [],
       })),
     };
   } catch (error) {
     console.error("Error fetching orders history:", error);
     return { orders: ordersHistoryMock };
   }
+}
+
+export async function generateInvoice(orderId) {
+  return authenticatedFetch("/api/invoices/generate", {
+    method: "POST",
+    body: JSON.stringify({ orderId }),
+  });
+}
+
+export async function generatePurchaseOrders(orderId) {
+  return authenticatedFetch("/api/purchase-orders/generate", {
+    method: "POST",
+    body: JSON.stringify({ orderId }),
+  });
 }
 
 export async function getVendors(status = "PENDING") {

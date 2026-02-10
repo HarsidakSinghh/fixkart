@@ -3,6 +3,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getSalesmen, getSalesmanDetail } from "../services/salesmanAdminApi";
+import SalesmanTrackScreen from "./SalesmanTrackScreen";
 import { View, Text, StyleSheet } from "react-native";
 import { colors, spacing } from "../theme";
 import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
@@ -15,12 +16,17 @@ export default function SalesmenScreen() {
   const { items, error, refresh, loading } = useAsyncList(fetchSalesmen, []);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [trackSalesman, setTrackSalesman] = useState(null);
 
   const loadDetail = async (id) => {
     setSelected(id);
     const data = await getSalesmanDetail(id);
     setDetail(data);
   };
+
+  if (trackSalesman) {
+    return <SalesmanTrackScreen salesman={trackSalesman} onBack={() => setTrackSalesman(null)} />;
+  }
 
   return (
     <AdminScreenLayout>
@@ -35,12 +41,14 @@ export default function SalesmenScreen() {
         <RowCard
           key={s.id}
           title={s.name || "Salesman"}
-          subtitle={`${s.phone}  •  ${s.code}`}
+          subtitle={`${s.phone}  •  ${s.code}${s.vendorName ? `  •  ${s.vendorName}` : ""}`}
           right={<Badge text={s.status || "ACTIVE"} tone={s.status === "ACTIVE" ? "success" : "warning"} />}
           meta={
             <ActionRow
               primaryLabel="View Details"
               onPrimary={() => loadDetail(s.id)}
+              secondaryLabel="Track"
+              onSecondary={() => setTrackSalesman(s)}
             />
           }
         />
@@ -52,6 +60,9 @@ export default function SalesmenScreen() {
           <Text style={styles.detailMeta}>Phone: {detail.salesman?.phone}</Text>
           <Text style={styles.detailMeta}>Code: {detail.salesman?.code}</Text>
           <Text style={styles.detailMeta}>Status: {detail.salesman?.status}</Text>
+          {detail.salesman?.vendorName ? (
+            <Text style={styles.detailMeta}>Vendor: {detail.salesman?.vendorName}</Text>
+          ) : null}
 
           <View style={styles.statsRow}>
             <View style={styles.statBox}>

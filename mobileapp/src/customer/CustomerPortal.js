@@ -171,6 +171,10 @@ export default function CustomerPortal({ onOpenLogin }) {
           setProfileGate(false);
           setTab('home');
         }}
+        onCancel={() => {
+          setProfileGate(false);
+          setTab('home');
+        }}
       />
     );
   }

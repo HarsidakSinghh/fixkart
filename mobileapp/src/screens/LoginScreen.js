@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { useSignIn, useAuth as useClerkAuth, useUser, useOAuth } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
@@ -217,9 +218,7 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
       >
         <View style={styles.content}>
           <View style={styles.header}>
-              <Text style={styles.title}>
-                {isSalesmanMode ? 'FixKart Sales' : 'FixKart Sign In'}
-              </Text>
+              <Image source={require('../../assets/logo1.png')} style={styles.logo} />
             <Text style={styles.subtitle}>
               {stage === 'email'
                 ? 'Sign in with email verification'
@@ -412,6 +411,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: colors.primary,
+    marginBottom: spacing.sm,
+  },
+  logo: {
+    width: 160,
+    height: 40,
+    resizeMode: 'contain',
     marginBottom: spacing.sm,
   },
   subtitle: {
