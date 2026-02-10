@@ -29,36 +29,62 @@ export async function GET(req: Request) {
 
   const customerMap = new Map(customers.map((c) => [c.userId, c]));
 
-  const payload = items.map((item) => {
+  const grouped = new Map<string, any>();
+
+  items.forEach((item) => {
     const order = item.order;
-    const customer = order ? customerMap.get(order.customerId) : null;
+    if (!order) return;
+
+    const customer = customerMap.get(order.customerId);
     const addressParts = customer
       ? [customer.address, customer.city, customer.state, customer.postalCode].filter(Boolean)
       : [];
+
     const productPrice = typeof item.product?.price === "number" ? item.product.price : null;
-    return {
+    const vendorPrice = productPrice ?? item.price;
+
+    const existing = grouped.get(order.id);
+    const entry = existing || {
+      id: order.id,
+      orderId: order.id,
+      status: order.status || "PENDING",
+      createdAt: order.createdAt.toISOString(),
+      customer: {
+        name: order.customerName || customer?.fullName || "Customer",
+        email: order.customerEmail || customer?.email || "",
+        phone: order.customerPhone || customer?.phone || "",
+        address: addressParts.join(", ") || "",
+      },
+      items: [],
+      totals: {
+        vendorTotal: 0,
+        totalQty: 0,
+      },
+    };
+
+    entry.items.push({
       id: item.id,
-      orderId: item.orderId,
       status: item.status,
       dispatchCode: item.dispatchCode || null,
       quantity: item.quantity,
       price: item.price,
-      vendorPrice: productPrice ?? item.price,
+      vendorPrice,
       productName: item.productName || item.product?.title || item.product?.name || "Product",
       image: item.image || item.product?.image || null,
       createdAt: item.createdAt.toISOString(),
-      customer: {
-        name: order?.customerName || customer?.fullName || "Customer",
-        email: order?.customerEmail || customer?.email || "",
-        phone: order?.customerPhone || customer?.phone || "",
-        address: addressParts.join(", ") || "",
-      },
-      order: {
-        status: order?.status || "PENDING",
-        totalAmount: order?.totalAmount || 0,
-      },
-    };
+    });
+
+    entry.totals.vendorTotal += vendorPrice * item.quantity;
+    entry.totals.totalQty += item.quantity;
+
+    if (!existing) {
+      grouped.set(order.id, entry);
+    }
   });
+
+  const payload = Array.from(grouped.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   return NextResponse.json({ orders: payload });
 }
