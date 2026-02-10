@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Act
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
-import { getStoreTypes } from './storeApi';
+import { getStoreCategories, getStoreTypes } from './storeApi';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 
@@ -11,6 +11,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [category, setCategory] = useState('All');
+  const [categories, setCategories] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [types, setTypes] = useState([]);
   const { isAuthenticated, clearSession } = useAuth();
@@ -39,6 +40,34 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   useEffect(() => {
     loadTypes();
   }, [loadTypes]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fallback = [
+      'Fastening & Joining',
+      'Electrical & Lighting',
+      'Tools & Hardware',
+      'Abrasives',
+      'Flow Control',
+      'Heating & Cooling',
+      'Fabricating',
+      'Lubricating',
+      'Material Handling',
+    ];
+    getStoreCategories()
+      .then((data) => {
+        if (!mounted) return;
+        const list = Array.isArray(data?.categories) ? data.categories : [];
+        setCategories(list.length ? list : fallback);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setCategories(fallback);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredTypes = useMemo(() => {
     if (!debouncedQuery) return types;
@@ -145,6 +174,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         active={category}
         onClose={() => setDrawerOpen(false)}
         onSelect={setCategory}
+        categories={categories}
       />
     </View>
   );

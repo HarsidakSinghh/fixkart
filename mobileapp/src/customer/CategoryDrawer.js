@@ -2,20 +2,10 @@ import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 
-export default function CategoryDrawer({ visible, active, onClose, onSelect }) {
-  const categories = [
-    'All',
-    'Fastening & Joining',
-    'Electrical & Lighting',
-    'Tools & Hardware',
-    'Abrasives',
-    'Flow Control',
-    'Heating & Cooling',
-    'Fabricating',
-    'Lubricating',
-    'Material Handling',
-  ];
-  const list = active && !categories.includes(active) ? [active, ...categories] : categories;
+export default function CategoryDrawer({ visible, active, onClose, onSelect, categories = [] }) {
+  const base = categories.length ? categories : ['All'];
+  const normalized = base.includes('All') ? base : ['All', ...base];
+  const list = active && !normalized.includes(active) ? [active, ...normalized] : normalized;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

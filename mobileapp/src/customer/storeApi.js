@@ -48,6 +48,22 @@ export async function getStoreTypes(category = '') {
   return res.json();
 }
 
+export async function getStoreCategories() {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
+  const cacheKey = 'store:categories';
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+  const res = await fetch(`${BASE_URL}/api/mobile/store/categories`);
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  const data = await res.json();
+  setCache(cacheKey, data, 60000);
+  return data;
+}
+
 export async function getTypeListings(subCategory) {
   if (!BASE_URL) {
     throw new Error('Missing API base URL');
