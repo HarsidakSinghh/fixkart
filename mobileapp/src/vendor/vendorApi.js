@@ -138,6 +138,13 @@ export async function getVendorOrders() {
   return data;
 }
 
+export async function getVendorOrderPO(orderId) {
+  return authFetch('/api/mobile/vendor/orders/po', {
+    method: 'POST',
+    body: JSON.stringify({ orderId }),
+  });
+}
+
 export async function getVendorComplaints() {
   const cacheKey = 'vendor:complaints';
   const cached = getCache(cacheKey);

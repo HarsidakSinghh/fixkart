@@ -1,16 +1,29 @@
 {
-    "build": {
-      "preview": {
-        "android": {
-          "buildType": "apk"
-        },
-        "env": {
-          "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZnVubnktZWxrLTkyLmNsZXJrLmFjY291bnRzLmRldiQ",
-          "EXPO_PUBLIC_API_BASE_URL": "https://fixkart-8p38.vercel.app",
-          "EXPO_PUBLIC_USE_MOCK": "false",
-          "EXPO_PUBLIC_CLERK_JWT_TEMPLATE": "mobile"
-        }
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZnVubnktZWxrLTkyLmNsZXJrLmFjY291bnRzLmRldiQ",
+        "EXPO_PUBLIC_API_BASE_URL": "https://fixkart-8p38.vercel.app",
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_CLERK_JWT_TEMPLATE": "mobile"
+      }
+    },
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZnVubnktZWxrLTkyLmNsZXJrLmFjY291bnRzLmRldiQ",
+        "EXPO_PUBLIC_API_BASE_URL": "https://fixkart-8p38.vercel.app",
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_CLERK_JWT_TEMPLATE": "mobile"
       }
     }
   }
+}
   

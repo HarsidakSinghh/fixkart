@@ -1,9 +1,34 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { prisma } from "@/lib/prisma";
+import fs from "fs";
+import path from "path";
 
 function numberToWords(amount: number) {
   return `INR ${amount.toFixed(0)} Only`;
+}
+
+const FIXKART_INFO = {
+  name: "Fixkart",
+  addressLines: [
+    "E-BXXX1-210, INDL AREA-C",
+    "JASPAL BANGAR ROAD, SUA ROAD",
+    "DHANDARI KALAN",
+    "LUDHIANA, PUNJAB (India) - 141010",
+  ],
+  gst: "03ADGPK7577B2ZO",
+  state: "Punjab",
+  stateCode: "03",
+};
+
+function loadLogoBase64() {
+  try {
+    const logoPath = path.resolve(process.cwd(), "mobileapp/assets/logo1.png");
+    const buffer = fs.readFileSync(logoPath);
+    return `data:image/png;base64,${buffer.toString("base64")}`;
+  } catch (_) {
+    return null;
+  }
 }
 
 export async function generateVendorPO(orderId: string, vendorId: string): Promise<{ success: boolean; url?: string; error?: string }> {
@@ -29,10 +54,7 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
       where: { userId: order.customerId },
     });
 
-    const customerName = order.customerName || customerProfile?.fullName || "Customer";
-    const customerEmail = order.customerEmail || customerProfile?.email || "";
-    const customerPhone = order.customerPhone || customerProfile?.phone || "";
-    const customerAddress = customerProfile
+    const deliveryAddress = customerProfile
       ? [customerProfile.address, customerProfile.city, customerProfile.state, customerProfile.postalCode]
           .filter(Boolean)
           .join(", ")
@@ -43,67 +65,75 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
     const pageHeight = doc.internal.pageSize.height;
     const margin = 14;
 
+    doc.setDrawColor(40);
     doc.rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2);
+
+    const logo = loadLogoBase64();
+    if (logo) {
+      doc.addImage(logo, "PNG", margin + 5, 18, 40, 14);
+    }
 
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("Purchase Order", margin + 5, 25);
+    doc.text("Purchase Order", margin + (logo ? 48 : 5), 28);
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Order: #${order.id.slice(0, 8)}`, pageWidth - margin - 5, 25, { align: "right" });
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin - 5, 31, { align: "right" });
+    doc.text(`Order: #${order.id.slice(0, 8).toUpperCase()}`, pageWidth - margin - 5, 24, { align: "right" });
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin - 5, 30, { align: "right" });
 
-    let yPos = 38;
+    let yPos = 36;
     doc.line(margin, yPos, pageWidth - margin, yPos);
 
     const sectionTop = yPos;
     const colCenter = pageWidth / 2;
-    doc.line(colCenter, yPos, colCenter, yPos + 58);
-    doc.line(margin, yPos + 58, pageWidth - margin, yPos + 58);
+    doc.line(colCenter, yPos, colCenter, yPos + 62);
+    doc.line(margin, yPos + 62, pageWidth - margin, yPos + 62);
 
-    // Vendor (Supplier)
+    // Buyer: Fixkart
     let leftY = sectionTop + 8;
     doc.setFont("helvetica", "bold");
-    doc.text("Vendor (Supplier):", margin + 4, leftY);
+    doc.text("Buyer (Fixkart)", margin + 4, leftY);
     doc.setFont("helvetica", "normal");
     leftY += 5;
-    doc.text(vendor.companyName || vendor.fullName, margin + 4, leftY);
+    doc.text(FIXKART_INFO.name, margin + 4, leftY);
     leftY += 5;
-    doc.text([vendor.address, vendor.city].filter(Boolean).join(", "), margin + 4, leftY);
-    leftY += 5;
-    doc.text([vendor.state, vendor.postalCode].filter(Boolean).join(" - "), margin + 4, leftY);
-    leftY += 5;
-    if (vendor.gstNumber) {
-      doc.text(`GSTIN: ${vendor.gstNumber}`, margin + 4, leftY);
+    FIXKART_INFO.addressLines.forEach((line) => {
+      doc.text(line, margin + 4, leftY);
       leftY += 5;
-    }
-    doc.text(`Phone: ${vendor.phone || "N/A"}`, margin + 4, leftY);
+    });
+    doc.text(`GSTIN/UIN: ${FIXKART_INFO.gst}`, margin + 4, leftY);
     leftY += 5;
-    doc.text(`Email: ${vendor.email || "N/A"}`, margin + 4, leftY);
+    doc.text(`State Name: ${FIXKART_INFO.state}, Code: ${FIXKART_INFO.stateCode}`, margin + 4, leftY);
 
-    // Customer (Buyer)
+    // Supplier: Vendor
     let rightY = sectionTop + 8;
     const rightColX = colCenter + 4;
     doc.setFont("helvetica", "bold");
-    doc.text("Customer (Buyer):", rightColX, rightY);
+    doc.text("Supplier (Vendor)", rightColX, rightY);
     doc.setFont("helvetica", "normal");
     rightY += 5;
-    doc.text(customerName, rightColX, rightY);
+    doc.text(vendor.companyName || vendor.fullName, rightColX, rightY);
     rightY += 5;
-    if (customerEmail) {
-      doc.text(customerEmail, rightColX, rightY);
+    doc.text([vendor.address, vendor.city].filter(Boolean).join(", "), rightColX, rightY);
+    rightY += 5;
+    doc.text([vendor.state, vendor.postalCode].filter(Boolean).join(" - "), rightColX, rightY);
+    rightY += 5;
+    if (vendor.gstNumber) {
+      doc.text(`GSTIN: ${vendor.gstNumber}`, rightColX, rightY);
       rightY += 5;
     }
-    if (customerPhone) {
-      doc.text(customerPhone, rightColX, rightY);
-      rightY += 5;
-    }
-    if (customerAddress) {
-      doc.text(customerAddress, rightColX, rightY, { maxWidth: pageWidth - rightColX - margin });
-    }
+    doc.text(`Phone: ${vendor.phone || "N/A"}`, rightColX, rightY);
+    rightY += 5;
+    doc.text(`Email: ${vendor.email || "N/A"}`, rightColX, rightY);
 
-    const tableStartY = sectionTop + 63;
+    const detailsY = sectionTop + 66;
+    doc.setFont("helvetica", "bold");
+    doc.text("Delivery Address", margin + 4, detailsY);
+    doc.setFont("helvetica", "normal");
+    doc.text(deliveryAddress || "N/A", margin + 4, detailsY + 5, { maxWidth: pageWidth - margin * 2 - 8 });
+
+    const tableStartY = detailsY + 18;
     const tableColumn = ["SI No.", "Description", "Qty", "Rate", "Amount"];
     const tableRows: any[] = [];
 
@@ -132,7 +162,7 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
       startY: tableStartY,
       theme: "grid",
       styles: { fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold" },
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: "bold" },
       columnStyles: { 0: { cellWidth: 14 }, 1: { cellWidth: 70 }, 4: { halign: "right" } },
       margin: { left: margin, right: margin },
     });
@@ -149,7 +179,7 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
 
     doc.setFontSize(6);
     doc.setFont("helvetica", "normal");
-    doc.text("This is a computer generated purchase order.", margin, finalY + 30);
+    doc.text("This is a computer generated purchase order.", margin, finalY + 28);
 
     const pdfOutput = doc.output("arraybuffer");
     const buffer = Buffer.from(pdfOutput);
@@ -169,6 +199,7 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
 
     const cloudUrl = getPrivateDownloadUrl(uploadResult.public_id, "pdf", "raw");
 
+    const poNumber = `PO-${order.id.slice(-6).toUpperCase()}-${vendor.id.slice(-4).toUpperCase()}`;
     const existing = await prisma.purchaseOrder.findFirst({
       where: { orderId: order.id, vendorId: vendor.userId },
     });
@@ -176,7 +207,7 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
     if (existing) {
       await prisma.purchaseOrder.update({
         where: { id: existing.id },
-        data: { url: cloudUrl, poNumber: `PO-${order.id.slice(-6).toUpperCase()}-${vendor.id.slice(-4).toUpperCase()}` },
+        data: { url: cloudUrl, poNumber },
       });
     } else {
       await prisma.purchaseOrder.create({
@@ -184,7 +215,7 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
           orderId: order.id,
           vendorId: vendor.userId,
           url: cloudUrl,
-          poNumber: `PO-${order.id.slice(-6).toUpperCase()}-${vendor.id.slice(-4).toUpperCase()}`,
+          poNumber,
         },
       });
     }

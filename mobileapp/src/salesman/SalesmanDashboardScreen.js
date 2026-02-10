@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
 import {
   getSalesmanDashboard,
@@ -14,28 +14,36 @@ import { useAuth } from '../context/AuthContext';
 import { getCurrentCoords } from './location';
 import { startBackgroundTracking, stopBackgroundTracking } from './backgroundLocation';
 
-export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
+export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual, refreshKey = 0 }) {
   const [status, setStatus] = useState('NOT_STARTED');
   const [stats, setStats] = useState({});
   const [beats, setBeats] = useState([]);
   const [recentVisits, setRecentVisits] = useState([]);
   const [showBeats, setShowBeats] = useState(true);
   const [showVisits, setShowVisits] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { clearSession } = useAuth();
 
   const loadData = useCallback(async () => {
-    const dashboard = await getSalesmanDashboard();
-    setStatus(dashboard.status);
-    setStats(dashboard.stats || {});
-    const beatData = await getSalesmanBeats();
-    setBeats(beatData.beats || []);
-    const visitsData = await getSalesmanVisits();
-    setRecentVisits(visitsData.visits || []);
+    setLoading(true);
+    try {
+      const [dashboard, beatData, visitsData] = await Promise.all([
+        getSalesmanDashboard(),
+        getSalesmanBeats(),
+        getSalesmanVisits(),
+      ]);
+      setStatus(dashboard.status);
+      setStats(dashboard.stats || {});
+      setBeats(beatData.beats || []);
+      setRecentVisits((visitsData.visits || []).slice(0, 3));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, refreshKey]);
 
   useEffect(() => {
     if (status === 'STARTED') {
@@ -76,7 +84,7 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
         onPress: async () => {
           await deleteSalesmanVisit(visitId);
           const visitsData = await getSalesmanVisits();
-          setRecentVisits(visitsData.visits || []);
+          setRecentVisits((visitsData.visits || []).slice(0, 3));
         },
       },
     ]);
@@ -102,6 +110,13 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
           </View>
         </View>
 
+        {loading ? (
+          <View style={styles.loadingBar}>
+            <ActivityIndicator color={salesmanColors.primary} />
+            <Text style={styles.loadingText}>Loading your day…</Text>
+          </View>
+        ) : null}
+
         <View style={styles.dayCard}>
           <View>
             <Text style={styles.dayLabel}>Attendance</Text>
@@ -120,12 +135,12 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Visits</Text>
+            <Text style={styles.statLabel}>Assigned</Text>
             <Text style={styles.statValue}>{stats.visitsPlanned || 0}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Follow-ups</Text>
-            <Text style={styles.statValue}>{stats.pendingFollowUps || 0}</Text>
+            <Text style={styles.statLabel}>Completed</Text>
+            <Text style={styles.statValue}>{stats.visitsCompleted || 0}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Orders</Text>
@@ -160,7 +175,7 @@ export default function SalesmanDashboardScreen({ onOpenVisit, onOpenManual }) {
         ) : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Previous Visits</Text>
+          <Text style={styles.sectionTitle}>Recent Visits</Text>
           <TouchableOpacity onPress={() => setShowVisits((prev) => !prev)}>
             <Text style={styles.sectionToggle}>{showVisits ? 'Collapse' : 'Expand'}</Text>
           </TouchableOpacity>
@@ -218,7 +233,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   logoutText: { color: salesmanColors.text, fontWeight: '700', fontSize: 12 },
+  loadingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: salesmanColors.card,
+    borderRadius: 12,
+    padding: salesmanSpacing.sm,
+    borderWidth: 1,
+    borderColor: salesmanColors.border,
+  },
+  loadingText: { color: salesmanColors.muted, fontSize: 12 },
   dayCard: {
+    marginTop: salesmanSpacing.md,
     backgroundColor: salesmanColors.card,
     borderRadius: 16,
     padding: salesmanSpacing.md,
@@ -243,7 +270,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: salesmanColors.border,
   },
-  statLabel: { color: salesmanColors.muted, fontSize: 11 },
+  statLabel: { color: salesmanColors.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   statValue: { color: salesmanColors.text, fontWeight: '800', fontSize: 18, marginTop: 6 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginTop: salesmanSpacing.lg, marginBottom: salesmanSpacing.sm },
   sectionTitle: { fontWeight: '700', color: salesmanColors.text },

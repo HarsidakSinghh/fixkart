@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
-import { getCustomerOrders, seedCustomerOrders } from './customerApi';
+import { getCustomerOrders, seedCustomerOrders, getCustomerInvoice } from './customerApi';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
 import { ErrorState } from '../components/StateViews';
 import StatusPill from '../components/StatusPill';
+import * as WebBrowser from 'expo-web-browser';
 
 const STATUS_STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
 const STATUS_ALIAS = {
@@ -38,6 +39,7 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [downloading, setDownloading] = useState(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -76,6 +78,20 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
       setError('Unable to create sample orders.');
     } finally {
       setSeeding(false);
+    }
+  };
+
+  const handleDownloadInvoice = async (orderId) => {
+    setDownloading(orderId);
+    try {
+      const data = await getCustomerInvoice(orderId);
+      if (data?.url) {
+        await WebBrowser.openBrowserAsync(data.url);
+      }
+    } catch (err) {
+      setError('Unable to download invoice.');
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -182,6 +198,15 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
                     <Text style={styles.helpText}>Help / Complaint / Refund</Text>
                   </TouchableOpacity>
                 ) : null}
+                <TouchableOpacity
+                  style={styles.invoiceBtn}
+                  onPress={() => handleDownloadInvoice(item.id)}
+                  disabled={downloading === item.id}
+                >
+                  <Text style={styles.invoiceText}>
+                    {downloading === item.id ? 'Preparing Invoice…' : 'Download Invoice'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             );
           }}
@@ -286,6 +311,15 @@ const styles = StyleSheet.create({
     borderColor: customerColors.border,
   },
   helpText: { color: customerColors.primary, fontSize: 12, fontWeight: '700' },
+  invoiceBtn: {
+    marginTop: customerSpacing.sm,
+    alignSelf: 'flex-start',
+    backgroundColor: customerColors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  invoiceText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
 });
 
 function statusTone(status) {

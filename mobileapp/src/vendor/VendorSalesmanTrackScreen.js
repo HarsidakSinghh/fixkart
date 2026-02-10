@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getSalesmanTrack } from './vendorApi';
 
@@ -10,6 +10,8 @@ export default function VendorSalesmanTrackScreen({ salesman, onBack }) {
   const [track, setTrack] = useState([]);
   const [current, setCurrent] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [startAt, setStartAt] = useState(null);
+  const [endAt, setEndAt] = useState(null);
 
   const loadTrack = useCallback(async () => {
     if (!salesman?.id) return;
@@ -20,10 +22,14 @@ export default function VendorSalesmanTrackScreen({ salesman, onBack }) {
       setTrack(Array.isArray(data.track) ? data.track : []);
       setCurrent(data.current || null);
       setLastUpdated(data.lastUpdated || null);
+      setStartAt(data.startAt || null);
+      setEndAt(data.endAt || null);
     } catch (error) {
       setTrack([]);
       setCurrent(null);
       setLastUpdated(null);
+      setStartAt(null);
+      setEndAt(null);
     } finally {
       setLoading(false);
     }
@@ -44,19 +50,72 @@ export default function VendorSalesmanTrackScreen({ salesman, onBack }) {
     () =>
       track
         .filter((point) => typeof point.lat === 'number' && typeof point.lng === 'number')
-        .map((point) => ({ latitude: point.lat, longitude: point.lng })),
+        .map((point) => [point.lat, point.lng]),
     [track]
   );
 
   const focus = useMemo(() => {
     if (current?.lat && current?.lng) {
-      return { latitude: current.lat, longitude: current.lng };
+      return [current.lat, current.lng];
     }
     if (mapPoints.length) {
       return mapPoints[mapPoints.length - 1];
     }
     return null;
   }, [current, mapPoints]);
+
+  const mapHtml = useMemo(() => {
+    const points = JSON.stringify(mapPoints);
+    const focusPoint = JSON.stringify(focus);
+    const live = JSON.stringify(current && current.lat && current.lng ? [current.lat, current.lng] : null);
+    const showStart = JSON.stringify(!active && mapPoints.length ? mapPoints[0] : null);
+    const showEnd = JSON.stringify(!active && mapPoints.length ? mapPoints[mapPoints.length - 1] : null);
+
+    return `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+          <style>
+            html, body, #map { height: 100%; margin: 0; padding: 0; }
+            .leaflet-control-attribution { font-size: 10px; }
+          </style>
+        </head>
+        <body>
+          <div id="map"></div>
+          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <script>
+            const points = ${points};
+            const focus = ${focusPoint};
+            const live = ${live};
+            const start = ${showStart};
+            const end = ${showEnd};
+            const map = L.map('map', { zoomControl: true });
+            if (focus) {
+              map.setView(focus, 13);
+            } else {
+              map.setView([20.5937, 78.9629], 4);
+            }
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 19,
+              attribution: '&copy; OpenStreetMap contributors',
+            }).addTo(map);
+            if (points.length > 1) {
+              L.polyline(points, { color: '#2563EB', weight: 4 }).addTo(map);
+            }
+            if (live) {
+              L.marker(live).addTo(map).bindPopup('Live location');
+            }
+            if (start) {
+              L.marker(start).addTo(map).bindPopup('Start');
+            }
+            if (end) {
+              L.marker(end).addTo(map).bindPopup('End');
+            }
+          </script>
+        </body>
+      </html>`;
+  }, [mapPoints, focus, current, active]);
 
   return (
     <View style={styles.container}>
@@ -75,6 +134,12 @@ export default function VendorSalesmanTrackScreen({ salesman, onBack }) {
         {lastUpdated ? (
           <Text style={styles.statusMeta}>Last updated: {new Date(lastUpdated).toLocaleString()}</Text>
         ) : null}
+        {startAt ? (
+          <Text style={styles.statusMeta}>Start: {new Date(startAt).toLocaleTimeString()}</Text>
+        ) : null}
+        {active ? null : endAt ? (
+          <Text style={styles.statusMeta}>End: {new Date(endAt).toLocaleTimeString()}</Text>
+        ) : null}
       </View>
 
       <View style={styles.mapCard}>
@@ -84,31 +149,13 @@ export default function VendorSalesmanTrackScreen({ salesman, onBack }) {
             <Text style={styles.loadingText}>Loading location…</Text>
           </View>
         ) : focus ? (
-          <MapView
+          <WebView
             style={styles.map}
-            initialRegion={{
-              latitude: focus.latitude,
-              longitude: focus.longitude,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            }}
-          >
-            {mapPoints.length > 1 ? (
-              <Polyline coordinates={mapPoints} strokeWidth={4} strokeColor={vendorColors.primary} />
-            ) : null}
-            {active && current?.lat && current?.lng ? (
-              <Marker
-                coordinate={{ latitude: current.lat, longitude: current.lng }}
-                title="Live location"
-              />
-            ) : null}
-            {!active && mapPoints.length ? (
-              <Marker coordinate={mapPoints[0]} title="Start" />
-            ) : null}
-            {!active && mapPoints.length ? (
-              <Marker coordinate={mapPoints[mapPoints.length - 1]} title="End" />
-            ) : null}
-          </MapView>
+            originWhitelist={['*']}
+            source={{ html: mapHtml }}
+            javaScriptEnabled
+            domStorageEnabled
+          />
         ) : (
           <View style={styles.centered}>
             <Text style={styles.loadingText}>No GPS data yet.</Text>

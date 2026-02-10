@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { customerColors, customerSpacing } from './CustomerTheme';
 
@@ -20,7 +20,7 @@ export default function CustomerHeader({
             <Text style={styles.menuText}>☰</Text>
           </TouchableOpacity>
           <View>
-            <Text style={styles.logo}>FIXKART</Text>
+            <Image source={require('../../assets/logo1.png')} style={styles.logoImage} />
             <Text style={styles.tagline}>Industrial Fasteners</Text>
           </View>
         </View>
@@ -93,6 +93,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: 1.5,
+  },
+  logoImage: {
+    width: 120,
+    height: 28,
+    resizeMode: 'contain',
   },
   tagline: { color: '#DDE6FF', fontSize: 10, fontWeight: '600' },
   actions: {

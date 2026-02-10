@@ -2,15 +2,16 @@
   "expo": {
     "name": "FixKart",
     "slug": "mobileapp",
+    "scheme": "fixkart",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo1.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F6FAFF"
+      "backgroundColor": "#0B5AA3"
     },
     "ios": {
       "supportsTablet": true,

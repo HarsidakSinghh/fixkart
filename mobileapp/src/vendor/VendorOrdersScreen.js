@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { getVendorOrders, markVendorOrderReady } from './vendorApi';
+import { getVendorOrders, markVendorOrderReady, getVendorOrderPO } from './vendorApi';
 import StatusPill from '../components/StatusPill';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function VendorOrdersScreen({ onSwitchToListings }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeCode, setActiveCode] = useState(null);
+  const [downloading, setDownloading] = useState(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -49,6 +51,20 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
     }
   };
 
+  const handleDownloadPO = async (orderId) => {
+    setDownloading(orderId);
+    try {
+      const data = await getVendorOrderPO(orderId);
+      if (data?.url) {
+        await WebBrowser.openBrowserAsync(data.url);
+      }
+    } catch (error) {
+      console.error('Failed to download PO', error);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const renderOrder = ({ item }) => (
     <View style={styles.card}>
       <Image source={{ uri: item.image }} style={styles.image} />
@@ -73,6 +89,15 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
             <Text style={styles.dispatchText}>Ready to Dispatch</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          style={styles.poBtn}
+          onPress={() => handleDownloadPO(item.orderId)}
+          disabled={downloading === item.orderId}
+        >
+          <Text style={styles.poText}>
+            {downloading === item.orderId ? 'Preparing PO…' : 'Download PO'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -167,6 +192,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dispatchText: { color: '#FFFFFF', fontWeight: '700', fontSize: 11 },
+  poBtn: {
+    marginTop: vendorSpacing.sm,
+    alignSelf: 'flex-start',
+    backgroundColor: vendorColors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+  },
+  poText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
   codeBadge: {
     marginTop: vendorSpacing.sm,
     alignSelf: 'flex-start',

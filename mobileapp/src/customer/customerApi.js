@@ -38,6 +38,13 @@ export async function getCustomerOrders() {
   return authFetch('/api/mobile/customer-orders');
 }
 
+export async function getCustomerInvoice(orderId) {
+  return authFetch('/api/mobile/customer-orders/invoice', {
+    method: 'POST',
+    body: JSON.stringify({ orderId }),
+  });
+}
+
 export async function getCustomerComplaints() {
   return authFetch('/api/mobile/customer/complaints');
 }

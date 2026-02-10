@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSignIn, useAuth as useClerkAuth, useUser, useOAuth } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useAuth as useCustomAuth } from '../context/AuthContext';
 import { colors, spacing } from '../theme';
 import ScreenLayout from '../components/ScreenLayout';
@@ -27,6 +28,7 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
   const { user } = useUser();
   const { saveSession, checkAdminStatus, clearSession, isAuthenticated, saveSalesmanSession } = useCustomAuth();
   const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+  const redirectUrl = makeRedirectUri({ scheme: 'fixkart', path: 'redirect' });
 
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -173,12 +175,16 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
   const handleGoogleLogin = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { createdSessionId } = await startOAuthFlow();
+      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow({
+        redirectUrl,
+        useProxy: false,
+      });
       if (!createdSessionId) {
         Alert.alert('Error', 'Google sign-in failed.');
         return;
       }
-      await setActive({ session: createdSessionId });
+      const activate = setOAuthActive || setActive;
+      await activate({ session: createdSessionId });
       const token = await getToken({ template: jwtTemplate });
       if (!token) {
         Alert.alert('Error', 'Failed to retrieve session token.');
@@ -196,7 +202,8 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
       onLoginSuccess('customer');
     } catch (error) {
       console.error('Google sign-in error:', error);
-      Alert.alert('Error', 'Google sign-in failed.');
+      const message = error?.errors?.[0]?.message || error?.message || 'Google sign-in failed.';
+      Alert.alert('Error', message);
     } finally {
       setIsLoading(false);
     }
