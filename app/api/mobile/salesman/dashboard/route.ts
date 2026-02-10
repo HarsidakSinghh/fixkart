@@ -17,17 +17,22 @@ export async function GET(req: Request) {
     .find({ salesmanId: String(guard.salesman._id), createdAt: { $gte: today } })
     .toArray();
 
+  const pendingAssignments = await db
+    .collection("SalesmanAssignment")
+    .find({ salesmanId: String(guard.salesman._id), status: "PENDING" })
+    .toArray();
+
   const started = logs.some((l) => l.event === "DAY_START");
   const ended = logs.some((l) => l.event === "DAY_END");
 
   return NextResponse.json({
     status: ended ? "ENDED" : started ? "STARTED" : "NOT_STARTED",
     stats: {
-      visitsPlanned: 8,
+      visitsPlanned: pendingAssignments.length,
       visitsCompleted: logs.filter((l) => l.event === "VISIT_END").length,
-      pendingFollowUps: 2,
-      ordersBooked: 3,
-      distanceCovered: "12.6 km",
+      pendingFollowUps: 0,
+      ordersBooked: 0,
+      distanceCovered: null,
     },
   });
 }

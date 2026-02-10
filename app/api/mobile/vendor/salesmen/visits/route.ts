@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
   const logs = await db
     .collection("TrackingLog")
-    .find({ salesmanId: String(salesman._id) })
+    .find({ salesmanId: String(salesman._id), event: "VISIT_END" })
     .sort({ createdAt: -1 })
     .limit(3)
     .toArray();

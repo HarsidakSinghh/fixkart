@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     .collection("TrackingLog")
     .find({ salesmanId: String(guard.salesman._id), event: "VISIT_END" })
     .sort({ createdAt: -1 })
-    .limit(5)
+    .limit(3)
     .toArray();
 
   return NextResponse.json({

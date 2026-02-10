@@ -37,6 +37,8 @@ export async function GET(req: Request) {
       track: [],
       current: null,
       lastUpdated: salesman.lastUpdated || null,
+      startAt: null,
+      endAt: null,
     });
   }
 
@@ -86,5 +88,7 @@ export async function GET(req: Request) {
     track,
     current,
     lastUpdated: salesman.lastUpdated || null,
+    startAt: lastStart.createdAt,
+    endAt: lastEnd?.createdAt || null,
   });
 }
