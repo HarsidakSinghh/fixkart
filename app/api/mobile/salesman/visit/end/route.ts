@@ -51,6 +51,20 @@ export async function POST(req: Request) {
     createdAt: new Date(),
   });
 
+  if (typeof lat === "number" && typeof lng === "number") {
+    await db.collection("Salesman").updateOne(
+      { _id: guard.salesman._id },
+      {
+        $set: {
+          currentLat: lat,
+          currentLng: lng,
+          lastUpdated: new Date(),
+          updatedAt: new Date(),
+        },
+      }
+    );
+  }
+
   if (outcome === "Follow-up Required" && followUpDate) {
     await db.collection("SalesmanAssignment").insertOne({
       vendorId: guard.salesman.vendorId,

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Modal, Image, ScrollView } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { createVendorSalesman, getVendorSalesmen, getSalesmanVisits, getSalesmanAssignments, createSalesmanAssignment } from './vendorApi';
+import VendorSalesmanTrackScreen from './VendorSalesmanTrackScreen';
 
 export default function VendorSalesmenScreen({ onBack }) {
   const [salesmen, setSalesmen] = useState([]);
@@ -17,6 +18,7 @@ export default function VendorSalesmenScreen({ onBack }) {
   const [assignSalesman, setAssignSalesman] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [assignForm, setAssignForm] = useState({ companyName: '', address: '', note: '', visitDate: '' });
+  const [trackSalesman, setTrackSalesman] = useState(null);
 
   const loadSalesmen = useCallback(async () => {
     setLoading(true);
@@ -114,6 +116,10 @@ export default function VendorSalesmenScreen({ onBack }) {
     }
   };
 
+  if (trackSalesman) {
+    return <VendorSalesmanTrackScreen salesman={trackSalesman} onBack={() => setTrackSalesman(null)} />;
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.heroCard}>
@@ -179,6 +185,9 @@ export default function VendorSalesmenScreen({ onBack }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.linkBtn} onPress={() => openAssign(item)}>
                 <Text style={styles.linkText}>Assign Visit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.trackBtn} onPress={() => setTrackSalesman(item)}>
+                <Text style={styles.trackText}>Track</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -364,6 +373,15 @@ const styles = StyleSheet.create({
   codeText: { color: vendorColors.primary, fontWeight: '700' },
   linkBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   linkText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
+  trackBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: vendorColors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+  },
+  trackText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
   emptyText: { color: vendorColors.muted, textAlign: 'center', marginTop: vendorSpacing.md },
   modalBackdrop: {
     flex: 1,

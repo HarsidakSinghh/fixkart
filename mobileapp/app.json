@@ -15,6 +15,12 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "FixKart uses your location to track sales visits during the work day.",
+        "NSLocationAlwaysUsageDescription": "FixKart uses your location to track sales visits during the work day.",
+        "NSLocationWhenInUseUsageDescription": "FixKart uses your location to track sales visits during the work day.",
+        "UIBackgroundModes": [
+          "location"
+        ],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
@@ -22,6 +28,11 @@
     },
     "android": {
       "usesCleartextTraffic": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F6FAFF"
@@ -36,6 +47,9 @@
       "eas": {
         "projectId": "c1f493ae-36da-469c-acb3-1c9aba884ac0"
       }
-    }
+    },
+    "plugins": [
+      "expo-location"
+    ]
   }
 }

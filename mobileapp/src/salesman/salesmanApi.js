@@ -97,3 +97,10 @@ export async function endVisit(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function sendSalesmanPing(lat, lng) {
+  return authFetch('/api/mobile/salesman/track/ping', {
+    method: 'POST',
+    body: JSON.stringify({ lat, lng }),
+  });
+}

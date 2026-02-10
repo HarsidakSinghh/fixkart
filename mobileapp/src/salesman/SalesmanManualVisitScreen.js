@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Alert, Scro
 import * as ImagePicker from 'expo-image-picker';
 import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
 import { endVisit } from './salesmanApi';
+import { getCurrentCoords } from './location';
 
 export default function SalesmanManualVisitScreen({ onBack }) {
   const [companyName, setCompanyName] = useState('');
@@ -26,6 +27,7 @@ export default function SalesmanManualVisitScreen({ onBack }) {
       Alert.alert('Missing info', 'Company name and address are required.');
       return;
     }
+    const coords = await getCurrentCoords();
     await endVisit({
       customerId: null,
       outcome: 'Manual Visit',
@@ -33,6 +35,8 @@ export default function SalesmanManualVisitScreen({ onBack }) {
       imageBase64: photoData || null,
       companyName,
       companyAddress: address,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
     });
     onBack();
   };

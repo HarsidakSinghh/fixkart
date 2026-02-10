@@ -10,23 +10,25 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const { lat, lng } = body || {};
+  const parsedLat = typeof lat === "number" ? lat : null;
+  const parsedLng = typeof lng === "number" ? lng : null;
 
   const db = await getMongoDb();
   await db.collection("TrackingLog").insertOne({
     salesmanId: String(guard.salesman._id),
-    event: "DAY_START",
-    lat: typeof lat === "number" ? lat : null,
-    lng: typeof lng === "number" ? lng : null,
+    event: "GPS_PING",
+    lat: parsedLat,
+    lng: parsedLng,
     createdAt: new Date(),
   });
 
-  if (typeof lat === "number" && typeof lng === "number") {
+  if (typeof parsedLat === "number" && typeof parsedLng === "number") {
     await db.collection("Salesman").updateOne(
       { _id: guard.salesman._id },
       {
         $set: {
-          currentLat: lat,
-          currentLng: lng,
+          currentLat: parsedLat,
+          currentLng: parsedLng,
           lastUpdated: new Date(),
           updatedAt: new Date(),
         },

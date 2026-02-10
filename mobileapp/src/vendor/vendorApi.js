@@ -223,3 +223,8 @@ export async function createSalesmanAssignment(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function getSalesmanTrack(salesmanId) {
+  const data = await authFetch(`/api/mobile/vendor/salesmen/track?salesmanId=${salesmanId}`);
+  return data;
+}

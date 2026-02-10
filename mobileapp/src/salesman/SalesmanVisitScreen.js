@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from 'reac
 import * as ImagePicker from 'expo-image-picker';
 import { salesmanColors, salesmanSpacing } from './SalesmanTheme';
 import { endVisit } from './salesmanApi';
+import { getCurrentCoords } from './location';
 
 const OUTCOMES = ['Order Placed', 'Follow-up Required', 'Not Interested'];
 
@@ -25,6 +26,7 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
   };
 
   const handleEnd = async () => {
+    const coords = await getCurrentCoords();
     await endVisit({
       customerId: beat.id,
       outcome,
@@ -33,6 +35,8 @@ export default function SalesmanVisitScreen({ beat, onBack }) {
       companyName: beat.name,
       companyAddress: beat.address,
       followUpDate: outcome === 'Follow-up Required' ? followUpDate || null : null,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
     });
     onBack();
   };
