@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 const DEFAULT_IMAGGA_ENDPOINT = "https://api.imagga.com";
+const DEFAULT_HF_MODEL_ID = "google/vit-base-patch16-224";
 
 const TAG_TO_PRODUCT: Record<string, string> = {
   bolt: "Hex Bolt",
@@ -26,32 +27,123 @@ const TAG_TO_PRODUCT: Record<string, string> = {
   adhesive: "Industrial Adhesive",
 };
 
-function normalizeProductFromTags(tags: Array<{ name: string; confidence: number }>) {
+type Candidate = {
+  name: string;
+  confidence: number;
+  source?: string;
+};
+
+function normalizeLabel(input: string): string {
+  const key = String(input || "").toLowerCase().trim();
+  if (!key) return "";
+  if (TAG_TO_PRODUCT[key]) return TAG_TO_PRODUCT[key];
+
+  const pairs = Object.entries(TAG_TO_PRODUCT);
+  for (const [needle, normalized] of pairs) {
+    if (key.includes(needle)) return normalized;
+  }
+
+  return key.replace(/\b\w/g, (m) => m.toUpperCase()).trim();
+}
+
+function normalizeProductFromTags(tags: Candidate[]) {
   for (const tag of tags) {
-    const key = String(tag.name || "").toLowerCase().trim();
-    if (TAG_TO_PRODUCT[key]) {
-      return TAG_TO_PRODUCT[key];
+    const normalized = normalizeLabel(tag.name);
+    if (normalized) {
+      return normalized;
     }
   }
   if (!tags.length) return "";
-  return String(tags[0].name || "")
-    .replace(/\b\w/g, (m) => m.toUpperCase())
-    .trim();
+  return normalizeLabel(String(tags[0].name || ""));
+}
+
+async function callHuggingFace(image: File): Promise<Candidate[]> {
+  const token = process.env.HF_API_TOKEN || "";
+  if (!token) return [];
+
+  const modelId = process.env.HF_MODEL_ID || DEFAULT_HF_MODEL_ID;
+  const endpoint = `https://api-inference.huggingface.co/models/${modelId}`;
+  const buffer = Buffer.from(await image.arrayBuffer());
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": image.type || "application/octet-stream",
+    },
+    body: buffer,
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("HuggingFace API error", { status: res.status, body });
+    return [];
+  }
+
+  const payload = await res.json();
+  if (!Array.isArray(payload)) return [];
+
+  return payload
+    .map((row: any) => ({
+      name: normalizeLabel(String(row?.label || "")),
+      confidence: Number(row?.score || 0) * 100,
+      source: "hf",
+    }))
+    .filter((row: Candidate) => row.name && !Number.isNaN(row.confidence))
+    .sort((a: Candidate, b: Candidate) => b.confidence - a.confidence)
+    .slice(0, 8);
+}
+
+async function callImagga(image: File): Promise<Candidate[]> {
+  const apiKey = process.env.IMAGGA_API_KEY;
+  const apiSecret = process.env.IMAGGA_API_SECRET;
+  const apiEndpoint = process.env.IMAGGA_API_ENDPOINT || DEFAULT_IMAGGA_ENDPOINT;
+  if (!apiKey || !apiSecret) return [];
+
+  const upstreamForm = new FormData();
+  upstreamForm.append("image", image, image.name || "upload.jpg");
+  const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
+  const upstream = await fetch(`${apiEndpoint}/v2/tags?language=en`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+    },
+    body: upstreamForm,
+  });
+
+  if (!upstream.ok) {
+    const body = await upstream.text();
+    console.error("Imagga API error", { status: upstream.status, body });
+    return [];
+  }
+
+  const payload = await upstream.json();
+  return Array.isArray(payload?.result?.tags)
+    ? payload.result.tags
+        .map((entry: any) => ({
+          name: normalizeLabel(String(entry?.tag?.en || "").trim()),
+          confidence: Number(entry?.confidence || 0),
+          source: "imagga",
+        }))
+        .filter((entry: Candidate) => entry.name)
+        .slice(0, 8)
+    : [];
+}
+
+function mergeCandidates(candidates: Candidate[]): Candidate[] {
+  const map = new Map<string, Candidate>();
+  for (const item of candidates) {
+    if (!item.name) continue;
+    const current = map.get(item.name);
+    if (!current || item.confidence > current.confidence) {
+      map.set(item.name, item);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.confidence - a.confidence).slice(0, 8);
 }
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.IMAGGA_API_KEY;
-    const apiSecret = process.env.IMAGGA_API_SECRET;
-    const apiEndpoint = process.env.IMAGGA_API_ENDPOINT || DEFAULT_IMAGGA_ENDPOINT;
-
-    if (!apiKey || !apiSecret) {
-      return NextResponse.json(
-        { error: "Imagga is not configured on server" },
-        { status: 500 }
-      );
-    }
-
     const incoming = await req.formData();
     const image = incoming.get("image");
 
@@ -63,35 +155,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Image must be less than 10MB" }, { status: 400 });
     }
 
-    const upstreamForm = new FormData();
-    upstreamForm.append("image", image, image.name || "upload.jpg");
+    const [imaggaCandidates, hfCandidates] = await Promise.all([
+      callImagga(image),
+      callHuggingFace(image),
+    ]);
+    const topCandidates = mergeCandidates([...imaggaCandidates, ...hfCandidates]);
 
-    const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
-    const upstream = await fetch(`${apiEndpoint}/v2/tags?language=en`, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-      },
-      body: upstreamForm,
-    });
-
-    if (!upstream.ok) {
-      const body = await upstream.text();
-      console.error("Imagga API error", { status: upstream.status, body });
-      return NextResponse.json({ error: "Recognition failed" }, { status: 502 });
+    if (!topCandidates.length) {
+      return NextResponse.json(
+        { error: "Vision service is not configured" },
+        { status: 500 }
+      );
     }
-
-    const payload = await upstream.json();
-    const tags = Array.isArray(payload?.result?.tags)
-      ? payload.result.tags
-          .map((entry: any) => ({
-            name: String(entry?.tag?.en || "").trim(),
-            confidence: Number(entry?.confidence || 0),
-          }))
-          .filter((entry: any) => entry.name)
-      : [];
-
-    const topCandidates = tags.slice(0, 8);
     const productName = normalizeProductFromTags(topCandidates);
     const confidence = Number(topCandidates[0]?.confidence || 0);
 
@@ -99,6 +174,7 @@ export async function POST(req: Request) {
       productName,
       confidence,
       candidates: topCandidates,
+      source: "ensemble",
     });
   } catch (error: any) {
     console.error("Vision recognize error", error);
@@ -108,4 +184,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

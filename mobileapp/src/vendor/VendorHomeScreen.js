@@ -11,8 +11,9 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { submitVendorProduct } from './vendorApi';
+import { submitVendorProduct, uploadVendorListingImage } from './vendorApi';
 import { VENDOR_INVENTORY } from '../data/vendorInventory';
 
 export default function VendorHomeScreen({ canAdd, status }) {
@@ -52,6 +53,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [customImageUrl, setCustomImageUrl] = useState('');
+  const [customImagePreview, setCustomImagePreview] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const loadCategories = useCallback(() => {
     const titles = VENDOR_INVENTORY.map((cat) => cat.title);
@@ -95,7 +99,48 @@ export default function VendorHomeScreen({ canAdd, status }) {
     });
     setMessage('');
     setShowAdvanced(false);
+    setCustomImageUrl('');
+    setCustomImagePreview('');
     setModalOpen(true);
+  };
+
+  const handlePickCustomImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setMessage('Gallery permission is required to upload image.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.75,
+      allowsEditing: true,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    if (!asset.base64) {
+      setMessage('Could not read image. Please choose another image.');
+      return;
+    }
+
+    setUploadingImage(true);
+    setMessage('');
+    setCustomImagePreview(asset.uri || '');
+    try {
+      const uploadRes = await uploadVendorListingImage(asset.base64, `vendor-listing-${Date.now()}`);
+      setCustomImageUrl(uploadRes?.url || '');
+      if (!uploadRes?.url) {
+        setMessage('Image upload failed. Please try again.');
+      }
+    } catch (error) {
+      setMessage('Image upload failed. Please try again.');
+      setCustomImagePreview('');
+      setCustomImageUrl('');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const openType = (item) => {
@@ -130,7 +175,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     try {
       await submitVendorProduct({
         baseProductId: selectedProduct.id || null,
-        imageUrl: selectedProduct.image || '',
+        imageUrl: customImageUrl || selectedProduct.image || '',
         name: form.name,
         category: form.category,
         subCategory: form.subCategory,
@@ -336,6 +381,24 @@ export default function VendorHomeScreen({ canAdd, status }) {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>Add Product</Text>
               <Text style={styles.modalSubtitle}>{selectedProduct?.title || selectedProduct?.name}</Text>
+
+              <Text style={styles.inputLabel}>Product Image</Text>
+              <View style={styles.imagePickerRow}>
+                <View style={styles.selectedImageWrap}>
+                  {customImagePreview ? (
+                    <Image source={{ uri: customImagePreview }} style={styles.selectedImage} />
+                  ) : selectedProduct?.image ? (
+                    <Image source={{ uri: selectedProduct.image }} style={styles.selectedImage} />
+                  ) : (
+                    <View style={[styles.selectedImage, styles.selectedImagePlaceholder]}>
+                      <Text style={styles.selectedImagePlaceholderText}>No image</Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity style={styles.uploadImageBtn} onPress={handlePickCustomImage} disabled={uploadingImage}>
+                  <Text style={styles.uploadImageBtnText}>{uploadingImage ? 'Uploading…' : 'Upload custom image'}</Text>
+                </TouchableOpacity>
+              </View>
 
               {renderInput('Name', 'name')}
               {renderInput('Category', 'category', true)}
@@ -604,6 +667,46 @@ const styles = StyleSheet.create({
   advancedText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: vendorColors.text },
   modalSubtitle: { color: vendorColors.muted, marginTop: 4, marginBottom: vendorSpacing.md },
+  imagePickerRow: {
+    marginBottom: vendorSpacing.md,
+  },
+  selectedImageWrap: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.surface,
+  },
+  selectedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  selectedImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedImagePlaceholderText: {
+    color: vendorColors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  uploadImageBtn: {
+    marginTop: vendorSpacing.sm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.surface,
+  },
+  uploadImageBtnText: {
+    color: vendorColors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   inputGroup: { marginBottom: vendorSpacing.md },
   inputLabel: { color: vendorColors.muted, fontSize: 12, marginBottom: 6 },
   input: {

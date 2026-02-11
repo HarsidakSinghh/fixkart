@@ -129,6 +129,13 @@ export async function submitVendorProduct(payload) {
   });
 }
 
+export async function uploadVendorListingImage(imageBase64, filename) {
+  return authFetch('/api/mobile/vendor/uploads', {
+    method: 'POST',
+    body: JSON.stringify({ imageBase64, filename }),
+  });
+}
+
 export async function getVendorOrders() {
   const cacheKey = 'vendor:orders';
   const cached = getCache(cacheKey);
