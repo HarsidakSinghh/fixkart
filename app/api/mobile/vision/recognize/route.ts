@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 const DEFAULT_IMAGGA_ENDPOINT = "https://api.imagga.com";
 const DEFAULT_HF_MODEL_ID = "google/vit-base-patch16-224";
+const DEFAULT_HF_INFERENCE_BASE = "https://router.huggingface.co/hf-inference/models";
 
 const TAG_TO_PRODUCT: Record<string, string> = {
   bolt: "Hex Bolt",
@@ -62,7 +63,7 @@ async function callHuggingFace(image: File): Promise<Candidate[]> {
   if (!token) return [];
 
   const modelId = process.env.HF_MODEL_ID || DEFAULT_HF_MODEL_ID;
-  const endpoint = `https://api-inference.huggingface.co/models/${modelId}`;
+  const endpoint = `${process.env.HF_INFERENCE_BASE || DEFAULT_HF_INFERENCE_BASE}/${modelId}`;
   const buffer = Buffer.from(await image.arrayBuffer());
 
   const res = await fetch(endpoint, {
