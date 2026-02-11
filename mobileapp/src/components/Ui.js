@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   buttonPrimary: {
     backgroundColor: colors.primary,
   },
-  buttonPrimaryText: { color: "#0B1020", fontWeight: "700", fontSize: 12 },
+  buttonPrimaryText: { color: "#FFFFFF", fontWeight: "700", fontSize: 12 },
   buttonGhost: {
     borderWidth: 1,
     borderColor: colors.line,

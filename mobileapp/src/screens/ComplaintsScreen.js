@@ -89,6 +89,15 @@ export default function ComplaintsScreen() {
               </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity
+                  style={styles.resolveBtn}
+                  onPress={async () => {
+                    await updateStatus(selectedComplaint.id, "RESOLVED");
+                    setSelectedComplaint(null);
+                  }}
+                >
+                  <Text style={styles.resolveText}>Mark Resolved</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={styles.reviewBtn}
                   onPress={async () => {
                     await updateStatus(selectedComplaint.id, "IN_REVIEW");
@@ -107,8 +116,9 @@ export default function ComplaintsScreen() {
 }
 
 function statusTone(status) {
-  if (status === "RESOLVED") return "success";
-  if (status === "IN_REVIEW") return "warning";
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "RESOLVED") return "success";
+  if (normalized === "IN_REVIEW") return "warning";
   return "danger";
 }
 
@@ -143,8 +153,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panelAlt,
   },
   linkText: { color: colors.info, marginTop: 6, fontWeight: "700", fontSize: 12 },
-  modalActions: { marginTop: spacing.sm },
+  modalActions: { marginTop: spacing.sm, flexDirection: "row", gap: spacing.sm },
+  resolveBtn: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: "center",
+    paddingVertical: 11,
+  },
+  resolveText: { color: colors.text, fontWeight: "700" },
   reviewBtn: {
+    flex: 1,
     backgroundColor: colors.primary,
     borderRadius: 10,
     alignItems: "center",

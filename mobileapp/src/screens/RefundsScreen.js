@@ -22,8 +22,8 @@ export default function RefundsScreen() {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
   }
 
-  const pending = items.filter((i) => i.status !== "APPROVED");
-  const issued = items.filter((i) => i.status === "APPROVED");
+  const pending = items.filter((i) => String(i.status || "").toUpperCase() !== "APPROVED");
+  const issued = items.filter((i) => String(i.status || "").toUpperCase() === "APPROVED");
 
   return (
     <AdminScreenLayout>
@@ -43,10 +43,10 @@ export default function RefundsScreen() {
           meta={
             <ActionRow
               secondaryLabel="View Details"
-              primaryLabel="Approve"
+              primaryLabel="In Review"
               onSecondary={() => setSelectedRefund(item)}
               onPrimary={async () => {
-                await updateStatus(item.id, "APPROVED");
+                await updateStatus(item.id, "IN_REVIEW");
                 refresh();
               }}
             />
@@ -63,7 +63,7 @@ export default function RefundsScreen() {
           key={item.id}
           title={`₹${item.amount}`}
           subtitle={`${item.orderId}  •  ${item.id}`}
-          right={<StatusPill label="APPROVED" tone="success" />}
+          right={<StatusPill label="ISSUED" tone="success" />}
         />
       ))}
 
@@ -83,6 +83,7 @@ export default function RefundsScreen() {
                 <Text style={styles.metaText}>Vendor: {selectedRefund.vendorName || "Vendor"}</Text>
                 <Text style={styles.metaText}>Amount: ₹{Math.round(selectedRefund.amountValue || 0)}</Text>
                 <Text style={styles.metaText}>Reason: {selectedRefund.reason || "-"}</Text>
+                <Text style={styles.metaText}>Status: {humanRefundStatus(selectedRefund.status)}</Text>
                 {selectedRefund.createdAt ? (
                   <Text style={styles.metaText}>Time: {new Date(selectedRefund.createdAt).toLocaleString()}</Text>
                 ) : null}
@@ -102,6 +103,16 @@ export default function RefundsScreen() {
               </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity
+                  style={styles.reviewBtn}
+                  onPress={async () => {
+                    await updateStatus(selectedRefund.id, "IN_REVIEW");
+                    setSelectedRefund(null);
+                    refresh();
+                  }}
+                >
+                  <Text style={styles.reviewText}>In Review</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={styles.rejectBtn}
                   onPress={async () => {
                     await updateStatus(selectedRefund.id, "REJECTED");
@@ -119,7 +130,7 @@ export default function RefundsScreen() {
                     refresh();
                   }}
                 >
-                  <Text style={styles.approveText}>Approve</Text>
+                  <Text style={styles.approveText}>Issue</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -131,9 +142,19 @@ export default function RefundsScreen() {
 }
 
 function statusTone(status) {
-  if (status === "APPROVED") return "success";
-  if (status === "PENDING") return "warning";
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "APPROVED") return "success";
+  if (normalized === "IN_REVIEW" || normalized === "PENDING") return "warning";
+  if (normalized === "REJECTED") return "danger";
   return "info";
+}
+
+function humanRefundStatus(status) {
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "APPROVED") return "Issued";
+  if (normalized === "IN_REVIEW" || normalized === "PENDING") return "In Review";
+  if (normalized === "REJECTED") return "Rejected";
+  return normalized || "Unknown";
 }
 
 const styles = StyleSheet.create({
@@ -166,6 +187,16 @@ const styles = StyleSheet.create({
   },
   linkText: { color: colors.info, marginTop: 8, fontWeight: "700", fontSize: 12 },
   modalActions: { marginTop: spacing.sm, flexDirection: "row", gap: spacing.sm },
+  reviewBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 11,
+    backgroundColor: colors.panelAlt,
+  },
+  reviewText: { color: colors.text, fontWeight: "700" },
   rejectBtn: {
     flex: 1,
     borderWidth: 1,

@@ -9,6 +9,13 @@ import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
+  const bannerSlides = [
+    { id: '1', image: require('../../assets/photo1.png') },
+    { id: '2', image: require('../../assets/photo2.png') },
+    { id: '3', image: require('../../assets/photo3.png') },
+    { id: '4', image: require('../../assets/photo4.png') },
+  ];
+
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [category, setCategory] = useState('All');
@@ -17,6 +24,9 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [types, setTypes] = useState([]);
   const [lensState, setLensState] = useState('idle');
   const [lensResult, setLensResult] = useState(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [carouselWidth, setCarouselWidth] = useState(0);
+  const carouselRef = React.useRef(null);
   const { isAuthenticated, clearSession } = useAuth();
   const { signOut } = useClerkAuth();
 
@@ -132,6 +142,18 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     ]);
   }, [pickFromCamera, pickFromGallery]);
 
+  useEffect(() => {
+    if (!carouselWidth || bannerSlides.length < 2) return;
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => {
+        const next = (prev + 1) % bannerSlides.length;
+        carouselRef.current?.scrollToOffset?.({ offset: next * carouselWidth, animated: true });
+        return next;
+      });
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [carouselWidth, bannerSlides.length]);
+
   return (
     <View style={styles.container}>
       <CustomerHeader
@@ -186,12 +208,38 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         ListHeaderComponent={() => (
           <>
             <View style={styles.hero}>
-              <Text style={styles.heroOverline}>Trusted Industrial Supply</Text>
-              <Text style={styles.heroTitle}>Worldwide supply for fasteners & tools.</Text>
-              <Text style={styles.heroSubtitle}>Shop reliable inventory, verified vendors, and fast delivery.</Text>
-              <TouchableOpacity style={styles.heroButton}>
-                <Text style={styles.heroButtonText}>Explore Services</Text>
-              </TouchableOpacity>
+              <View
+                style={styles.carouselWrap}
+                onLayout={(event) => {
+                  const width = event.nativeEvent.layout.width;
+                  if (width !== carouselWidth) setCarouselWidth(width);
+                }}
+              >
+                <FlatList
+                  ref={carouselRef}
+                  data={bannerSlides}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={(event) => {
+                    if (!carouselWidth) return;
+                    const index = Math.round(event.nativeEvent.contentOffset.x / carouselWidth);
+                    setActiveSlide(index);
+                  }}
+                  renderItem={({ item }) => (
+                    <Image source={item.image} style={[styles.carouselImage, { width: carouselWidth || 1 }]} />
+                  )}
+                />
+                <View style={styles.dotRow}>
+                  {bannerSlides.map((slide, index) => (
+                    <View
+                      key={`dot-${slide.id}`}
+                      style={[styles.dot, index === activeSlide ? styles.dotActive : null]}
+                    />
+                  ))}
+                </View>
+              </View>
             </View>
 
             <View style={styles.sectionHeader}>
@@ -293,7 +341,7 @@ const styles = StyleSheet.create({
     marginTop: customerSpacing.lg,
     backgroundColor: customerColors.surface,
     borderRadius: 22,
-    padding: customerSpacing.md,
+    padding: customerSpacing.sm,
     borderWidth: 1,
     borderColor: customerColors.border,
     shadowColor: customerColors.shadow,
@@ -302,30 +350,34 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
-  heroOverline: {
-    color: customerColors.primary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
+  carouselWrap: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    height: 160,
+    backgroundColor: customerColors.surface,
   },
-  heroTitle: {
-    color: customerColors.text,
-    fontSize: 18,
-    fontWeight: '800',
-    marginTop: customerSpacing.sm,
+  carouselImage: {
+    height: 160,
+    resizeMode: 'cover',
   },
-  heroSubtitle: { color: customerColors.muted, fontSize: 12, marginTop: 6 },
-  heroButton: {
-    marginTop: customerSpacing.sm,
-    backgroundColor: customerColors.card,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: customerColors.border,
+  dotRow: {
+    position: 'absolute',
+    bottom: 8,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
   },
-  heroButtonText: { color: customerColors.primary, fontWeight: '700', fontSize: 12 },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 99,
+    backgroundColor: '#FFFFFF99',
+  },
+  dotActive: {
+    width: 16,
+    backgroundColor: '#FFFFFF',
+  },
   sectionHeader: {
     paddingHorizontal: customerSpacing.lg,
     marginTop: customerSpacing.lg,

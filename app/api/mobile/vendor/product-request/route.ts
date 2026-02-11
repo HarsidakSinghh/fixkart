@@ -12,6 +12,7 @@ export async function POST(req: Request) {
   const {
     baseProductId,
     imageUrl,
+    imageUrls,
     name,
     category,
     subCategory,
@@ -42,7 +43,12 @@ export async function POST(req: Request) {
   if (baseProductId && !base) {
     return NextResponse.json({ error: "Base product not found" }, { status: 404 });
   }
-  if (!base && !imageUrl) {
+  const normalizedImageUrls = Array.isArray(imageUrls)
+    ? imageUrls.map((url) => String(url || "").trim()).filter(Boolean)
+    : [];
+  const primaryImageUrl = normalizedImageUrls[0] || imageUrl;
+
+  if (!base && !primaryImageUrl) {
     return NextResponse.json({ error: "Missing imageUrl for listing" }, { status: 400 });
   }
 
@@ -89,9 +95,13 @@ export async function POST(req: Request) {
       category,
       subCategory,
       subSubCategory: base?.subSubCategory || null,
-      image: imageUrl || base?.image,
+      image: primaryImageUrl || base?.image,
       imagePath: base?.imagePath || null,
-      gallery: imageUrl ? [imageUrl] : base?.gallery || [],
+      gallery: normalizedImageUrls.length
+        ? normalizedImageUrls
+        : primaryImageUrl
+        ? [primaryImageUrl]
+        : base?.gallery || [],
       price: Number(price),
       quantity: stock ? Number(stock) : 0,
       sku: finalSku,

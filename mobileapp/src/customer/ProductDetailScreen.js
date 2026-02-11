@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -45,6 +45,10 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
 
   if (!product) return null;
   const view = detail || product;
+  const imageWidth = Dimensions.get('window').width - customerSpacing.lg * 2 - customerSpacing.md * 2;
+  const photos = [view.image, ...(Array.isArray(view.gallery) ? view.gallery : [])]
+    .filter(Boolean)
+    .filter((uri, index, arr) => arr.indexOf(uri) === index);
 
   return (
     <View style={styles.container}>
@@ -54,7 +58,18 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
       </TouchableOpacity>
 
       <View style={styles.imageWrap}>
-        <Image source={{ uri: view.image }} style={styles.image} />
+        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+          {photos.map((uri, idx) => (
+            <Image key={`${uri}-${idx}`} source={{ uri }} style={[styles.image, { width: imageWidth }]} />
+          ))}
+        </ScrollView>
+        {photos.length > 1 ? (
+          <View style={styles.dotRow}>
+            {photos.map((uri, idx) => (
+              <View key={`dot-${uri}-${idx}`} style={styles.dot} />
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.content}>
@@ -94,7 +109,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: customerColors.border,
   },
-  image: { width: '100%', height: 260, borderRadius: 16 },
+  image: { height: 260, borderRadius: 16, marginRight: 8 },
+  dotRow: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: 8 },
+  dot: { width: 6, height: 6, borderRadius: 99, backgroundColor: customerColors.muted },
   content: { padding: customerSpacing.lg },
   title: { fontSize: 20, fontWeight: '800', color: customerColors.text },
   meta: { color: customerColors.muted, marginTop: 4 },

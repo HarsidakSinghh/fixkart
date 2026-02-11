@@ -53,8 +53,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [customImageUrl, setCustomImageUrl] = useState('');
-  const [customImagePreview, setCustomImagePreview] = useState('');
+  const [customImageUrls, setCustomImageUrls] = useState([]);
+  const [customImagePreviews, setCustomImagePreviews] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const loadCategories = useCallback(() => {
@@ -99,8 +99,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
     });
     setMessage('');
     setShowAdvanced(false);
-    setCustomImageUrl('');
-    setCustomImagePreview('');
+    setCustomImageUrls([]);
+    setCustomImagePreviews([]);
     setModalOpen(true);
   };
 
@@ -114,30 +114,38 @@ export default function VendorHomeScreen({ canAdd, status }) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.75,
-      allowsEditing: true,
+      allowsEditing: false,
+      allowsMultipleSelection: true,
       base64: true,
+      selectionLimit: 8,
     });
     if (result.canceled || !result.assets?.length) return;
 
-    const asset = result.assets[0];
-    if (!asset.base64) {
+    const assets = result.assets || [];
+    if (!assets.length) return;
+    if (assets.some((asset) => !asset.base64)) {
       setMessage('Could not read image. Please choose another image.');
       return;
     }
 
     setUploadingImage(true);
     setMessage('');
-    setCustomImagePreview(asset.uri || '');
+    setCustomImagePreviews(assets.map((asset) => asset.uri).filter(Boolean));
     try {
-      const uploadRes = await uploadVendorListingImage(asset.base64, `vendor-listing-${Date.now()}`);
-      setCustomImageUrl(uploadRes?.url || '');
-      if (!uploadRes?.url) {
+      const uploads = await Promise.all(
+        assets.map((asset, index) =>
+          uploadVendorListingImage(asset.base64, `vendor-listing-${Date.now()}-${index}`)
+        )
+      );
+      const urls = uploads.map((u) => u?.url).filter(Boolean);
+      setCustomImageUrls(urls);
+      if (!urls.length) {
         setMessage('Image upload failed. Please try again.');
       }
     } catch (error) {
       setMessage('Image upload failed. Please try again.');
-      setCustomImagePreview('');
-      setCustomImageUrl('');
+      setCustomImagePreviews([]);
+      setCustomImageUrls([]);
     } finally {
       setUploadingImage(false);
     }
@@ -175,7 +183,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
     try {
       await submitVendorProduct({
         baseProductId: selectedProduct.id || null,
-        imageUrl: customImageUrl || selectedProduct.image || '',
+        imageUrl: customImageUrls[0] || selectedProduct.image || '',
+        imageUrls: customImageUrls,
         name: form.name,
         category: form.category,
         subCategory: form.subCategory,
@@ -382,21 +391,27 @@ export default function VendorHomeScreen({ canAdd, status }) {
               <Text style={styles.modalTitle}>Add Product</Text>
               <Text style={styles.modalSubtitle}>{selectedProduct?.title || selectedProduct?.name}</Text>
 
-              <Text style={styles.inputLabel}>Product Image</Text>
+              <Text style={styles.inputLabel}>Product Images</Text>
               <View style={styles.imagePickerRow}>
-                <View style={styles.selectedImageWrap}>
-                  {customImagePreview ? (
-                    <Image source={{ uri: customImagePreview }} style={styles.selectedImage} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
+                  {customImagePreviews.length ? (
+                    customImagePreviews.map((uri, idx) => (
+                      <View key={`${uri}-${idx}`} style={styles.selectedImageWrap}>
+                        <Image source={{ uri }} style={styles.selectedImage} />
+                      </View>
+                    ))
                   ) : selectedProduct?.image ? (
-                    <Image source={{ uri: selectedProduct.image }} style={styles.selectedImage} />
+                    <View style={styles.selectedImageWrap}>
+                      <Image source={{ uri: selectedProduct.image }} style={styles.selectedImage} />
+                    </View>
                   ) : (
                     <View style={[styles.selectedImage, styles.selectedImagePlaceholder]}>
                       <Text style={styles.selectedImagePlaceholderText}>No image</Text>
                     </View>
                   )}
-                </View>
+                </ScrollView>
                 <TouchableOpacity style={styles.uploadImageBtn} onPress={handlePickCustomImage} disabled={uploadingImage}>
-                  <Text style={styles.uploadImageBtnText}>{uploadingImage ? 'Uploading…' : 'Upload custom image'}</Text>
+                  <Text style={styles.uploadImageBtnText}>{uploadingImage ? 'Uploading…' : 'Upload images'}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -669,6 +684,10 @@ const styles = StyleSheet.create({
   modalSubtitle: { color: vendorColors.muted, marginTop: 4, marginBottom: vendorSpacing.md },
   imagePickerRow: {
     marginBottom: vendorSpacing.md,
+  },
+  previewRow: {
+    gap: 8,
+    paddingRight: 6,
   },
   selectedImageWrap: {
     width: 120,
