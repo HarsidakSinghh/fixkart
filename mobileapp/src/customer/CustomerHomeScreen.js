@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Image, Modal, Alert } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
-import { getStoreCategories, getStoreTypes } from './storeApi';
+import { getStoreCategories, getStoreTypes, recognizeProductFromImage } from './storeApi';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [query, setQuery] = useState('');
@@ -14,6 +15,8 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [categories, setCategories] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [types, setTypes] = useState([]);
+  const [lensState, setLensState] = useState('idle');
+  const [lensResult, setLensResult] = useState(null);
   const { isAuthenticated, clearSession } = useAuth();
   const { signOut } = useClerkAuth();
 
@@ -75,11 +78,66 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     return types.filter((item) => item.label?.toLowerCase().includes(needle));
   }, [types, debouncedQuery]);
 
+  const runImageRecognition = useCallback(async (asset) => {
+    setLensResult(null);
+    setLensState('processing');
+    try {
+      const data = await recognizeProductFromImage(asset);
+      setLensResult(data);
+    } catch (error) {
+      setLensResult({
+        productName: '',
+        confidence: 0,
+        error: 'Could not identify this product. Please try another image.',
+      });
+    } finally {
+      setLensState('result');
+    }
+  }, []);
+
+  const pickFromCamera = useCallback(async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Camera permission needed', 'Please allow camera access to search by image.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsEditing: true,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    runImageRecognition(result.assets[0]);
+  }, [runImageRecognition]);
+
+  const pickFromGallery = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Gallery permission needed', 'Please allow gallery access to search by image.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    runImageRecognition(result.assets[0]);
+  }, [runImageRecognition]);
+
+  const onLensPress = useCallback(() => {
+    Alert.alert('Search by photo', 'Choose image source', [
+      { text: 'Camera', onPress: pickFromCamera },
+      { text: 'Gallery', onPress: pickFromGallery },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [pickFromCamera, pickFromGallery]);
+
   return (
     <View style={styles.container}>
       <CustomerHeader
         query={query}
         onQueryChange={setQuery}
+        onLensPress={onLensPress}
         onLogin={onOpenLogin}
         onToggleMenu={() => setDrawerOpen(true)}
         categoryLabel={category}
@@ -176,6 +234,54 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         onSelect={setCategory}
         categories={categories}
       />
+
+      <Modal visible={lensState === 'processing'} transparent animationType="fade">
+        <View style={styles.processingBackdrop}>
+          <View style={styles.processingCard}>
+            <ActivityIndicator color={customerColors.primary} size="large" />
+            <Text style={styles.processingTitle}>Processing image...</Text>
+            <Text style={styles.processingSub}>Please wait while we detect the product.</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={lensState === 'result'} transparent animationType="slide">
+        <View style={styles.processingBackdrop}>
+          <View style={styles.resultCard}>
+            <Text style={styles.resultTitle}>Image Search Result</Text>
+            <Text style={styles.resultBody}>
+              {lensResult?.productName
+                ? `This looks like: ${lensResult.productName}`
+                : lensResult?.error || 'Could not detect a product name.'}
+            </Text>
+            <View style={styles.resultActions}>
+              <TouchableOpacity
+                style={styles.resultSecondary}
+                onPress={() => {
+                  setLensState('idle');
+                  setLensResult(null);
+                  onLensPress();
+                }}
+              >
+                <Text style={styles.resultSecondaryText}>Try Another</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.resultPrimary,
+                  !lensResult?.productName ? { opacity: 0.5 } : null,
+                ]}
+                disabled={!lensResult?.productName}
+                onPress={() => {
+                  setQuery(lensResult.productName);
+                  setLensState('idle');
+                }}
+              >
+                <Text style={styles.resultPrimaryText}>Search</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -280,4 +386,65 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: 'center', paddingVertical: customerSpacing.xl },
   emptyText: { color: customerColors.text, fontWeight: '700' },
   emptySubtext: { color: customerColors.muted, marginTop: 6, textAlign: 'center' },
+  processingBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: customerSpacing.lg,
+  },
+  processingCard: {
+    width: '100%',
+    backgroundColor: customerColors.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    padding: customerSpacing.lg,
+    alignItems: 'center',
+  },
+  processingTitle: {
+    marginTop: customerSpacing.md,
+    color: customerColors.text,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  processingSub: {
+    marginTop: 6,
+    color: customerColors.muted,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  resultCard: {
+    width: '100%',
+    backgroundColor: customerColors.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    padding: customerSpacing.lg,
+  },
+  resultTitle: { color: customerColors.text, fontSize: 18, fontWeight: '800' },
+  resultBody: { color: customerColors.muted, marginTop: customerSpacing.sm, fontSize: 14 },
+  resultActions: {
+    marginTop: customerSpacing.md,
+    flexDirection: 'row',
+    gap: customerSpacing.sm,
+  },
+  resultPrimary: {
+    flex: 1,
+    backgroundColor: customerColors.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  resultPrimaryText: { color: '#FFFFFF', fontWeight: '700' },
+  resultSecondary: {
+    flex: 1,
+    backgroundColor: customerColors.surface,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  resultSecondaryText: { color: customerColors.text, fontWeight: '700' },
 });

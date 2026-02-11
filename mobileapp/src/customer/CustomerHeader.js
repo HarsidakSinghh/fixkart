@@ -6,6 +6,7 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 export default function CustomerHeader({
   query,
   onQueryChange,
+  onLensPress,
   onLogin,
   onToggleMenu,
   categoryLabel,
@@ -47,6 +48,9 @@ export default function CustomerHeader({
         />
         <TouchableOpacity style={styles.filterChip} onPress={onToggleMenu}>
           <Feather name="filter" size={14} color={customerColors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterChip} onPress={onLensPress}>
+          <Feather name="camera" size={14} color={customerColors.primary} />
         </TouchableOpacity>
       </View>
       <View style={styles.categoryRow}>

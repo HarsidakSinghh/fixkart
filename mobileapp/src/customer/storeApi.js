@@ -76,3 +76,30 @@ export async function getTypeListings(subCategory) {
   }
   return res.json();
 }
+
+export async function recognizeProductFromImage(asset) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
+  if (!asset?.uri) {
+    throw new Error('Image is required');
+  }
+
+  const formData = new FormData();
+  formData.append('image', {
+    uri: asset.uri,
+    name: asset.fileName || `lens-${Date.now()}.jpg`,
+    type: asset.mimeType || 'image/jpeg',
+  });
+
+  const res = await fetch(`${BASE_URL}/api/mobile/vision/recognize`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(message || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
