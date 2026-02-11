@@ -8,14 +8,14 @@ import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
 
-export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
-  const bannerSlides = [
-    { id: '1', image: require('../../assets/photo1.png') },
-    { id: '2', image: require('../../assets/photo2.png') },
-    { id: '3', image: require('../../assets/photo3.png') },
-    { id: '4', image: require('../../assets/photo4.png') },
-  ];
+const BANNER_SLIDES = [
+  { id: '1', image: require('../../assets/photo1.png') },
+  { id: '2', image: require('../../assets/photo2.png') },
+  { id: '3', image: require('../../assets/photo3.png') },
+  { id: '4', image: require('../../assets/photo4.png') },
+];
 
+export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [category, setCategory] = useState('All');
@@ -143,16 +143,16 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   }, [pickFromCamera, pickFromGallery]);
 
   useEffect(() => {
-    if (!carouselWidth || bannerSlides.length < 2) return;
+    if (!carouselWidth || BANNER_SLIDES.length < 2) return;
     const timer = setInterval(() => {
       setActiveSlide((prev) => {
-        const next = (prev + 1) % bannerSlides.length;
+        const next = (prev + 1) % BANNER_SLIDES.length;
         carouselRef.current?.scrollToOffset?.({ offset: next * carouselWidth, animated: true });
         return next;
       });
     }, 2000);
     return () => clearInterval(timer);
-  }, [carouselWidth, bannerSlides.length]);
+  }, [carouselWidth]);
 
   return (
     <View style={styles.container}>
@@ -217,7 +217,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
               >
                 <FlatList
                   ref={carouselRef}
-                  data={bannerSlides}
+                  data={BANNER_SLIDES}
                   keyExtractor={(item) => item.id}
                   horizontal
                   pagingEnabled
@@ -232,7 +232,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
                   )}
                 />
                 <View style={styles.dotRow}>
-                  {bannerSlides.map((slide, index) => (
+                  {BANNER_SLIDES.map((slide, index) => (
                     <View
                       key={`dot-${slide.id}`}
                       style={[styles.dot, index === activeSlide ? styles.dotActive : null]}
@@ -337,21 +337,17 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: customerColors.bg },
   hero: {
-    marginHorizontal: customerSpacing.lg,
+    marginHorizontal: -customerSpacing.lg,
     marginTop: customerSpacing.lg,
-    backgroundColor: customerColors.surface,
-    borderRadius: 22,
-    padding: customerSpacing.sm,
-    borderWidth: 1,
-    borderColor: customerColors.border,
-    shadowColor: customerColors.shadow,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    padding: 0,
+    borderWidth: 0,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   carouselWrap: {
-    borderRadius: 16,
+    borderRadius: 0,
     overflow: 'hidden',
     height: 160,
     backgroundColor: customerColors.surface,
