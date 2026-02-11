@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const DEFAULT_IMAGGA_ENDPOINT = "https://api.imagga.com";
-const DEFAULT_HF_MODEL_ID = "google/vit-base-patch16-224";
+const DEFAULT_HF_MODEL_ID = "microsoft/resnet-50";
 const DEFAULT_HF_INFERENCE_BASE = "https://router.huggingface.co/hf-inference/models";
 
 const TAG_TO_PRODUCT: Record<string, string> = {
@@ -62,37 +62,48 @@ async function callHuggingFace(image: File): Promise<Candidate[]> {
   const token = process.env.HF_API_TOKEN || "";
   if (!token) return [];
 
-  const modelId = process.env.HF_MODEL_ID || DEFAULT_HF_MODEL_ID;
-  const endpoint = `${process.env.HF_INFERENCE_BASE || DEFAULT_HF_INFERENCE_BASE}/${modelId}`;
+  const configured = process.env.HF_MODEL_ID || DEFAULT_HF_MODEL_ID;
+  const modelIds = configured
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean);
+  const base = process.env.HF_INFERENCE_BASE || DEFAULT_HF_INFERENCE_BASE;
   const buffer = Buffer.from(await image.arrayBuffer());
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": image.type || "application/octet-stream",
-    },
-    body: buffer,
-  });
+  for (const modelId of modelIds) {
+    const endpoint = `${base}/${modelId}`;
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": image.type || "application/octet-stream",
+      },
+      body: buffer,
+    });
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("HuggingFace API error", { status: res.status, body });
-    return [];
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("HuggingFace API error", { modelId, status: res.status, body });
+      continue;
+    }
+
+    const payload = await res.json();
+    if (!Array.isArray(payload)) continue;
+
+    const candidates = payload
+      .map((row: any) => ({
+        name: normalizeLabel(String(row?.label || "")),
+        confidence: Number(row?.score || 0) * 100,
+        source: "hf",
+      }))
+      .filter((row: Candidate) => row.name && !Number.isNaN(row.confidence))
+      .sort((a: Candidate, b: Candidate) => b.confidence - a.confidence)
+      .slice(0, 8);
+
+    if (candidates.length) return candidates;
   }
 
-  const payload = await res.json();
-  if (!Array.isArray(payload)) return [];
-
-  return payload
-    .map((row: any) => ({
-      name: normalizeLabel(String(row?.label || "")),
-      confidence: Number(row?.score || 0) * 100,
-      source: "hf",
-    }))
-    .filter((row: Candidate) => row.name && !Number.isNaN(row.confidence))
-    .sort((a: Candidate, b: Candidate) => b.confidence - a.confidence)
-    .slice(0, 8);
+  return [];
 }
 
 async function callImagga(image: File): Promise<Candidate[]> {
