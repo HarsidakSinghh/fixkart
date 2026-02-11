@@ -3,9 +3,10 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, ActionRow } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
 import { getComplaints, updateComplaintStatus } from "../services/api";
-import { Linking, Text } from "react-native";
+import { Linking, Text, View, Modal, TouchableOpacity, ScrollView, StyleSheet, Image } from "react-native";
 import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import StatusPill from "../components/StatusPill";
+import { colors, spacing } from "../theme";
 
 export default function ComplaintsScreen() {
   const fetchComplaints = useCallback(async () => {
@@ -14,6 +15,7 @@ export default function ComplaintsScreen() {
   }, []);
 
   const { items, setItems, error, refresh, loading } = useAsyncList(fetchComplaints, []);
+  const [selectedComplaint, setSelectedComplaint] = React.useState(null);
 
   async function updateStatus(id, status) {
     await updateComplaintStatus(id, status);
@@ -46,15 +48,60 @@ export default function ComplaintsScreen() {
                 </Text>
               ) : null}
               <ActionRow
-                secondaryLabel="Resolve"
+                secondaryLabel="View Details"
                 primaryLabel="In Review"
-                onSecondary={() => updateStatus(item.id, "RESOLVED")}
+                onSecondary={() => setSelectedComplaint(item)}
                 onPrimary={() => updateStatus(item.id, "IN_REVIEW")}
               />
             </>
           }
         />
       ))}
+
+      {selectedComplaint ? (
+        <Modal visible transparent animationType="slide" onRequestClose={() => setSelectedComplaint(null)}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Complaint Detail</Text>
+                <TouchableOpacity onPress={() => setSelectedComplaint(null)}>
+                  <Text style={styles.closeText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.metaText}>Customer: {selectedComplaint.customerName || "Customer"}</Text>
+                {selectedComplaint.customerPhone ? <Text style={styles.metaText}>Phone: {selectedComplaint.customerPhone}</Text> : null}
+                <Text style={styles.metaText}>Order: {selectedComplaint.orderId || "-"}</Text>
+                <Text style={styles.metaText}>Status: {selectedComplaint.status || "OPEN"}</Text>
+                {selectedComplaint.createdAt ? (
+                  <Text style={styles.metaText}>Time: {new Date(selectedComplaint.createdAt).toLocaleString()}</Text>
+                ) : null}
+                <Text style={styles.noteTitle}>Note</Text>
+                <Text style={styles.noteText}>{selectedComplaint.message || selectedComplaint.subject || "-"}</Text>
+                {selectedComplaint.imageUrl ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(selectedComplaint.imageUrl)}>
+                    <Image source={{ uri: selectedComplaint.imageUrl }} style={styles.attachmentImage} />
+                    <Text style={styles.linkText}>Open full image</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.metaText}>No image attached.</Text>
+                )}
+              </ScrollView>
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.reviewBtn}
+                  onPress={async () => {
+                    await updateStatus(selectedComplaint.id, "IN_REVIEW");
+                    setSelectedComplaint(null);
+                  }}
+                >
+                  <Text style={styles.reviewText}>Mark In Review</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </AdminScreenLayout>
   );
 }
@@ -64,3 +111,44 @@ function statusTone(status) {
   if (status === "IN_REVIEW") return "warning";
   return "danger";
 }
+
+const styles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.line,
+    maxHeight: "88%",
+    padding: spacing.lg,
+  },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  modalTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
+  closeText: { color: colors.primary, fontWeight: "700" },
+  metaText: { color: colors.muted, fontSize: 12, marginTop: 6 },
+  noteTitle: { color: colors.text, fontWeight: "700", marginTop: spacing.md },
+  noteText: { color: colors.text, marginTop: 6, fontSize: 13 },
+  attachmentImage: {
+    marginTop: spacing.sm,
+    width: "100%",
+    height: 190,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panelAlt,
+  },
+  linkText: { color: colors.info, marginTop: 6, fontWeight: "700", fontSize: 12 },
+  modalActions: { marginTop: spacing.sm },
+  reviewBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 11,
+  },
+  reviewText: { color: "#FFFFFF", fontWeight: "700" },
+});

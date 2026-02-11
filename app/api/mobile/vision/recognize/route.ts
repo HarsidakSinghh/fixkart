@@ -83,7 +83,10 @@ async function callHuggingFace(image: File): Promise<Candidate[]> {
 
     if (!res.ok) {
       const body = await res.text();
-      console.error("HuggingFace API error", { modelId, status: res.status, body });
+      // 404/410 are common for unsupported/deprecated hf-inference models; skip quietly.
+      if (res.status !== 404 && res.status !== 410) {
+        console.error("HuggingFace API error", { modelId, status: res.status, body });
+      }
       continue;
     }
 

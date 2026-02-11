@@ -37,6 +37,7 @@ export async function GET(req: Request) {
     lastUpdated: s.lastUpdated,
     vendorName: vendorMap.get(s.vendorId)?.companyName || vendorMap.get(s.vendorId)?.fullName || "",
     vendorId: s.vendorId || null,
+    idProofUrl: s.idProofUrl || null,
   }));
 
   return NextResponse.json({ salesmen: mapped });

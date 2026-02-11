@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { WebView } from "react-native-webview";
 import { colors, spacing } from "../theme";
 import { getSalesmanTrack } from "../services/salesmanAdminApi";
@@ -12,6 +12,7 @@ export default function SalesmanTrackScreen({ salesman, onBack }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [startAt, setStartAt] = useState(null);
   const [endAt, setEndAt] = useState(null);
+  const [recentVisits, setRecentVisits] = useState([]);
 
   const loadTrack = useCallback(async () => {
     if (!salesman?.id) return;
@@ -24,6 +25,7 @@ export default function SalesmanTrackScreen({ salesman, onBack }) {
       setLastUpdated(data.lastUpdated || null);
       setStartAt(data.startAt || null);
       setEndAt(data.endAt || null);
+      setRecentVisits(Array.isArray(data.recentVisits) ? data.recentVisits : []);
     } finally {
       setLoading(false);
     }
@@ -112,7 +114,7 @@ export default function SalesmanTrackScreen({ salesman, onBack }) {
   }, [mapPoints, focus, current, active]);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.containerPad}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backText}>← Back</Text>
@@ -150,12 +152,29 @@ export default function SalesmanTrackScreen({ salesman, onBack }) {
           </View>
         )}
       </View>
-    </View>
+
+      <View style={styles.recentCard}>
+        <Text style={styles.recentTitle}>Recent 3 Visits</Text>
+        {recentVisits.length ? (
+          recentVisits.map((visit) => (
+            <View key={visit.id} style={styles.recentRow}>
+              <Text style={styles.recentName}>{visit.companyName || "Visit"}</Text>
+              {visit.companyAddress ? <Text style={styles.recentMeta}>{visit.companyAddress}</Text> : null}
+              {visit.note ? <Text style={styles.recentMeta}>{visit.note}</Text> : null}
+              <Text style={styles.recentMeta}>{new Date(visit.createdAt).toLocaleString()}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.recentMeta}>No recent visits logged yet.</Text>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: colors.bg },
+  containerPad: { padding: spacing.lg, paddingBottom: 140 },
   header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: spacing.md },
   backText: { color: colors.primary, fontWeight: "700" },
   title: { color: colors.text, fontSize: 18, fontWeight: "800" },
@@ -171,7 +190,7 @@ const styles = StyleSheet.create({
   statusMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
   mapCard: {
     marginTop: spacing.lg,
-    flex: 1,
+    height: 360,
     backgroundColor: colors.card,
     borderRadius: 18,
     borderWidth: 1,
@@ -181,4 +200,20 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   loadingText: { color: colors.muted, marginTop: 8 },
+  recentCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.md,
+  },
+  recentTitle: { color: colors.text, fontWeight: "700", marginBottom: spacing.sm },
+  recentRow: {
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  recentName: { color: colors.text, fontWeight: "700" },
+  recentMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
 });

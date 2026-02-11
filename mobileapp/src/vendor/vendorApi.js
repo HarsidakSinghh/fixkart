@@ -221,6 +221,13 @@ export async function createVendorSalesman(payload) {
   });
 }
 
+export async function uploadSalesmanIdProof(imageBase64, filename) {
+  return authFetch('/api/mobile/vendor/salesmen/id-proof', {
+    method: 'POST',
+    body: JSON.stringify({ imageBase64, filename }),
+  });
+}
+
 export async function getSalesmanVisits(salesmanId) {
   const data = await authFetch(`/api/mobile/vendor/salesmen/visits?salesmanId=${salesmanId}`);
   return data.visits || [];

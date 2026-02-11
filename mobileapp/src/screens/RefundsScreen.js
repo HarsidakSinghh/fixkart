@@ -5,6 +5,8 @@ import { useAsyncList } from "../services/useAsyncList";
 import { getRefunds, updateRefundStatus } from "../services/api";
 import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import StatusPill from "../components/StatusPill";
+import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, Image, Linking } from "react-native";
+import { colors, spacing } from "../theme";
 
 export default function RefundsScreen() {
   const fetchRefunds = useCallback(async () => {
@@ -13,6 +15,7 @@ export default function RefundsScreen() {
   }, []);
 
   const { items, setItems, error, refresh, loading } = useAsyncList(fetchRefunds, []);
+  const [selectedRefund, setSelectedRefund] = React.useState(null);
 
   async function updateStatus(id, status) {
     await updateRefundStatus(id, status);
@@ -39,10 +42,13 @@ export default function RefundsScreen() {
           right={<StatusPill label={item.status} tone={statusTone(item.status)} />}
           meta={
             <ActionRow
-              secondaryLabel="Reject"
+              secondaryLabel="View Details"
               primaryLabel="Approve"
-              onSecondary={() => updateStatus(item.id, "REJECTED")}
-              onPrimary={() => updateStatus(item.id, "APPROVED")}
+              onSecondary={() => setSelectedRefund(item)}
+              onPrimary={async () => {
+                await updateStatus(item.id, "APPROVED");
+                refresh();
+              }}
             />
           }
         />
@@ -60,6 +66,66 @@ export default function RefundsScreen() {
           right={<StatusPill label="APPROVED" tone="success" />}
         />
       ))}
+
+      {selectedRefund ? (
+        <Modal visible transparent animationType="slide" onRequestClose={() => setSelectedRefund(null)}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Refund Detail</Text>
+                <TouchableOpacity onPress={() => setSelectedRefund(null)}>
+                  <Text style={styles.closeText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.metaText}>Order: {selectedRefund.orderId || "-"}</Text>
+                <Text style={styles.metaText}>Customer: {selectedRefund.customerName || "Customer"}</Text>
+                <Text style={styles.metaText}>Vendor: {selectedRefund.vendorName || "Vendor"}</Text>
+                <Text style={styles.metaText}>Amount: ₹{Math.round(selectedRefund.amountValue || 0)}</Text>
+                <Text style={styles.metaText}>Reason: {selectedRefund.reason || "-"}</Text>
+                {selectedRefund.createdAt ? (
+                  <Text style={styles.metaText}>Time: {new Date(selectedRefund.createdAt).toLocaleString()}</Text>
+                ) : null}
+                {selectedRefund.productImage ? (
+                  <Image source={{ uri: selectedRefund.productImage }} style={styles.productImage} />
+                ) : null}
+                {selectedRefund.billUrl ? (
+                  <Text style={styles.linkText} onPress={() => Linking.openURL(selectedRefund.billUrl)}>
+                    Open Bill
+                  </Text>
+                ) : null}
+                {selectedRefund.transportSlipUrl ? (
+                  <Text style={styles.linkText} onPress={() => Linking.openURL(selectedRefund.transportSlipUrl)}>
+                    Open Transport Slip
+                  </Text>
+                ) : null}
+              </ScrollView>
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.rejectBtn}
+                  onPress={async () => {
+                    await updateStatus(selectedRefund.id, "REJECTED");
+                    setSelectedRefund(null);
+                    refresh();
+                  }}
+                >
+                  <Text style={styles.rejectText}>Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.approveBtn}
+                  onPress={async () => {
+                    await updateStatus(selectedRefund.id, "APPROVED");
+                    setSelectedRefund(null);
+                    refresh();
+                  }}
+                >
+                  <Text style={styles.approveText}>Approve</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </AdminScreenLayout>
   );
 }
@@ -69,3 +135,53 @@ function statusTone(status) {
   if (status === "PENDING") return "warning";
   return "info";
 }
+
+const styles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.line,
+    maxHeight: "88%",
+    padding: spacing.lg,
+  },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  modalTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
+  closeText: { color: colors.primary, fontWeight: "700" },
+  metaText: { color: colors.muted, fontSize: 12, marginTop: 6 },
+  productImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panelAlt,
+    marginTop: spacing.sm,
+  },
+  linkText: { color: colors.info, marginTop: 8, fontWeight: "700", fontSize: 12 },
+  modalActions: { marginTop: spacing.sm, flexDirection: "row", gap: spacing.sm },
+  rejectBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 11,
+    backgroundColor: colors.card,
+  },
+  rejectText: { color: colors.text, fontWeight: "700" },
+  approveBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 11,
+  },
+  approveText: { color: "#FFFFFF", fontWeight: "700" },
+});

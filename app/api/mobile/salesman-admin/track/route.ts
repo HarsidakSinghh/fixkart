@@ -80,6 +80,13 @@ export async function GET(req: Request) {
       ? { lat: salesman.currentLat, lng: salesman.currentLng }
       : null;
 
+  const recentVisits = await db
+    .collection("TrackingLog")
+    .find({ salesmanId: String(salesman._id), event: "VISIT_END" })
+    .sort({ createdAt: -1 })
+    .limit(3)
+    .toArray();
+
   return NextResponse.json({
     active,
     track,
@@ -87,5 +94,13 @@ export async function GET(req: Request) {
     lastUpdated: salesman.lastUpdated || null,
     startAt: lastStart.createdAt,
     endAt: lastEnd?.createdAt || null,
+    recentVisits: recentVisits.map((log) => ({
+      id: String(log._id),
+      companyName: log.companyName || "Visit",
+      companyAddress: log.companyAddress || "",
+      note: log.note || "",
+      imageUrl: log.imageUrl || null,
+      createdAt: log.createdAt,
+    })),
   });
 }

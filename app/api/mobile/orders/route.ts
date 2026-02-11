@@ -15,6 +15,14 @@ export async function GET(req: Request) {
 
   const orders = await prisma.order.findMany({
     where: status ? { status } : undefined,
+    include: {
+      items: {
+        include: {
+          product: true,
+          vendor: true,
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 200,
   });
@@ -30,10 +38,33 @@ export async function GET(req: Request) {
     return {
       id: o.id,
       customerName: o.customerName || customer?.fullName || "Customer",
+      customerEmail: o.customerEmail || customer?.email || "",
+      customerPhone: o.customerPhone || customer?.phone || "",
+      customerAddress:
+        o.billingAddress ||
+        [
+          customer?.address || "",
+          customer?.city || "",
+          customer?.state || "",
+          customer?.postalCode || "",
+        ]
+          .filter(Boolean)
+          .join(", "),
       totalAmount: o.totalAmount,
       status: o.status,
       createdAt: o.createdAt.toISOString(),
       city: customer?.city || "",
+      paymentMethod: o.paymentMethod || "",
+      items: (o.items || []).map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.productName || item.product?.title || item.product?.name || "Product",
+        image: item.image || item.product?.image || null,
+        quantity: item.quantity || 0,
+        price: item.price || 0,
+        vendorId: item.vendorId || "",
+        vendorName: item.vendor?.companyName || item.vendor?.fullName || "Vendor",
+      })),
     };
   });
 

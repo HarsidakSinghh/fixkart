@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Modal, Image, ScrollView } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { createVendorSalesman, getVendorSalesmen, getSalesmanVisits, getSalesmanAssignments, createSalesmanAssignment } from './vendorApi';
+import * as ImagePicker from 'expo-image-picker';
+import { createVendorSalesman, getVendorSalesmen, getSalesmanVisits, getSalesmanAssignments, createSalesmanAssignment, uploadSalesmanIdProof } from './vendorApi';
 import VendorSalesmanTrackScreen from './VendorSalesmanTrackScreen';
 
 export default function VendorSalesmenScreen({ onBack }) {
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', code: '' });
+  const [form, setForm] = useState({ name: '', phone: '', code: '', idProofUrl: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingIdProof, setUploadingIdProof] = useState(false);
+  const [idProofPreview, setIdProofPreview] = useState('');
   const [visitModal, setVisitModal] = useState(false);
   const [visitLoading, setVisitLoading] = useState(false);
   const [visitSalesman, setVisitSalesman] = useState(null);
@@ -51,14 +54,51 @@ export default function VendorSalesmenScreen({ onBack }) {
         name: form.name,
         phone: form.phone,
         code: String(form.code),
+        idProofUrl: form.idProofUrl || null,
       });
-      setForm({ name: '', phone: '', code: '' });
+      setForm({ name: '', phone: '', code: '', idProofUrl: '' });
+      setIdProofPreview('');
       await loadSalesmen();
       Alert.alert('Salesman added', 'The salesman can now log in.');
     } catch (error) {
       Alert.alert('Failed', 'Unable to add salesman.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const pickIdProof = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow gallery access to upload ID proof.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.75,
+      allowsEditing: true,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+    if (!asset.base64) {
+      Alert.alert('Failed', 'Could not read selected image.');
+      return;
+    }
+    setUploadingIdProof(true);
+    setIdProofPreview(asset.uri || '');
+    try {
+      const upload = await uploadSalesmanIdProof(asset.base64, `salesman-id-${Date.now()}`);
+      setForm((prev) => ({ ...prev, idProofUrl: upload?.url || '' }));
+      if (!upload?.url) {
+        Alert.alert('Failed', 'ID proof upload failed.');
+      }
+    } catch (error) {
+      setForm((prev) => ({ ...prev, idProofUrl: '' }));
+      setIdProofPreview('');
+      Alert.alert('Failed', 'ID proof upload failed.');
+    } finally {
+      setUploadingIdProof(false);
     }
   };
 
@@ -158,6 +198,21 @@ export default function VendorSalesmenScreen({ onBack }) {
           onChangeText={(v) => setForm((prev) => ({ ...prev, code: v }))}
           maxLength={4}
         />
+        <View style={styles.idProofBlock}>
+          <Text style={styles.idProofLabel}>ID Proof (optional)</Text>
+          <View style={styles.idProofRow}>
+            {idProofPreview ? (
+              <Image source={{ uri: idProofPreview }} style={styles.idProofImage} />
+            ) : (
+              <View style={[styles.idProofImage, styles.idProofPlaceholder]}>
+                <Text style={styles.idProofPlaceholderText}>No file</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.uploadProofBtn} onPress={pickIdProof} disabled={uploadingIdProof}>
+              <Text style={styles.uploadProofText}>{uploadingIdProof ? 'Uploading…' : 'Upload ID Proof'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <TouchableOpacity style={styles.primaryBtn} onPress={handleCreate} disabled={submitting}>
           <Text style={styles.primaryText}>{submitting ? 'Saving…' : 'Add Salesman'}</Text>
         </TouchableOpacity>
@@ -338,6 +393,28 @@ const styles = StyleSheet.create({
     backgroundColor: vendorColors.card,
     marginBottom: vendorSpacing.sm,
   },
+  idProofBlock: { marginBottom: vendorSpacing.md },
+  idProofLabel: { color: vendorColors.muted, fontSize: 12, marginBottom: 8 },
+  idProofRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  idProofImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.surface,
+  },
+  idProofPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  idProofPlaceholderText: { color: vendorColors.muted, fontSize: 10, fontWeight: '600' },
+  uploadProofBtn: {
+    backgroundColor: vendorColors.surface,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  uploadProofText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
   inputNote: { minHeight: 80 },
   primaryBtn: {
     backgroundColor: vendorColors.primary,

@@ -40,6 +40,8 @@ export async function GET(req: Request) {
       category: p.category,
       subCategory: p.subCategory,
       price: p.price,
+      commissionPercent: Number((p.specs as any)?.commissionPercent || 0),
+      specs: p.specs || null,
       image: p.image,
       gallery: p.gallery || [],
       vendorId: p.vendorId || "N/A",

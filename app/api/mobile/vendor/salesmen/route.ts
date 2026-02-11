@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, phone, code } = body || {};
+  const { name, phone, code, idProofUrl } = body || {};
   if (!phone || !code) {
     return NextResponse.json({ error: "Missing phone or code" }, { status: 400 });
   }
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
     name: name || "",
     phone,
     code: String(code),
+    idProofUrl: idProofUrl || null,
     status: "ACTIVE",
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -36,8 +36,20 @@ export async function GET(req: Request) {
     .collection("TrackingLog")
     .find({ salesmanId: String(salesman._id) })
     .sort({ createdAt: -1 })
-    .limit(10)
+    .limit(40)
     .toArray();
+
+  const recentVisits = logs
+    .filter((l) => l.event === "VISIT_END")
+    .slice(0, 3)
+    .map((l) => ({
+      id: String(l._id),
+      companyName: l.companyName || "Visit",
+      companyAddress: l.companyAddress || "",
+      note: l.note || "",
+      imageUrl: l.imageUrl || null,
+      createdAt: l.createdAt,
+    }));
 
   const stats = {
     totalLogs: logs.length,
@@ -58,8 +70,10 @@ export async function GET(req: Request) {
       lastUpdated: salesman.lastUpdated,
       vendorName: vendor?.companyName || vendor?.fullName || "",
       vendorId: salesman.vendorId || null,
+      idProofUrl: salesman.idProofUrl || null,
     },
     stats,
+    recentVisits,
     logs: logs.map((l) => ({
       id: String(l._id),
       event: l.event,
