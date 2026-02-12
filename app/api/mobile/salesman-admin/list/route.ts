@@ -38,6 +38,8 @@ export async function GET(req: Request) {
     vendorName: vendorMap.get(s.vendorId)?.companyName || vendorMap.get(s.vendorId)?.fullName || "",
     vendorId: s.vendorId || null,
     idProofUrl: s.idProofUrl || null,
+    aadhaarCardUrl: s.aadhaarCardUrl || s.idProofUrl || null,
+    panCardUrl: s.panCardUrl || null,
   }));
 
   return NextResponse.json({ salesmen: mapped });

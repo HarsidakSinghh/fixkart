@@ -22,8 +22,54 @@ export async function PATCH(
     include: { order: true },
   });
 
+  // Order-level dispatch: one Ready action for all vendor items in the order.
   if (!item) {
-    return NextResponse.json({ error: "Order item not found" }, { status: 404 });
+    const vendorItems = await prisma.orderItem.findMany({
+      where: { orderId: resolved.id, vendorId: guard.userId },
+      include: { order: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!vendorItems.length) {
+      return NextResponse.json({ error: "Order item not found" }, { status: 404 });
+    }
+
+    const processable = vendorItems.filter((orderItem) =>
+      ["PROCESSING", "SHIPPED", "READY"].includes(String(orderItem.status || "").toUpperCase())
+    );
+    if (!processable.length) {
+      return NextResponse.json(
+        { error: "Accept order first before generating OTP" },
+        { status: 409 }
+      );
+    }
+
+    const code = processable.find((orderItem) => orderItem.dispatchCode)?.dispatchCode || generateCode();
+    await prisma.orderItem.updateMany({
+      where: { id: { in: processable.map((orderItem) => orderItem.id) } },
+      data: { dispatchCode: code, status: "SHIPPED" },
+    });
+
+    try {
+      await prisma.order.update({
+        where: { id: resolved.id },
+        data: { status: "SHIPPED" },
+      });
+
+      const customerId = processable[0]?.order?.customerId;
+      if (customerId) {
+        await sendPushToUsers(
+          [customerId],
+          "Order Shipped",
+          `Your order item is shipped. Rider OTP: ${code}`,
+          { orderId: resolved.id, status: "SHIPPED" }
+        );
+      }
+    } catch (err) {
+      console.error("[push] failed to notify customer", err);
+    }
+
+    return NextResponse.json({ success: true, code });
   }
 
   const normalized = String(item.status || "").toUpperCase();

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMongoDb } from "@/lib/mongo";
 import { requireVendor } from "@/lib/vendor-guard";
-import { ObjectId } from "mongodb";
 
 export async function GET(req: Request) {
   const guard = await requireVendor(req);
@@ -23,6 +22,8 @@ export async function GET(req: Request) {
       phone: s.phone,
       code: s.code,
       status: s.status || "ACTIVE",
+      aadhaarCardUrl: s.aadhaarCardUrl || null,
+      panCardUrl: s.panCardUrl || null,
       createdAt: s.createdAt,
     })),
   });
@@ -35,9 +36,12 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { name, phone, code, idProofUrl } = body || {};
+  const { name, phone, code, aadhaarCardUrl, panCardUrl } = body || {};
   if (!phone || !code) {
     return NextResponse.json({ error: "Missing phone or code" }, { status: 400 });
+  }
+  if (!aadhaarCardUrl || !panCardUrl) {
+    return NextResponse.json({ error: "Aadhaar card and PAN card are required" }, { status: 400 });
   }
 
   const db = await getMongoDb();
@@ -51,7 +55,10 @@ export async function POST(req: Request) {
     name: name || "",
     phone,
     code: String(code),
-    idProofUrl: idProofUrl || null,
+    aadhaarCardUrl: aadhaarCardUrl || null,
+    panCardUrl: panCardUrl || null,
+    // Backward compatibility for old admin screens.
+    idProofUrl: aadhaarCardUrl || null,
     status: "ACTIVE",
     createdAt: new Date(),
     updatedAt: new Date(),

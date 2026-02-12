@@ -47,10 +47,10 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
     loadOrders();
   }, [loadOrders]);
 
-  const handleDispatch = async (itemId, orderId) => {
+  const handleDispatch = async (orderId) => {
     try {
-      const res = await markVendorOrderReady(itemId);
-      setActiveCode({ id: itemId, code: res.code });
+      const res = await markVendorOrderReady(orderId);
+      setActiveCode({ id: orderId, code: res.code });
       setOrders((prev) =>
         prev.map((order) => {
           if (order.orderId !== orderId) return order;
@@ -58,7 +58,9 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
             ...order,
             status: 'SHIPPED',
             items: order.items.map((item) =>
-              item.id === itemId ? { ...item, status: 'SHIPPED', dispatchCode: res.code } : item
+              ['PROCESSING', 'READY', 'SHIPPED'].includes(String(item.status || '').toUpperCase())
+                ? { ...item, status: 'SHIPPED', dispatchCode: item.dispatchCode || res.code }
+                : item
             ),
           };
         })
@@ -169,6 +171,14 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
         </View>
       ) : null}
 
+      {String(item.status || '').toUpperCase() === 'PROCESSING' ? (
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.dispatchBtn} onPress={() => handleDispatch(item.orderId)}>
+            <Text style={styles.dispatchText}>Ready (Generate OTP)</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {(item.items || []).map((orderItem) => (
         <View key={orderItem.id} style={styles.itemRow}>
           <Image source={{ uri: orderItem.image }} style={styles.image} />
@@ -184,11 +194,7 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
               <Text style={styles.codeLabel}>Rider OTP</Text>
               <Text style={styles.codeValue}>{orderItem.dispatchCode}</Text>
             </View>
-          ) : String(orderItem.status || '').toUpperCase() !== 'PROCESSING' ? null : (
-            <TouchableOpacity style={styles.dispatchBtn} onPress={() => handleDispatch(orderItem.id, item.orderId)}>
-              <Text style={styles.dispatchText}>Generate OTP</Text>
-            </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       ))}
 

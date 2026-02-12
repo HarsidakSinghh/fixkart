@@ -7,6 +7,7 @@ import { Linking, Text, View, Modal, TouchableOpacity, ScrollView, StyleSheet, I
 import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import StatusPill from "../components/StatusPill";
 import { colors, spacing } from "../theme";
+import OrderDetailAdminScreen from "./OrderDetailAdminScreen";
 
 export default function ComplaintsScreen() {
   const getComplaintImages = (complaint) => {
@@ -22,6 +23,11 @@ export default function ComplaintsScreen() {
 
   const { items, setItems, error, refresh, loading } = useAsyncList(fetchComplaints, []);
   const [selectedComplaint, setSelectedComplaint] = React.useState(null);
+  const [selectedOrderId, setSelectedOrderId] = React.useState(null);
+
+  if (selectedOrderId) {
+    return <OrderDetailAdminScreen orderId={selectedOrderId} onBack={() => setSelectedOrderId(null)} />;
+  }
 
   async function updateStatus(id, status) {
     await updateComplaintStatus(id, status);
@@ -133,27 +139,16 @@ export default function ComplaintsScreen() {
                   <Text style={styles.metaText}>Time: {new Date(selectedComplaint.createdAt).toLocaleString()}</Text>
                 ) : null}
 
-                <Text style={styles.noteTitle}>Order Details</Text>
-                {selectedComplaint.orderCreatedAt ? (
-                  <Text style={styles.metaText}>
-                    Ordered On: {new Date(selectedComplaint.orderCreatedAt).toLocaleString()}
-                  </Text>
-                ) : null}
-                {selectedComplaint.orderStatus ? (
-                  <Text style={styles.metaText}>Order Status: {selectedComplaint.orderStatus}</Text>
-                ) : null}
-                {selectedComplaint.orderPaymentMethod ? (
-                  <Text style={styles.metaText}>Payment: {selectedComplaint.orderPaymentMethod}</Text>
-                ) : null}
-                {Number(selectedComplaint.orderTotalAmount || 0) > 0 ? (
-                  <Text style={styles.metaText}>Order Total: ₹{Math.round(selectedComplaint.orderTotalAmount || 0)}</Text>
-                ) : null}
-                {selectedComplaint.orderCustomerPhone ? (
-                  <Text style={styles.metaText}>Order Phone: {selectedComplaint.orderCustomerPhone}</Text>
-                ) : null}
-                {selectedComplaint.orderBillingAddress ? (
-                  <Text style={styles.metaText}>Billing Address: {selectedComplaint.orderBillingAddress}</Text>
-                ) : null}
+                <TouchableOpacity
+                  style={styles.viewOrderBtn}
+                  onPress={() => {
+                    setSelectedComplaint(null);
+                    setSelectedOrderId(selectedComplaint.orderId || null);
+                  }}
+                  disabled={!selectedComplaint.orderId}
+                >
+                  <Text style={styles.viewOrderText}>View Order</Text>
+                </TouchableOpacity>
 
                 <Text style={styles.noteTitle}>Note</Text>
                 <Text style={styles.noteText}>{selectedComplaint.message || selectedComplaint.subject || "-"}</Text>
@@ -260,4 +255,14 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   reviewText: { color: "#FFFFFF", fontWeight: "700" },
+  viewOrderBtn: {
+    marginTop: spacing.md,
+    backgroundColor: colors.panelAlt,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  viewOrderText: { color: colors.primary, fontWeight: "700" },
 });

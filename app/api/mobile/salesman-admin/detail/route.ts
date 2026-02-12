@@ -71,6 +71,8 @@ export async function GET(req: Request) {
       vendorName: vendor?.companyName || vendor?.fullName || "",
       vendorId: salesman.vendorId || null,
       idProofUrl: salesman.idProofUrl || null,
+      aadhaarCardUrl: salesman.aadhaarCardUrl || salesman.idProofUrl || null,
+      panCardUrl: salesman.panCardUrl || null,
     },
     stats,
     recentVisits,

@@ -89,10 +89,22 @@ export default function SalesmenScreen() {
                 </View>
 
                 <Text style={styles.logTitle}>ID Proof</Text>
-                {detail.salesman?.idProofUrl ? (
-                  <Image source={{ uri: detail.salesman.idProofUrl }} style={styles.idProofImage} />
+                {detail.salesman?.aadhaarCardUrl ? (
+                  <>
+                    <Text style={styles.detailMeta}>Aadhaar Card</Text>
+                    <Image source={{ uri: detail.salesman.aadhaarCardUrl }} style={styles.idProofImage} />
+                  </>
                 ) : (
-                  <Text style={styles.logMeta}>No ID proof uploaded.</Text>
+                  <Text style={styles.logMeta}>No Aadhaar uploaded.</Text>
+                )}
+
+                {detail.salesman?.panCardUrl ? (
+                  <>
+                    <Text style={styles.detailMeta}>PAN Card</Text>
+                    <Image source={{ uri: detail.salesman.panCardUrl }} style={styles.idProofImage} />
+                  </>
+                ) : (
+                  <Text style={styles.logMeta}>No PAN uploaded.</Text>
                 )}
 
                 <Text style={styles.logTitle}>Recent 3 Visits</Text>

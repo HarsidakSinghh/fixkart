@@ -7,6 +7,7 @@ import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import StatusPill from "../components/StatusPill";
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, Image, Linking } from "react-native";
 import { colors, spacing } from "../theme";
+import OrderDetailAdminScreen from "./OrderDetailAdminScreen";
 
 export default function RefundsScreen() {
   const fetchRefunds = useCallback(async () => {
@@ -16,6 +17,11 @@ export default function RefundsScreen() {
 
   const { items, setItems, error, refresh, loading } = useAsyncList(fetchRefunds, []);
   const [selectedRefund, setSelectedRefund] = React.useState(null);
+  const [selectedOrderId, setSelectedOrderId] = React.useState(null);
+
+  if (selectedOrderId) {
+    return <OrderDetailAdminScreen orderId={selectedOrderId} onBack={() => setSelectedOrderId(null)} />;
+  }
 
   async function updateStatus(id, status) {
     await updateRefundStatus(id, status);
@@ -136,27 +142,16 @@ export default function RefundsScreen() {
                   <Text style={styles.metaText}>Time: {new Date(selectedRefund.createdAt).toLocaleString()}</Text>
                 ) : null}
 
-                <Text style={styles.orderTitle}>Order Details</Text>
-                {selectedRefund.orderCreatedAt ? (
-                  <Text style={styles.metaText}>
-                    Ordered On: {new Date(selectedRefund.orderCreatedAt).toLocaleString()}
-                  </Text>
-                ) : null}
-                {selectedRefund.orderStatus ? (
-                  <Text style={styles.metaText}>Order Status: {selectedRefund.orderStatus}</Text>
-                ) : null}
-                {selectedRefund.orderPaymentMethod ? (
-                  <Text style={styles.metaText}>Payment: {selectedRefund.orderPaymentMethod}</Text>
-                ) : null}
-                {Number(selectedRefund.orderTotalAmount || 0) > 0 ? (
-                  <Text style={styles.metaText}>Order Total: ₹{Math.round(selectedRefund.orderTotalAmount || 0)}</Text>
-                ) : null}
-                {selectedRefund.orderCustomerPhone ? (
-                  <Text style={styles.metaText}>Order Phone: {selectedRefund.orderCustomerPhone}</Text>
-                ) : null}
-                {selectedRefund.orderBillingAddress ? (
-                  <Text style={styles.metaText}>Billing Address: {selectedRefund.orderBillingAddress}</Text>
-                ) : null}
+                <TouchableOpacity
+                  style={styles.viewOrderBtn}
+                  onPress={() => {
+                    setSelectedRefund(null);
+                    setSelectedOrderId(selectedRefund.orderId || null);
+                  }}
+                  disabled={!selectedRefund.orderId}
+                >
+                  <Text style={styles.viewOrderText}>View Order</Text>
+                </TouchableOpacity>
 
                 {selectedRefund.productImage ? (
                   <Image source={{ uri: selectedRefund.productImage }} style={styles.productImage} />
@@ -248,6 +243,16 @@ const styles = StyleSheet.create({
   closeText: { color: colors.primary, fontWeight: "700" },
   metaText: { color: colors.muted, fontSize: 12, marginTop: 6 },
   orderTitle: { color: colors.text, fontWeight: "700", marginTop: spacing.md },
+  viewOrderBtn: {
+    marginTop: spacing.md,
+    backgroundColor: colors.panelAlt,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  viewOrderText: { color: colors.primary, fontWeight: "700" },
   productImage: {
     width: "100%",
     height: 180,

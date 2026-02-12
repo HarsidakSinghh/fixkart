@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Modal, TouchableOpacity, ScrollView, Image } from "react-native";
+import { View, Text, StyleSheet, Pressable, Modal, TouchableOpacity, ScrollView, Image, TextInput, Alert } from "react-native";
 import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
 import { colors, spacing } from "../theme";
@@ -13,6 +13,7 @@ import {
   getInventoryApprovals,
   approveProduct,
   rejectProduct,
+  updateProductCommission,
 } from "../services/api";
 
 const TABS = [
@@ -24,6 +25,8 @@ const TABS = [
 export default function ApprovalsScreen() {
   const [activeTab, setActiveTab] = useState("vendors");
   const [selectedInventory, setSelectedInventory] = useState(null);
+  const [commissionInput, setCommissionInput] = useState("");
+  const [savingCommission, setSavingCommission] = useState(false);
 
   const fetchVendors = useCallback(async () => {
     const data = await getVendors("PENDING");
@@ -68,6 +71,28 @@ export default function ApprovalsScreen() {
       await rejectProduct(productId);
     }
     inventoryList.setItems((prev) => prev.filter((p) => p.id !== productId));
+  };
+
+  const saveCommission = async () => {
+    if (!selectedInventory?.id) return;
+    const percent = Number(commissionInput);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+      Alert.alert("Invalid commission", "Commission must be between 0 and 100.");
+      return;
+    }
+    setSavingCommission(true);
+    try {
+      await updateProductCommission(selectedInventory.id, percent);
+      setSelectedInventory((prev) => (prev ? { ...prev, commissionPercent: percent } : prev));
+      inventoryList.setItems((prev) =>
+        prev.map((item) => (item.id === selectedInventory.id ? { ...item, commissionPercent: percent } : item))
+      );
+      Alert.alert("Updated", "Commission percent updated.");
+    } catch {
+      Alert.alert("Failed", "Could not update commission percent.");
+    } finally {
+      setSavingCommission(false);
+    }
   };
 
   const activeItems =
@@ -144,7 +169,10 @@ export default function ApprovalsScreen() {
                   primaryLabel="Approve"
                   secondaryLabel="View Details"
                   onPrimary={() => handleInventoryAction(item.id, "APPROVE")}
-                  onSecondary={() => setSelectedInventory(item)}
+                  onSecondary={() => {
+                    setSelectedInventory(item);
+                    setCommissionInput(String(Number(item.commissionPercent || 0)));
+                  }}
                 />
               }
             />
@@ -209,6 +237,26 @@ export default function ApprovalsScreen() {
                 <Text style={styles.metaText}>Price: ₹{Math.round(selectedInventory.price || 0)}</Text>
                 <Text style={styles.metaText}>Commission: {Number(selectedInventory.commissionPercent || 0)}%</Text>
                 <Text style={styles.metaText}>Description: {selectedInventory.description || "No description"}</Text>
+                <View style={styles.commissionWrap}>
+                  <Text style={styles.commissionLabel}>Change Commission %</Text>
+                  <TextInput
+                    value={commissionInput}
+                    onChangeText={setCommissionInput}
+                    keyboardType="numeric"
+                    placeholder="e.g. 12"
+                    placeholderTextColor={colors.muted}
+                    style={styles.commissionInput}
+                  />
+                  <TouchableOpacity
+                    style={[styles.commissionBtn, savingCommission ? { opacity: 0.7 } : null]}
+                    onPress={saveCommission}
+                    disabled={savingCommission}
+                  >
+                    <Text style={styles.commissionBtnText}>
+                      {savingCommission ? "Saving..." : "Save Commission"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity
@@ -321,4 +369,30 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   approveText: { color: "#FFFFFF", fontWeight: "700" },
+  commissionWrap: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    padding: spacing.sm,
+    backgroundColor: colors.card,
+  },
+  commissionLabel: { color: colors.text, fontWeight: "700", fontSize: 12, marginBottom: 6 },
+  commissionInput: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: colors.text,
+    fontSize: 12,
+  },
+  commissionBtn: {
+    marginTop: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  commissionBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
 });

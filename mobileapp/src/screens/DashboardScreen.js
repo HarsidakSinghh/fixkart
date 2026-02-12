@@ -37,10 +37,21 @@ export default function DashboardScreen({ onNavigate }) {
         getRefunds(),
         getComplaints(),
       ]);
+
+      const openComplaintCount = (complaints.complaints || []).filter((c) => {
+        const status = String(c.status || "").toUpperCase();
+        return status === "OPEN" || status === "PENDING" || status === "IN_REVIEW";
+      }).length;
+
+      const activeRefundCount = (refunds.refunds || []).filter((r) => {
+        const status = String(r.status || "").toUpperCase();
+        return status === "PENDING" || status === "IN_REVIEW";
+      }).length;
+
       setQueue({
         inventory: inventory.products?.length || 0,
-        refunds: refunds.refunds?.length || 0,
-        complaints: complaints.complaints?.length || 0,
+        refunds: activeRefundCount,
+        complaints: openComplaintCount,
       });
     } catch (_) {
       setQueue({ inventory: 0, refunds: 0, complaints: 0 });

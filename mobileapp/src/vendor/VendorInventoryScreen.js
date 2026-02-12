@@ -40,7 +40,11 @@ export default function VendorInventoryScreen() {
 
   const filteredListings = useMemo(() => {
     let filtered = listings;
-    if (statusFilter === 'LIVE') filtered = filtered.filter((p) => p.status === 'APPROVED' && p.isPublished);
+    if (statusFilter === 'LIVE') {
+      filtered = filtered.filter(
+        (p) => p.status === 'APPROVED' && p.isPublished && Number(p.quantity ?? 0) > 0
+      );
+    }
     if (statusFilter === 'PENDING') filtered = filtered.filter((p) => p.status === 'PENDING');
     if (statusFilter === 'ACTION') filtered = filtered.filter((p) => p.status === 'REJECTED');
     if (search.trim()) {
@@ -61,7 +65,7 @@ export default function VendorInventoryScreen() {
       <View style={styles.listingBody}>
         <Text style={styles.productName}>{item.title || item.name}</Text>
         <Text style={styles.productSku} numberOfLines={1}>SKU: {item.sku || 'N/A'}</Text>
-        {typeof item.quantity === 'number' && item.quantity > 0 && item.quantity <= 5 ? (
+        {typeof item.quantity === 'number' && item.quantity > 0 && item.quantity < 5 ? (
           <View style={styles.lowStockPill}>
             <Text style={styles.lowStockText}>Only {item.quantity} left</Text>
           </View>
@@ -283,21 +287,36 @@ export default function VendorInventoryScreen() {
   );
 
   function statusLabel(item) {
-    if (item.status === 'APPROVED' && item.isPublished) return 'LIVE';
+    const qty = Number(item?.quantity ?? 0);
+    if (item.status === 'APPROVED' && item.isPublished) {
+      if (qty <= 0) return 'SOLD OUT';
+      if (qty < 5) return 'LOW STOCK';
+      return 'LIVE';
+    }
     if (item.status === 'PENDING') return 'PENDING';
     if (item.status === 'REJECTED') return 'ACTION REQUIRED';
     return item.status || 'PENDING';
   }
 
   function statusTone(item) {
-    if (item.status === 'APPROVED' && item.isPublished) return 'success';
+    const qty = Number(item?.quantity ?? 0);
+    if (item.status === 'APPROVED' && item.isPublished) {
+      if (qty <= 0) return 'danger';
+      if (qty < 5) return 'warning';
+      return 'success';
+    }
     if (item.status === 'PENDING') return 'warning';
     if (item.status === 'REJECTED') return 'danger';
     return 'warning';
   }
 
   function statusStripe(item) {
-    if (item.status === 'APPROVED' && item.isPublished) return '#2F9E6F';
+    const qty = Number(item?.quantity ?? 0);
+    if (item.status === 'APPROVED' && item.isPublished) {
+      if (qty <= 0) return '#E05252';
+      if (qty < 5) return '#F0B429';
+      return '#2F9E6F';
+    }
     if (item.status === 'PENDING') return '#F0B429';
     if (item.status === 'REJECTED') return '#E05252';
     return '#F0B429';

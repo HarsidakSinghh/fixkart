@@ -8,10 +8,12 @@ import VendorSalesmanTrackScreen from './VendorSalesmanTrackScreen';
 export default function VendorSalesmenScreen({ onBack }) {
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', code: '', idProofUrl: '' });
+  const [form, setForm] = useState({ name: '', phone: '', code: '', aadhaarCardUrl: '', panCardUrl: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [uploadingIdProof, setUploadingIdProof] = useState(false);
-  const [idProofPreview, setIdProofPreview] = useState('');
+  const [uploadingAadhaar, setUploadingAadhaar] = useState(false);
+  const [uploadingPan, setUploadingPan] = useState(false);
+  const [aadhaarPreview, setAadhaarPreview] = useState('');
+  const [panPreview, setPanPreview] = useState('');
   const [visitModal, setVisitModal] = useState(false);
   const [visitLoading, setVisitLoading] = useState(false);
   const [visitSalesman, setVisitSalesman] = useState(null);
@@ -22,6 +24,8 @@ export default function VendorSalesmenScreen({ onBack }) {
   const [assignments, setAssignments] = useState([]);
   const [assignForm, setAssignForm] = useState({ companyName: '', address: '', note: '', visitDate: '' });
   const [trackSalesman, setTrackSalesman] = useState(null);
+  const [salesmanDetail, setSalesmanDetail] = useState(null);
+  const [detailModal, setDetailModal] = useState(false);
 
   const loadSalesmen = useCallback(async () => {
     setLoading(true);
@@ -48,16 +52,22 @@ export default function VendorSalesmenScreen({ onBack }) {
       Alert.alert('Invalid code', 'Code must be 4 digits.');
       return;
     }
+    if (!form.aadhaarCardUrl || !form.panCardUrl) {
+      Alert.alert('Missing documents', 'Aadhaar card and PAN card are required.');
+      return;
+    }
     setSubmitting(true);
     try {
       await createVendorSalesman({
         name: form.name,
         phone: form.phone,
         code: String(form.code),
-        idProofUrl: form.idProofUrl || null,
+        aadhaarCardUrl: form.aadhaarCardUrl || null,
+        panCardUrl: form.panCardUrl || null,
       });
-      setForm({ name: '', phone: '', code: '', idProofUrl: '' });
-      setIdProofPreview('');
+      setForm({ name: '', phone: '', code: '', aadhaarCardUrl: '', panCardUrl: '' });
+      setAadhaarPreview('');
+      setPanPreview('');
       await loadSalesmen();
       Alert.alert('Salesman added', 'The salesman can now log in.');
     } catch (error) {
@@ -67,10 +77,10 @@ export default function VendorSalesmenScreen({ onBack }) {
     }
   };
 
-  const pickIdProof = async () => {
+  const pickDoc = async (type) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Please allow gallery access to upload ID proof.');
+      Alert.alert('Permission needed', 'Please allow gallery access to upload documents.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -85,20 +95,38 @@ export default function VendorSalesmenScreen({ onBack }) {
       Alert.alert('Failed', 'Could not read selected image.');
       return;
     }
-    setUploadingIdProof(true);
-    setIdProofPreview(asset.uri || '');
+    if (type === 'aadhaar') {
+      setUploadingAadhaar(true);
+      setAadhaarPreview(asset.uri || '');
+    } else {
+      setUploadingPan(true);
+      setPanPreview(asset.uri || '');
+    }
     try {
-      const upload = await uploadSalesmanIdProof(asset.base64, `salesman-id-${Date.now()}`);
-      setForm((prev) => ({ ...prev, idProofUrl: upload?.url || '' }));
+      const upload = await uploadSalesmanIdProof(asset.base64, `salesman-${type}-${Date.now()}`);
+      if (type === 'aadhaar') {
+        setForm((prev) => ({ ...prev, aadhaarCardUrl: upload?.url || '' }));
+      } else {
+        setForm((prev) => ({ ...prev, panCardUrl: upload?.url || '' }));
+      }
       if (!upload?.url) {
-        Alert.alert('Failed', 'ID proof upload failed.');
+        Alert.alert('Failed', 'Document upload failed.');
       }
     } catch (error) {
-      setForm((prev) => ({ ...prev, idProofUrl: '' }));
-      setIdProofPreview('');
-      Alert.alert('Failed', 'ID proof upload failed.');
+      if (type === 'aadhaar') {
+        setForm((prev) => ({ ...prev, aadhaarCardUrl: '' }));
+        setAadhaarPreview('');
+      } else {
+        setForm((prev) => ({ ...prev, panCardUrl: '' }));
+        setPanPreview('');
+      }
+      Alert.alert('Failed', 'Document upload failed.');
     } finally {
-      setUploadingIdProof(false);
+      if (type === 'aadhaar') {
+        setUploadingAadhaar(false);
+      } else {
+        setUploadingPan(false);
+      }
     }
   };
 
@@ -199,17 +227,32 @@ export default function VendorSalesmenScreen({ onBack }) {
           maxLength={4}
         />
         <View style={styles.idProofBlock}>
-          <Text style={styles.idProofLabel}>ID Proof (optional)</Text>
+          <Text style={styles.idProofLabel}>Aadhaar Card (required)</Text>
           <View style={styles.idProofRow}>
-            {idProofPreview ? (
-              <Image source={{ uri: idProofPreview }} style={styles.idProofImage} />
+            {aadhaarPreview ? (
+              <Image source={{ uri: aadhaarPreview }} style={styles.idProofImage} />
             ) : (
               <View style={[styles.idProofImage, styles.idProofPlaceholder]}>
                 <Text style={styles.idProofPlaceholderText}>No file</Text>
               </View>
             )}
-            <TouchableOpacity style={styles.uploadProofBtn} onPress={pickIdProof} disabled={uploadingIdProof}>
-              <Text style={styles.uploadProofText}>{uploadingIdProof ? 'Uploading…' : 'Upload ID Proof'}</Text>
+            <TouchableOpacity style={styles.uploadProofBtn} onPress={() => pickDoc('aadhaar')} disabled={uploadingAadhaar}>
+              <Text style={styles.uploadProofText}>{uploadingAadhaar ? 'Uploading…' : 'Upload Aadhaar'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.idProofBlock}>
+          <Text style={styles.idProofLabel}>PAN Card (required)</Text>
+          <View style={styles.idProofRow}>
+            {panPreview ? (
+              <Image source={{ uri: panPreview }} style={styles.idProofImage} />
+            ) : (
+              <View style={[styles.idProofImage, styles.idProofPlaceholder]}>
+                <Text style={styles.idProofPlaceholderText}>No file</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.uploadProofBtn} onPress={() => pickDoc('pan')} disabled={uploadingPan}>
+              <Text style={styles.uploadProofText}>{uploadingPan ? 'Uploading…' : 'Upload PAN'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -243,6 +286,15 @@ export default function VendorSalesmenScreen({ onBack }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.trackBtn} onPress={() => setTrackSalesman(item)}>
                 <Text style={styles.trackText}>Track</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.linkBtn}
+                onPress={() => {
+                  setSalesmanDetail(item);
+                  setDetailModal(true);
+                }}
+              >
+                <Text style={styles.linkText}>Details</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -352,6 +404,37 @@ export default function VendorSalesmenScreen({ onBack }) {
                 ))
               ) : (
                 <Text style={styles.emptyText}>No assignments yet.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={detailModal} animationType="slide" transparent onRequestClose={() => setDetailModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Salesman Details</Text>
+              <TouchableOpacity onPress={() => setDetailModal(false)}>
+                <Text style={styles.linkText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>{salesmanDetail?.name || 'Salesman'}</Text>
+            <Text style={styles.meta}>{salesmanDetail?.phone}</Text>
+            <Text style={styles.meta}>Code: {salesmanDetail?.code}</Text>
+            <Text style={styles.meta}>Status: {salesmanDetail?.status || 'ACTIVE'}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.sectionTitle}>Aadhaar Card</Text>
+              {salesmanDetail?.aadhaarCardUrl || salesmanDetail?.idProofUrl ? (
+                <Image source={{ uri: salesmanDetail?.aadhaarCardUrl || salesmanDetail?.idProofUrl }} style={styles.visitImage} />
+              ) : (
+                <Text style={styles.emptyText}>No Aadhaar uploaded.</Text>
+              )}
+              <Text style={styles.sectionTitle}>PAN Card</Text>
+              {salesmanDetail?.panCardUrl ? (
+                <Image source={{ uri: salesmanDetail.panCardUrl }} style={styles.visitImage} />
+              ) : (
+                <Text style={styles.emptyText}>No PAN uploaded.</Text>
               )}
             </ScrollView>
           </View>
