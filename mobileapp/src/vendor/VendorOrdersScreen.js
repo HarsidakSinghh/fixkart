@@ -1,17 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { getVendorOrders, markVendorOrderReady, getVendorOrderPO } from './vendorApi';
+import {
+  getVendorOrders,
+  markVendorOrderReady,
+  getVendorOrderPO,
+  updateVendorOrderStatus,
+} from './vendorApi';
 import StatusPill from '../components/StatusPill';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 
 export default function VendorOrdersScreen({ onSwitchToListings }) {
   const [orders, setOrders] = useState([]);
+  const [activeTab, setActiveTab] = useState('PENDING');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCode, setActiveCode] = useState(null);
   const [downloading, setDownloading] = useState(null);
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -26,7 +33,7 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
           createdAt: order.createdAt,
         }));
         await SecureStore.setItemAsync('vendor_notifications', JSON.stringify(notifications));
-      } catch (_) {
+      } catch {
         // ignore
       }
     } catch (error) {
@@ -49,14 +56,45 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
           if (order.orderId !== orderId) return order;
           return {
             ...order,
+            status: 'SHIPPED',
             items: order.items.map((item) =>
-              item.id === itemId ? { ...item, status: 'READY', dispatchCode: res.code } : item
+              item.id === itemId ? { ...item, status: 'SHIPPED', dispatchCode: res.code } : item
             ),
           };
         })
       );
     } catch (error) {
       console.error('Failed to mark dispatch', error);
+    }
+  };
+
+  const handleOrderAction = async (orderId, action) => {
+    setUpdatingOrderId(orderId);
+    try {
+      const res = await updateVendorOrderStatus(orderId, action);
+      const nextStatus = res?.status || (action === 'ACCEPT' ? 'PROCESSING' : 'REJECTED');
+      setOrders((prev) =>
+        prev.map((order) => {
+          if (order.orderId !== orderId) return order;
+          return {
+            ...order,
+            status: nextStatus,
+            items: order.items.map((item) => ({
+              ...item,
+              status:
+                item.status === 'SHIPPED' || item.status === 'DELIVERED'
+                  ? item.status
+                  : action === 'ACCEPT'
+                  ? 'PROCESSING'
+                  : 'REJECTED',
+            })),
+          };
+        })
+      );
+    } catch (error) {
+      console.error(`Failed to ${action.toLowerCase()} order`, error);
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -74,6 +112,16 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
     }
   };
 
+  const filteredOrders = orders.filter((order) => {
+    const status = String(order.status || '').toUpperCase();
+    if (activeTab === 'PENDING') return status === 'PENDING';
+    if (activeTab === 'PROCESSING') return status === 'PROCESSING' || status === 'APPROVED';
+    if (activeTab === 'SHIPPED') return status === 'SHIPPED';
+    if (activeTab === 'DELIVERED') return status === 'DELIVERED';
+    if (activeTab === 'REJECTED') return status === 'REJECTED' || status === 'CANCELLED';
+    return true;
+  });
+
   const renderOrder = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.orderHeader}>
@@ -88,6 +136,25 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
         </View>
       </View>
 
+      {String(item.status || '').toUpperCase() === 'PENDING' ? (
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.acceptBtn]}
+            disabled={updatingOrderId === item.orderId}
+            onPress={() => handleOrderAction(item.orderId, 'ACCEPT')}
+          >
+            <Text style={styles.actionText}>{updatingOrderId === item.orderId ? 'Please wait…' : 'Accept'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.rejectBtn]}
+            disabled={updatingOrderId === item.orderId}
+            onPress={() => handleOrderAction(item.orderId, 'REJECT')}
+          >
+            <Text style={styles.actionText}>Reject</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {(item.items || []).map((orderItem) => (
         <View key={orderItem.id} style={styles.itemRow}>
           <Image source={{ uri: orderItem.image }} style={styles.image} />
@@ -100,12 +167,12 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
           </View>
           {orderItem.dispatchCode ? (
             <View style={styles.codeBadge}>
-              <Text style={styles.codeLabel}>Dispatch</Text>
+              <Text style={styles.codeLabel}>Rider OTP</Text>
               <Text style={styles.codeValue}>{orderItem.dispatchCode}</Text>
             </View>
-          ) : (
+          ) : String(orderItem.status || '').toUpperCase() !== 'PROCESSING' ? null : (
             <TouchableOpacity style={styles.dispatchBtn} onPress={() => handleDispatch(orderItem.id, item.orderId)}>
-              <Text style={styles.dispatchText}>Ready</Text>
+              <Text style={styles.dispatchText}>Generate OTP</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -124,7 +191,7 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
   return (
     <View style={styles.container}>
       <FlatList
-        data={orders}
+        data={filteredOrders}
         keyExtractor={(item) => item.orderId}
         contentContainerStyle={styles.list}
         renderItem={renderOrder}
@@ -149,12 +216,23 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
           <View>
             <View style={styles.heroCard}>
               <Text style={styles.heroTitle}>Orders</Text>
-              <Text style={styles.heroSubtitle}>Track and dispatch today’s orders</Text>
+              <Text style={styles.heroSubtitle}>Accept, ship with OTP, then wait for delivery closure</Text>
               {onSwitchToListings ? (
                 <TouchableOpacity style={styles.switchBtn} onPress={onSwitchToListings}>
                   <Text style={styles.switchText}>Back to Listings</Text>
                 </TouchableOpacity>
               ) : null}
+            </View>
+            <View style={styles.tabsRow}>
+              {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'REJECTED'].map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
+                  onPress={() => setActiveTab(tab)}
+                >
+                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         }
@@ -170,8 +248,9 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
 }
 
 function statusTone(status) {
-  if (status === 'DELIVERED' || status === 'COMPLETED' || status === 'READY') return 'success';
-  if (status === 'SHIPPED' || status === 'APPROVED') return 'info';
+  if (status === 'DELIVERED' || status === 'COMPLETED') return 'success';
+  if (status === 'SHIPPED') return 'info';
+  if (status === 'PROCESSING' || status === 'APPROVED') return 'warning';
   if (status === 'CANCELLED' || status === 'REJECTED') return 'danger';
   return 'warning';
 }
@@ -194,6 +273,27 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 20, fontWeight: '800', color: vendorColors.text },
   heroSubtitle: { color: vendorColors.muted, marginTop: 6, fontSize: 12 },
   list: { padding: vendorSpacing.lg, paddingBottom: 120 },
+  tabsRow: {
+    marginTop: vendorSpacing.md,
+    marginHorizontal: vendorSpacing.lg,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tabPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: vendorColors.surface,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+  },
+  tabPillActive: {
+    backgroundColor: vendorColors.primary,
+    borderColor: vendorColors.primary,
+  },
+  tabText: { color: vendorColors.muted, fontSize: 11, fontWeight: '700' },
+  tabTextActive: { color: '#FFFFFF' },
   loadingWrap: { alignItems: 'center', paddingVertical: vendorSpacing.md },
   loadingText: { marginTop: 8, color: vendorColors.muted, fontSize: 12 },
   card: {
@@ -220,6 +320,23 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: vendorColors.border,
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: vendorSpacing.sm,
+  },
+  actionBtn: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  acceptBtn: {
+    backgroundColor: vendorColors.primary,
+  },
+  rejectBtn: {
+    backgroundColor: '#D9534F',
+  },
+  actionText: { color: '#FFFFFF', fontWeight: '700', fontSize: 11 },
   image: { width: 54, height: 54, borderRadius: 10, backgroundColor: vendorColors.surface },
   title: { color: vendorColors.text, fontWeight: '700' },
   dispatchBtn: {

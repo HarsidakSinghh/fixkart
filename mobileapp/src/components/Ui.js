@@ -66,7 +66,13 @@ export function RowCard({ title, subtitle, right, meta }) {
   );
 }
 
-export function ActionRow({ primaryLabel, secondaryLabel, onPrimary, onSecondary }) {
+export function ActionRow({
+  primaryLabel,
+  secondaryLabel,
+  onPrimary,
+  onSecondary,
+  primaryDisabled = false,
+}) {
   return (
     <View style={styles.actionRow}>
       {secondaryLabel ? (
@@ -75,7 +81,11 @@ export function ActionRow({ primaryLabel, secondaryLabel, onPrimary, onSecondary
         </Pressable>
       ) : null}
       {primaryLabel ? (
-        <Pressable onPress={onPrimary} style={[styles.button, styles.buttonPrimary]}>
+        <Pressable
+          onPress={onPrimary}
+          disabled={primaryDisabled}
+          style={[styles.button, styles.buttonPrimary, primaryDisabled && styles.buttonDisabled]}
+        >
           <Text style={styles.buttonPrimaryText}>{primaryLabel}</Text>
         </Pressable>
       ) : null}
@@ -232,6 +242,9 @@ const styles = StyleSheet.create({
   },
   buttonPrimary: {
     backgroundColor: colors.primary,
+  },
+  buttonDisabled: {
+    backgroundColor: colors.line,
   },
   buttonPrimaryText: { color: "#FFFFFF", fontWeight: "700", fontSize: 12 },
   buttonGhost: {

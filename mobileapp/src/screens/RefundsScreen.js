@@ -22,8 +22,13 @@ export default function RefundsScreen() {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
   }
 
-  const pending = items.filter((i) => String(i.status || "").toUpperCase() !== "APPROVED");
+  const pending = items.filter((i) => {
+    const s = String(i.status || "").toUpperCase();
+    return s === "PENDING" || s === "";
+  });
+  const inReview = items.filter((i) => String(i.status || "").toUpperCase() === "IN_REVIEW");
   const issued = items.filter((i) => String(i.status || "").toUpperCase() === "APPROVED");
+  const rejected = items.filter((i) => String(i.status || "").toUpperCase() === "REJECTED");
 
   return (
     <AdminScreenLayout>
@@ -54,6 +59,30 @@ export default function RefundsScreen() {
         />
       ))}
 
+      <SectionHeader title="In Review Refunds" />
+      {!loading && !error && inReview.length === 0 ? (
+        <EmptyState title="No refunds in review" message="Refunds marked in review appear here." />
+      ) : null}
+      {inReview.map((item) => (
+        <RowCard
+          key={item.id}
+          title={`₹${item.amount}`}
+          subtitle={`${item.orderId}  •  ${item.id}`}
+          right={<StatusPill label="IN_REVIEW" tone="warning" />}
+          meta={
+            <ActionRow
+              secondaryLabel="View Details"
+              primaryLabel="Issue"
+              onSecondary={() => setSelectedRefund(item)}
+              onPrimary={async () => {
+                await updateStatus(item.id, "APPROVED");
+                refresh();
+              }}
+            />
+          }
+        />
+      ))}
+
       <SectionHeader title="Issued Refunds" />
       {!loading && !error && issued.length === 0 ? (
         <EmptyState title="No issued refunds" message="Approved refunds will appear here." />
@@ -64,6 +93,25 @@ export default function RefundsScreen() {
           title={`₹${item.amount}`}
           subtitle={`${item.orderId}  •  ${item.id}`}
           right={<StatusPill label="ISSUED" tone="success" />}
+        />
+      ))}
+
+      <SectionHeader title="Rejected Refunds" />
+      {!loading && !error && rejected.length === 0 ? (
+        <EmptyState title="No rejected refunds" message="Rejected refunds appear here." />
+      ) : null}
+      {rejected.map((item) => (
+        <RowCard
+          key={item.id}
+          title={`₹${item.amount}`}
+          subtitle={`${item.orderId}  •  ${item.id}`}
+          right={<StatusPill label="REJECTED" tone="danger" />}
+          meta={
+            <ActionRow
+              secondaryLabel="View Details"
+              onSecondary={() => setSelectedRefund(item)}
+            />
+          }
         />
       ))}
 

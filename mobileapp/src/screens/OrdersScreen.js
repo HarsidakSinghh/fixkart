@@ -10,6 +10,7 @@ import { ActionRow } from "../components/Ui";
 import StatusPill from "../components/StatusPill";
 
 export default function OrdersScreen() {
+  const [activeTab, setActiveTab] = React.useState("PENDING");
   const [stats, setStats] = React.useState({
     pending: 0,
     processing: 0,
@@ -18,12 +19,10 @@ export default function OrdersScreen() {
 
   const fetchOrders = useCallback(async () => {
     const data = await getOrders();
-    return (data.orders || []).filter(
-      (o) => !["COMPLETED", "DELIVERED"].includes(String(o.status || "").toUpperCase())
-    );
+    return data.orders || [];
   }, []);
 
-  const { items, setItems, error, refresh, loading } = useAsyncList(fetchOrders, []);
+  const { items, error, refresh, loading } = useAsyncList(fetchOrders, []);
   const [selectedOrder, setSelectedOrder] = React.useState(null);
 
   React.useEffect(() => {
@@ -41,6 +40,15 @@ export default function OrdersScreen() {
     };
   }, []);
 
+  const filteredItems = items.filter((order) => {
+    const status = String(order.status || "").toUpperCase();
+    if (activeTab === "PENDING") return status === "PENDING";
+    if (activeTab === "PROCESSING") return status === "PROCESSING" || status === "APPROVED";
+    if (activeTab === "SHIPPED") return status === "SHIPPED";
+    if (activeTab === "DELIVERED") return status === "DELIVERED" || status === "COMPLETED";
+    if (activeTab === "REJECTED") return status === "REJECTED" || status === "CANCELLED";
+    return true;
+  });
 
   return (
     <AdminScreenLayout>
@@ -54,18 +62,29 @@ export default function OrdersScreen() {
       </View>
 
       <SectionHeader title="Latest Orders" actionLabel="Filter" />
-      {loading && items.length === 0 ? <SkeletonList count={3} /> : null}
-      {error && items.length === 0 ? (
+      <View style={styles.tabsRow}>
+        {["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "REJECTED"].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.tabActive]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {loading && filteredItems.length === 0 ? <SkeletonList count={3} /> : null}
+      {error && filteredItems.length === 0 ? (
         <ErrorState message={error} onRetry={refresh} />
-      ) : !loading && items.length === 0 ? (
+      ) : !loading && filteredItems.length === 0 ? (
         <EmptyState
-          title="No orders yet"
-          message="New orders will appear here as they come in."
+          title="No orders in this status"
+          message="Orders move automatically as vendor and admin update status."
           actionLabel="Refresh"
           onAction={refresh}
         />
       ) : (
-        items.map((order) => (
+        filteredItems.map((order) => (
           <RowCard
             key={order.id}
             title={order.customer}
@@ -81,15 +100,13 @@ export default function OrdersScreen() {
                 <Text style={styles.placed}>Placed {order.placedAt}</Text>
                 <ActionRow
                   secondaryLabel="View Details"
-                  primaryLabel={String(order.status || "").toUpperCase() === "PENDING" ? "Approve" : "Mark Delivered"}
+                  primaryLabel="Mark Delivered"
+                  primaryDisabled={String(order.status || "").toUpperCase() !== "SHIPPED"}
                   onSecondary={async () => {
                     setSelectedOrder(order);
                   }}
                   onPrimary={async () => {
-                    await updateOrderStatus(
-                      order.id,
-                      String(order.status || "").toUpperCase() === "PENDING" ? "APPROVED" : "DELIVERED"
-                    );
+                    await updateOrderStatus(order.id, "DELIVERED");
                     refresh();
                   }}
                 />
@@ -130,14 +147,18 @@ export default function OrdersScreen() {
               </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity
-                  style={styles.approveBtn}
+                  style={[
+                    styles.approveBtn,
+                    String(selectedOrder.status || "").toUpperCase() !== "SHIPPED" && styles.approveBtnDisabled,
+                  ]}
+                  disabled={String(selectedOrder.status || "").toUpperCase() !== "SHIPPED"}
                   onPress={async () => {
-                    await updateOrderStatus(selectedOrder.id, "APPROVED");
+                    await updateOrderStatus(selectedOrder.id, "DELIVERED");
                     setSelectedOrder(null);
                     refresh();
                   }}
                 >
-                  <Text style={styles.approveText}>Approve Order</Text>
+                  <Text style={styles.approveText}>Mark Delivered</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -149,9 +170,10 @@ export default function OrdersScreen() {
 }
 
 function statusTone(status) {
-  if (status === "COMPLETED") return "success";
+  if (status === "COMPLETED" || status === "DELIVERED") return "success";
   if (status === "PENDING") return "warning";
-  if (status === "APPROVED") return "info";
+  if (status === "PROCESSING" || status === "APPROVED") return "info";
+  if (status === "SHIPPED") return "info";
   if (status === "IN_TRANSIT") return "info";
   return "danger";
 }
@@ -165,6 +187,21 @@ const styles = StyleSheet.create({
   },
   amount: { color: colors.text, fontWeight: "700", marginBottom: 6 },
   placed: { color: colors.muted, fontSize: 11, marginBottom: 6 },
+  tabsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md },
+  tab: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panelAlt,
+  },
+  tabActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  tabText: { color: colors.muted, fontSize: 11, fontWeight: "700" },
+  tabTextActive: { color: "#FFFFFF" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.55)",
@@ -203,6 +240,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     paddingVertical: 11,
+  },
+  approveBtnDisabled: {
+    backgroundColor: colors.line,
   },
   approveText: { color: "#FFFFFF", fontWeight: "700" },
 });

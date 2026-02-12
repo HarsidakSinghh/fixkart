@@ -5,8 +5,15 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerProfile, updateCustomerProfile } from './customerApi';
 import { useAuth } from '../context/AuthContext';
 
+const PREF_KEY_BASE = 'customer_billing_pref';
+const PROFILE_CACHE_KEY_BASE = 'customer_profile_cache';
+
+function withUserKey(base, userId) {
+  return userId ? `${base}:${userId}` : base;
+}
+
 export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNotifications, onOpenPushDebug, forceComplete = false, onCompleted, onCancel }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(forceComplete);
@@ -21,20 +28,22 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
       setProfile(data.profile || null);
       setForm(data.profile || {});
       try {
-        await SecureStore.setItemAsync('customer_profile_cache', JSON.stringify(data.profile || {}));
-      } catch (_) {
+        const profileCacheKey = withUserKey(PROFILE_CACHE_KEY_BASE, user?.id);
+        await SecureStore.setItemAsync(profileCacheKey, JSON.stringify(data.profile || {}));
+      } catch {
         // ignore
       }
       try {
         const notifRaw = await SecureStore.getItemAsync('customer_notifications');
         if (notifRaw) setNotifications(JSON.parse(notifRaw));
-      } catch (_) {
+      } catch {
         // ignore
       }
       try {
-        const saved = await SecureStore.getItemAsync('customer_billing_pref');
+        const prefKey = withUserKey(PREF_KEY_BASE, user?.id);
+        const saved = await SecureStore.getItemAsync(prefKey);
         if (saved) setSavedBilling(JSON.parse(saved));
-      } catch (_) {
+      } catch {
         // ignore
       }
     } catch (error) {
@@ -42,7 +51,7 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -155,8 +164,9 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
                 const res = await updateCustomerProfile(form);
                 setProfile(res.profile || form);
                 try {
-                  await SecureStore.setItemAsync('customer_profile_cache', JSON.stringify(res.profile || form));
-                } catch (_) {
+                  const profileCacheKey = withUserKey(PROFILE_CACHE_KEY_BASE, user?.id);
+                  await SecureStore.setItemAsync(profileCacheKey, JSON.stringify(res.profile || form));
+                } catch {
                   // ignore
                 }
                 if (forceComplete && onCompleted) {
@@ -165,7 +175,7 @@ export default function CustomerProfileScreen({ onOpenSupportHistory, onOpenNoti
                   setEditing(false);
                 }
                 Alert.alert('Updated', forceComplete ? 'Profile completed.' : 'Profile updated successfully.');
-              } catch (error) {
+              } catch {
                 Alert.alert('Error', 'Unable to update profile.');
               }
             }}

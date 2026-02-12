@@ -60,7 +60,12 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
       <View style={styles.imageWrap}>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
           {photos.map((uri, idx) => (
-            <Image key={`${uri}-${idx}`} source={{ uri }} style={[styles.image, { width: imageWidth }]} />
+            <Image
+              key={`${uri}-${idx}`}
+              source={{ uri }}
+              style={[styles.image, { width: imageWidth }]}
+              resizeMode="contain"
+            />
           ))}
         </ScrollView>
         {photos.length > 1 ? (
@@ -109,7 +114,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: customerColors.border,
   },
-  image: { height: 260, borderRadius: 16, marginRight: 8 },
+  image: {
+    height: 260,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: customerColors.surface,
+  },
   dotRow: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: 8 },
   dot: { width: 6, height: 6, borderRadius: 99, backgroundColor: customerColors.muted },
   content: { padding: customerSpacing.lg },

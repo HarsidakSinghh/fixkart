@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-guard";
+import { prisma } from "@/lib/prisma";
 import { updateOrderDetails, updateOrderStatus } from "@/app/admin/actions";
 
 export async function PATCH(
@@ -27,7 +28,30 @@ export async function PATCH(
     return NextResponse.json(res, { status: res.success ? 200 : 500 });
   }
 
+  if (status && status !== "DELIVERED") {
+    return NextResponse.json(
+      { error: "Admin can only change status to DELIVERED from SHIPPED" },
+      { status: 403 }
+    );
+  }
+
   const resolved = await params;
+  const order = await prisma.order.findUnique({
+    where: { id: resolved.id },
+    select: { status: true },
+  });
+
+  if (!order) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+
+  if (order.status !== "SHIPPED") {
+    return NextResponse.json(
+      { error: "Only SHIPPED orders can be marked DELIVERED by admin" },
+      { status: 409 }
+    );
+  }
+
   const res = await updateOrderStatus(resolved.id, status);
   return NextResponse.json(res, { status: res.success ? 200 : 500 });
 }

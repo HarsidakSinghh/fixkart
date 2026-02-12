@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Image, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Image, Modal, Alert, ScrollView, Dimensions } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
@@ -15,6 +15,52 @@ const BANNER_SLIDES = [
   { id: '4', image: require('../../assets/photo4.png') },
 ];
 
+const HeroCarousel = React.memo(function HeroCarousel() {
+  const width = Dimensions.get('window').width;
+  const [activeSlide, setActiveSlide] = useState(0);
+  const scrollRef = React.useRef(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => {
+        const next = (prev + 1) % BANNER_SLIDES.length;
+        scrollRef.current?.scrollTo({ x: next * width, animated: true });
+        return next;
+      });
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [width]);
+
+  return (
+    <View style={styles.hero}>
+      <View style={styles.carouselWrap}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(event) => {
+            const index = Math.round(event.nativeEvent.contentOffset.x / width);
+            setActiveSlide(index);
+          }}
+        >
+          {BANNER_SLIDES.map((slide) => (
+            <Image key={slide.id} source={slide.image} style={[styles.carouselImage, { width }]} />
+          ))}
+        </ScrollView>
+        <View style={styles.dotRow}>
+          {BANNER_SLIDES.map((slide, index) => (
+            <View
+              key={`dot-${slide.id}`}
+              style={[styles.dot, index === activeSlide ? styles.dotActive : null]}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+});
+
 export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -24,9 +70,6 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [types, setTypes] = useState([]);
   const [lensState, setLensState] = useState('idle');
   const [lensResult, setLensResult] = useState(null);
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [carouselWidth, setCarouselWidth] = useState(0);
-  const carouselRef = React.useRef(null);
   const { isAuthenticated, clearSession } = useAuth();
   const { signOut } = useClerkAuth();
 
@@ -142,18 +185,6 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     ]);
   }, [pickFromCamera, pickFromGallery]);
 
-  useEffect(() => {
-    if (!carouselWidth || BANNER_SLIDES.length < 2) return;
-    const timer = setInterval(() => {
-      setActiveSlide((prev) => {
-        const next = (prev + 1) % BANNER_SLIDES.length;
-        carouselRef.current?.scrollToOffset?.({ offset: next * carouselWidth, animated: true });
-        return next;
-      });
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [carouselWidth]);
-
   return (
     <View style={styles.container}>
       <CustomerHeader
@@ -162,7 +193,6 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         onLensPress={onLensPress}
         onLogin={onOpenLogin}
         onToggleMenu={() => setDrawerOpen(true)}
-        categoryLabel={category}
         isAuthenticated={isAuthenticated}
         onLogout={async () => {
           await signOut();
@@ -207,40 +237,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         }
         ListHeaderComponent={() => (
           <>
-            <View style={styles.hero}>
-              <View
-                style={styles.carouselWrap}
-                onLayout={(event) => {
-                  const width = event.nativeEvent.layout.width;
-                  if (width !== carouselWidth) setCarouselWidth(width);
-                }}
-              >
-                <FlatList
-                  ref={carouselRef}
-                  data={BANNER_SLIDES}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onMomentumScrollEnd={(event) => {
-                    if (!carouselWidth) return;
-                    const index = Math.round(event.nativeEvent.contentOffset.x / carouselWidth);
-                    setActiveSlide(index);
-                  }}
-                  renderItem={({ item }) => (
-                    <Image source={item.image} style={[styles.carouselImage, { width: carouselWidth || 1 }]} />
-                  )}
-                />
-                <View style={styles.dotRow}>
-                  {BANNER_SLIDES.map((slide, index) => (
-                    <View
-                      key={`dot-${slide.id}`}
-                      style={[styles.dot, index === activeSlide ? styles.dotActive : null]}
-                    />
-                  ))}
-                </View>
-              </View>
-            </View>
+            <HeroCarousel />
 
             <View style={styles.sectionHeader}>
               <View>

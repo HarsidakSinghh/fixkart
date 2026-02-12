@@ -85,11 +85,13 @@ export default function VendorInventoryScreen() {
                   [item.id]: { ...prev[item.id], price: value },
                 }))}
               />
+              <Metric label="Commission" value={formatCommission(item)} />
             </>
           ) : (
             <>
               <Metric label="Stock" value={item.quantity ?? '—'} />
               <Metric label="Price" value={item.price ? `₹${item.price}` : '—'} />
+              <Metric label="Commission" value={formatCommission(item)} />
             </>
           )}
         </View>
@@ -312,6 +314,12 @@ export default function VendorInventoryScreen() {
         />
       </View>
     );
+  }
+
+  function formatCommission(item) {
+    const value = Number(item?.commissionPercent ?? item?.specs?.commissionPercent ?? 0);
+    if (!Number.isFinite(value) || value <= 0) return '—';
+    return `${value}%`;
   }
 }
 

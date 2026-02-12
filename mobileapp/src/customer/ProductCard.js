@@ -7,7 +7,7 @@ export default function ProductCard({ product, onPress, onAdd }) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.imageWrap}>
-        <Image source={{ uri: product.image }} style={styles.image} />
+        <Image source={{ uri: product.image }} style={styles.image} resizeMode="contain" />
       </View>
       <Text style={styles.title} numberOfLines={2}>{product.name}</Text>
       <Text style={styles.meta} numberOfLines={1}>{product.subCategory || product.category}</Text>
@@ -47,12 +47,13 @@ const styles = StyleSheet.create({
   imageWrap: {
     backgroundColor: customerColors.surface,
     borderRadius: 14,
-    padding: 8,
+    padding: 10,
   },
   image: {
     width: '100%',
     height: 110,
     borderRadius: 10,
+    backgroundColor: customerColors.surface,
   },
   title: {
     color: customerColors.text,

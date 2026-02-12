@@ -9,7 +9,6 @@ export default function CustomerHeader({
   onLensPress,
   onLogin,
   onToggleMenu,
-  categoryLabel,
   isAuthenticated,
   onLogout,
 }) {
@@ -52,10 +51,6 @@ export default function CustomerHeader({
         <TouchableOpacity style={styles.filterChip} onPress={onLensPress}>
           <Feather name="camera" size={14} color={customerColors.primary} />
         </TouchableOpacity>
-      </View>
-      <View style={styles.categoryRow}>
-        <Text style={styles.categoryLabel}>Category</Text>
-        <Text style={styles.categoryValue}>{categoryLabel}</Text>
       </View>
     </View>
   );
@@ -153,22 +148,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E6ECFF',
-  },
-  categoryRow: {
-    marginTop: customerSpacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  categoryLabel: {
-    color: '#DDE6FF',
-    fontSize: 11,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  categoryValue: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
   },
 });

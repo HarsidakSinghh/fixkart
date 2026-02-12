@@ -11,6 +11,7 @@ import * as WebBrowser from 'expo-web-browser';
 const STATUS_STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
 const STATUS_ALIAS = {
   APPROVED: 'PROCESSING',
+  READY: 'SHIPPED',
   COMPLETED: 'DELIVERED',
   CANCELLED: 'PENDING',
 };
@@ -35,6 +36,7 @@ function itemStatusLabel(status) {
 export default function CustomerOrdersScreen({ onOpenSupport }) {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
+  const [activeTab, setActiveTab] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState('');
@@ -55,10 +57,10 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
           createdAt: order.createdAt,
         }));
         await SecureStore.setItemAsync('customer_notifications', JSON.stringify(notifications));
-      } catch (_) {
+      } catch {
         // ignore
       }
-    } catch (err) {
+    } catch {
       setError('Unable to load orders.');
     } finally {
       setLoading(false);
@@ -74,7 +76,7 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
     try {
       await seedCustomerOrders();
       await loadOrders();
-    } catch (err) {
+    } catch {
       setError('Unable to create sample orders.');
     } finally {
       setSeeding(false);
@@ -88,7 +90,7 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
       if (data?.url) {
         await WebBrowser.openBrowserAsync(data.url);
       }
-    } catch (err) {
+    } catch {
       setError('Unable to download invoice.');
     } finally {
       setDownloading(null);
@@ -109,7 +111,16 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
         </View>
       ) : (
         <FlatList
-          data={orders}
+          data={orders.filter((item) => {
+            const normalized = STATUS_ALIAS[item.status] || item.status;
+            if (activeTab === 'ALL') return true;
+            if (activeTab === 'PENDING') return normalized === 'PENDING';
+            if (activeTab === 'PROCESSING') return normalized === 'PROCESSING';
+            if (activeTab === 'SHIPPED') return normalized === 'SHIPPED' || normalized === 'READY';
+            if (activeTab === 'DELIVERED') return normalized === 'DELIVERED';
+            if (activeTab === 'REJECTED') return normalized === 'REJECTED' || normalized === 'CANCELLED';
+            return true;
+          })}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           refreshControl={
@@ -140,6 +151,19 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
                 {!!error && <Text style={styles.errorText}>{error}</Text>}
               </View>
             )
+          }
+          ListHeaderComponent={
+            <View style={styles.tabsRow}>
+              {['ALL', 'PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'REJECTED'].map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
+                  onPress={() => setActiveTab(tab)}
+                >
+                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           }
           renderItem={({ item }) => {
             const stepIndex = getStepIndex(item.status);
@@ -235,6 +259,27 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', color: customerColors.text },
   subtitle: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
   list: { paddingHorizontal: customerSpacing.lg, paddingBottom: customerSpacing.lg },
+  tabsRow: {
+    marginTop: customerSpacing.md,
+    marginBottom: customerSpacing.md,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tabPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: customerColors.surface,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  tabPillActive: {
+    backgroundColor: customerColors.primary,
+    borderColor: customerColors.primary,
+  },
+  tabText: { color: customerColors.muted, fontSize: 11, fontWeight: '700' },
+  tabTextActive: { color: '#FFFFFF' },
   statusWrap: { alignSelf: 'flex-start', marginTop: 2 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: customerColors.muted },

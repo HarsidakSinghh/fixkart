@@ -22,16 +22,23 @@ export default function ComplaintsScreen() {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
   }
 
+  const pending = items.filter((i) => {
+    const s = String(i.status || "OPEN").toUpperCase();
+    return s === "OPEN" || s === "PENDING";
+  });
+  const inReview = items.filter((i) => String(i.status || "").toUpperCase() === "IN_REVIEW");
+  const resolved = items.filter((i) => String(i.status || "").toUpperCase() === "RESOLVED");
+
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Complaints" subtitle="Customer escalations" />
-      <SectionHeader title="Open Tickets" actionLabel="Assign" />
+      <SectionHeader title="Pending Complaints" actionLabel="Assign" />
       {loading && items.length === 0 ? <SkeletonList count={4} /> : null}
       {error && items.length === 0 ? <ErrorState message={error} onRetry={refresh} /> : null}
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="No complaints" message="Customer complaints will show here." />
       ) : null}
-      {items.map((item) => (
+      {pending.map((item) => (
         <RowCard
           key={item.id}
           title={item.customerName || "Customer"}
@@ -54,6 +61,46 @@ export default function ComplaintsScreen() {
                 onPrimary={() => updateStatus(item.id, "IN_REVIEW")}
               />
             </>
+          }
+        />
+      ))}
+
+      <SectionHeader title="In Review" />
+      {!loading && !error && inReview.length === 0 ? (
+        <EmptyState title="No complaints in review" message="Items marked in review appear here." />
+      ) : null}
+      {inReview.map((item) => (
+        <RowCard
+          key={item.id}
+          title={item.customerName || "Customer"}
+          subtitle={`${item.orderId || "—"}  •  ${item.message}`}
+          right={<StatusPill label={item.status || "IN_REVIEW"} tone={statusTone(item.status)} />}
+          meta={
+            <ActionRow
+              secondaryLabel="View Details"
+              primaryLabel="Resolved"
+              onSecondary={() => setSelectedComplaint(item)}
+              onPrimary={() => updateStatus(item.id, "RESOLVED")}
+            />
+          }
+        />
+      ))}
+
+      <SectionHeader title="Resolved" />
+      {!loading && !error && resolved.length === 0 ? (
+        <EmptyState title="No resolved complaints" message="Resolved complaints appear here." />
+      ) : null}
+      {resolved.map((item) => (
+        <RowCard
+          key={item.id}
+          title={item.customerName || "Customer"}
+          subtitle={`${item.orderId || "—"}  •  ${item.message}`}
+          right={<StatusPill label="RESOLVED" tone="success" />}
+          meta={
+            <ActionRow
+              secondaryLabel="View Details"
+              onSecondary={() => setSelectedComplaint(item)}
+            />
           }
         />
       ))}

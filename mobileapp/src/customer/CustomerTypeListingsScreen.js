@@ -67,7 +67,7 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.listingCard} onPress={() => onOpenProduct(item)}>
-              <Image source={{ uri: item.image }} style={styles.cardImage} />
+              <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
                 <Text style={styles.cardVendor} numberOfLines={1}>{item.vendorName}</Text>
@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 14,
     backgroundColor: customerColors.surface,
+    padding: 6,
   },
   cardBody: { flex: 1, justifyContent: 'space-between' },
   cardTitle: { color: customerColors.text, fontWeight: '700' },

@@ -176,6 +176,26 @@ export async function markVendorOrderReady(itemId) {
   });
 }
 
+export async function updateVendorOrderStatus(orderId, action) {
+  try {
+    return await authFetch(`/api/mobile/vendor/orders/${orderId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action }),
+    });
+  } catch (error) {
+    const message = String(error?.message || '');
+    if (!message.includes('405')) {
+      throw error;
+    }
+
+    // Backward-compat fallback in case runtime serves POST-only handler.
+    return authFetch(`/api/mobile/vendor/orders/${orderId}`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+  }
+}
+
 export async function getPublicCategories() {
   const res = await fetch(`${BASE_URL}/api/mobile/store/categories`);
   if (!res.ok) {

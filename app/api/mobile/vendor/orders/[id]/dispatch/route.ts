@@ -17,41 +17,43 @@ export async function PATCH(
   }
 
   const resolved = await params;
-  const code = generateCode();
-
-  const updated = await prisma.orderItem.updateMany({
+  const item = await prisma.orderItem.findFirst({
     where: { id: resolved.id, vendorId: guard.userId },
-    data: { dispatchCode: code, status: "READY" },
+    include: { order: true },
   });
 
-  if (!updated.count) {
+  if (!item) {
     return NextResponse.json({ error: "Order item not found" }, { status: 404 });
   }
 
+  const normalized = String(item.status || "").toUpperCase();
+  if (!["PROCESSING", "SHIPPED", "READY"].includes(normalized)) {
+    return NextResponse.json(
+      { error: "Accept order first before generating OTP" },
+      { status: 409 }
+    );
+  }
+
+  const code = item.dispatchCode || generateCode();
+  await prisma.orderItem.update({
+    where: { id: resolved.id },
+    data: { dispatchCode: code, status: "SHIPPED" },
+  });
+
   try {
-    const item = await prisma.orderItem.findUnique({
-      where: { id: resolved.id },
-      include: { order: true },
-    });
-    if (item?.orderId) {
-      const orderItems = await prisma.orderItem.findMany({
-        where: { orderId: item.orderId },
-        select: { status: true },
+    if (item.orderId) {
+      await prisma.order.update({
+        where: { id: item.orderId },
+        data: { status: "SHIPPED" },
       });
-      const anyReady = orderItems.some((i) => i.status === "READY");
-      if (anyReady) {
-        await prisma.order.update({
-          where: { id: item.orderId },
-          data: { status: "SHIPPED" },
-        });
-      }
     }
+
     if (item?.order?.customerId) {
       await sendPushToUsers(
         [item.order.customerId],
-        "Order Ready",
-        `Your order item is ready for dispatch. Code: ${code}`,
-        { orderId: item.orderId, status: "READY" }
+        "Order Shipped",
+        `Your order item is shipped. Rider OTP: ${code}`,
+        { orderId: item.orderId, status: "SHIPPED" }
       );
     }
   } catch (err) {

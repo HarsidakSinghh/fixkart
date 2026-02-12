@@ -3,18 +3,26 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, S
 import * as SecureStore from 'expo-secure-store';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { placeCustomerOrder, getCustomerProfile } from './customerApi';
 import { useToast } from '../components/Toast';
 
-const PREF_KEY = 'customer_billing_pref';
-const DRAFT_KEY = 'customer_checkout_draft';
+const PREF_KEY_BASE = 'customer_billing_pref';
+const DRAFT_KEY_BASE = 'customer_checkout_draft';
+const PROFILE_CACHE_KEY_BASE = 'customer_profile_cache';
+
+function withUserKey(base, userId) {
+  return userId ? `${base}:${userId}` : base;
+}
 
 export default function CustomerCheckoutScreen({ onDone, onBack }) {
-  const { items, totals, clearCart } = useCart();
+  const { user } = useAuth();
+  const { items, clearCart } = useCart();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [savePref, setSavePref] = useState(true);
   const [usePref, setUsePref] = useState(false);
+  const [hadSavedPref, setHadSavedPref] = useState(false);
   const [prefData, setPrefData] = useState(null);
   const draftLoaded = useRef(false);
   const toast = useToast();
@@ -31,64 +39,77 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
 
   useEffect(() => {
     async function loadPref() {
+      if (!user?.id) return;
+      const prefKey = withUserKey(PREF_KEY_BASE, user.id);
+      const draftKey = withUserKey(DRAFT_KEY_BASE, user.id);
+      const profileCacheKey = withUserKey(PROFILE_CACHE_KEY_BASE, user.id);
+
       try {
-        const draftRaw = await SecureStore.getItemAsync(DRAFT_KEY);
-        if (draftRaw) {
-          const draft = JSON.parse(draftRaw);
-          if (draft?.billing) {
-            setBilling((prev) => ({ ...prev, ...draft.billing }));
-          }
-          if (draft?.paymentMethod) setPaymentMethod(draft.paymentMethod);
-          if (draft?.step) setStep(draft.step);
-          if (typeof draft?.savePref === 'boolean') setSavePref(draft.savePref);
-          if (typeof draft?.usePref === 'boolean') setUsePref(draft.usePref);
-        }
-      } catch (_) {
-        // ignore
-      }
-      const raw = await SecureStore.getItemAsync(PREF_KEY);
-      if (raw) {
         try {
-          const data = JSON.parse(raw);
-          setPrefData(data);
-          setUsePref(true);
-          setBilling((prev) => ({ ...prev, ...data }));
-          return;
-        } catch (_) {
+          const draftRaw = await SecureStore.getItemAsync(draftKey);
+          if (draftRaw) {
+            const draft = JSON.parse(draftRaw);
+            if (draft?.billing) {
+              setBilling((prev) => ({ ...prev, ...draft.billing }));
+            }
+            if (draft?.paymentMethod) setPaymentMethod(draft.paymentMethod);
+            if (draft?.step) setStep(draft.step);
+            if (typeof draft?.savePref === 'boolean') setSavePref(draft.savePref);
+            if (typeof draft?.usePref === 'boolean') setUsePref(draft.usePref);
+          }
+        } catch {
           // ignore
         }
-      }
-      // fallback to profile when no saved pref
-      try {
-        const profileRaw = await SecureStore.getItemAsync('customer_profile_cache');
-        if (profileRaw) {
-          const profile = JSON.parse(profileRaw);
-          setPrefData(profile);
-          setUsePref(true);
-          setBilling((prev) => ({ ...prev, ...profile }));
-          return;
+
+        const raw = await SecureStore.getItemAsync(prefKey);
+        try {
+          if (raw) {
+            const data = JSON.parse(raw);
+            setPrefData(data);
+            setHadSavedPref(true);
+            setUsePref(true);
+            setBilling((prev) => ({ ...prev, ...data }));
+            return;
+          }
+        } catch {
+          // ignore
         }
-      } catch (_) {
-        // ignore
-      }
-      // last fallback: fetch profile
-      try {
-        const data = await getCustomerProfile();
-        if (data?.profile) {
-          setPrefData(data.profile);
-          setUsePref(true);
-          setBilling((prev) => ({ ...prev, ...data.profile }));
+
+        // fallback to user-specific profile cache when no saved pref
+        try {
+          const profileRaw = await SecureStore.getItemAsync(profileCacheKey);
+          if (profileRaw) {
+            const profile = JSON.parse(profileRaw);
+            setPrefData(profile);
+            setUsePref(true);
+            setBilling((prev) => ({ ...prev, ...profile }));
+            return;
+          }
+        } catch {
+          // ignore
         }
-      } catch (_) {
-        // ignore
+
+        // last fallback: fetch profile
+        try {
+          const data = await getCustomerProfile();
+          if (data?.profile) {
+            setPrefData(data.profile);
+            setUsePref(true);
+            setBilling((prev) => ({ ...prev, ...data.profile }));
+          }
+        } catch {
+          // ignore
+        }
+      } finally {
+        draftLoaded.current = true;
       }
-      draftLoaded.current = true;
     }
     loadPref();
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
-    if (!draftLoaded.current) return;
+    if (!draftLoaded.current || !user?.id) return;
+    const draftKey = withUserKey(DRAFT_KEY_BASE, user.id);
     const payload = {
       billing,
       paymentMethod,
@@ -96,8 +117,8 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
       savePref,
       usePref,
     };
-    SecureStore.setItemAsync(DRAFT_KEY, JSON.stringify(payload));
-  }, [billing, paymentMethod, step, savePref, usePref]);
+    SecureStore.setItemAsync(draftKey, JSON.stringify(payload));
+  }, [billing, paymentMethod, step, savePref, usePref, user?.id]);
 
   const isValid = useMemo(() => {
     return (
@@ -116,22 +137,36 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
       return;
     }
     setSubmitting(true);
+    const prefKey = withUserKey(PREF_KEY_BASE, user?.id);
+    const draftKey = withUserKey(DRAFT_KEY_BASE, user?.id);
+    const profileCacheKey = withUserKey(PROFILE_CACHE_KEY_BASE, user?.id);
+
     try {
       await placeCustomerOrder({
         items: items.map((item) => ({ productId: item.id, qty: item.qty })),
         billing,
         paymentMethod,
       });
+    } catch {
+      toast.show('Order failed. Try again.', 'error');
+      setSubmitting(false);
+      return;
+    }
+
+    try {
       if (savePref) {
-        await SecureStore.setItemAsync(PREF_KEY, JSON.stringify(billing));
+        await SecureStore.setItemAsync(prefKey, JSON.stringify(billing));
       }
-      await SecureStore.setItemAsync('customer_profile_cache', JSON.stringify(billing));
-      await SecureStore.deleteItemAsync(DRAFT_KEY);
+      await SecureStore.setItemAsync(profileCacheKey, JSON.stringify(billing));
+      await SecureStore.deleteItemAsync(draftKey);
+    } catch (error) {
+      console.error('Non-blocking checkout persistence failed', error);
+    }
+
+    try {
       clearCart();
       toast.show('Order placed successfully', 'success');
       onDone?.();
-    } catch (error) {
-      toast.show('Order failed. Try again.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -204,6 +239,17 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
             ))}
           </View>
 
+          <View style={styles.prefRow}>
+            <TouchableOpacity
+              style={[styles.prefBox, savePref && styles.prefBoxActive]}
+              onPress={() => setSavePref((prev) => !prev)}
+            >
+              <Text style={[styles.prefText, savePref && styles.prefTextActive]}>
+                {savePref ? '✓ ' : ''}{hadSavedPref ? 'Update saved details for future orders' : 'Save details for future orders'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             style={[styles.primaryBtn, !isValid && styles.primaryBtnDisabled]}
             onPress={() => setStep(2)}
@@ -230,17 +276,6 @@ export default function CustomerCheckoutScreen({ onDone, onBack }) {
 
           <Text style={styles.sectionLabel}>Payment</Text>
           <Text style={styles.summaryText}>{paymentMethod === 'CASH' ? 'Cash' : 'Bank to Bank'}</Text>
-
-          <View style={styles.prefRow}>
-            <TouchableOpacity
-              style={[styles.prefBox, savePref && styles.prefBoxActive]}
-              onPress={() => setSavePref((prev) => !prev)}
-            >
-              <Text style={[styles.prefText, savePref && styles.prefTextActive]}>
-                Save preferences for next order
-              </Text>
-            </TouchableOpacity>
-          </View>
 
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep(1)}>
