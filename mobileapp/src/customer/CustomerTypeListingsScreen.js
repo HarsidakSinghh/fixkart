@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
-import { getTypeListings } from './storeApi';
+import { getTypeListings, getReviewSummaries } from './storeApi';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,7 +15,15 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
     setLoading(true);
     try {
       const data = await getTypeListings(typeLabel);
-      setItems(data.listings || []);
+      const listings = data.listings || [];
+      const summaries = await getReviewSummaries(listings.map((item) => item.id));
+      setItems(
+        listings.map((item) => ({
+          ...item,
+          averageRating: summaries[item.id]?.averageRating || 0,
+          reviewCount: summaries[item.id]?.reviewCount || 0,
+        }))
+      );
     } catch (error) {
       console.error('Failed to load type listings', error);
     } finally {
@@ -71,6 +79,9 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
                 <Text style={styles.cardVendor} numberOfLines={1}>{item.vendorName}</Text>
+                {Number(item.averageRating || 0) >= 4 ? (
+                  <Text style={styles.ratingText}>★ {Number(item.averageRating).toFixed(1)}/5</Text>
+                ) : null}
                 <View style={styles.cardRow}>
                   <Text style={styles.cardPrice}>₹{Math.round(item.price || 0)}</Text>
                   <Text style={styles.cardMeta}>Qty: {item.quantity ?? 0}</Text>
@@ -126,6 +137,7 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1, justifyContent: 'space-between' },
   cardTitle: { color: customerColors.text, fontWeight: '700' },
   cardVendor: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
+  ratingText: { color: '#B45309', fontSize: 12, fontWeight: '700', marginTop: 4 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, alignItems: 'center' },
   cardPrice: { color: customerColors.primary, fontWeight: '800' },
   cardMeta: { color: customerColors.muted, fontSize: 12 },

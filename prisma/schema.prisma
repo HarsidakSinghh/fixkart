@@ -52,9 +52,28 @@ model Product {
   // --- RELATIONS ---
   variants       Variant[]
   orderItems     OrderItem[] 
+  reviews        ProductReview[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model ProductReview {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId      String   @db.ObjectId
+  customerId     String
+  customerName   String
+  rating         Int
+  comment        String
+  adminReply     String?
+  adminRepliedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, customerId])
+  @@index([productId, createdAt])
 }
 
 model Variant {

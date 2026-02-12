@@ -95,3 +95,10 @@ export async function updateCustomerProfile(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function submitProductReview(productId, payload) {
+  return authFetch(`/api/mobile/reviews/${productId}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

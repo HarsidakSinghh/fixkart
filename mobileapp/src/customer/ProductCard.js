@@ -11,6 +11,9 @@ export default function ProductCard({ product, onPress, onAdd }) {
       </View>
       <Text style={styles.title} numberOfLines={2}>{product.name}</Text>
       <Text style={styles.meta} numberOfLines={1}>{product.subCategory || product.category}</Text>
+      {Number(product.averageRating || 0) >= 4 ? (
+        <Text style={styles.rating}>★ {Number(product.averageRating).toFixed(1)}/5</Text>
+      ) : null}
       {lowStock ? (
         <View style={styles.stockPill}>
           <Text style={styles.stockText}>Only {product.quantity} left</Text>
@@ -66,6 +69,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 4,
   },
+  rating: { color: '#B45309', fontSize: 11, fontWeight: '700', marginTop: 4 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

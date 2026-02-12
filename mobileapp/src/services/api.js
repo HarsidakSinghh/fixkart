@@ -349,14 +349,38 @@ export async function getInventory() {
       inventory: data.inventory.map((p) => ({
         id: p.id,
         item: p.name,
+        name: p.name,
         status: p.stock > 10 ? "OK" : p.stock > 0 ? "LOW" : "CRITICAL",
         warehouse: p.vendorName || "Warehouse",
+        vendor: p.vendorName || "Warehouse",
+        vendorName: p.vendorName || "Warehouse",
+        vendorEmail: p.vendorEmail || "",
+        vendorPhone: p.vendorPhone || "",
+        category: p.category || "",
+        subCategory: p.subCategory || "",
+        price: Number(p.price || 0),
+        stock: Number(p.stock || 0),
+        description: p.description || "",
+        image: p.image || "",
+        gallery: p.gallery || [],
+        createdAt: p.createdAt || null,
       })),
     };
   } catch (error) {
     console.error("Error fetching inventory:", error);
     return { inventory: inventoryMock };
   }
+}
+
+export async function getProductReviews(productId) {
+  return authenticatedFetch(`/api/mobile/reviews/${productId}`);
+}
+
+export async function replyToProductReview(productId, reviewId, reply) {
+  return authenticatedFetch(`/api/mobile/reviews/${productId}/${reviewId}/reply`, {
+    method: "PATCH",
+    body: JSON.stringify({ reply }),
+  });
 }
 
 export async function getProducts() {

@@ -24,6 +24,33 @@ export async function getStoreProducts({ query = '', category = '', subCategory 
   return data;
 }
 
+export async function getReviewSummaries(productIds = []) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
+  const ids = Array.isArray(productIds) ? productIds.filter(Boolean) : [];
+  if (!ids.length) return {};
+  const params = new URLSearchParams();
+  params.set('productIds', ids.join(','));
+  const res = await fetch(`${BASE_URL}/api/mobile/reviews/summary?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.summaries || {};
+}
+
+export async function getProductReviews(productId) {
+  if (!BASE_URL) {
+    throw new Error('Missing API base URL');
+  }
+  const res = await fetch(`${BASE_URL}/api/mobile/reviews/${productId}`);
+  if (!res.ok) {
+    throw new Error(`Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function getStoreProduct(id) {
   if (!BASE_URL) {
     throw new Error('Missing API base URL');
