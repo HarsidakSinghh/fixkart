@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Modal, Image, ScrollView } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerOrders, seedCustomerOrders, getCustomerInvoice } from './customerApi';
 import * as SecureStore from 'expo-secure-store';
@@ -42,6 +42,7 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -222,6 +223,9 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
                     <Text style={styles.helpText}>Help / Complaint / Refund</Text>
                   </TouchableOpacity>
                 ) : null}
+                <TouchableOpacity style={styles.summaryBtn} onPress={() => setSelectedOrder(item)}>
+                  <Text style={styles.summaryText}>View Order Summary</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.invoiceBtn}
                   onPress={() => handleDownloadInvoice(item.id)}
@@ -236,6 +240,57 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
           }}
         />
       )}
+
+      <Modal visible={!!selectedOrder} transparent animationType="slide" onRequestClose={() => setSelectedOrder(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Order Summary</Text>
+              <TouchableOpacity onPress={() => setSelectedOrder(null)}>
+                <Text style={styles.modalClose}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            {selectedOrder ? (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.modalMeta}>Order #{selectedOrder.id.slice(-6).toUpperCase()}</Text>
+                <Text style={styles.modalMeta}>Status: {selectedOrder.status}</Text>
+                <Text style={styles.modalMeta}>Placed: {new Date(selectedOrder.createdAt).toLocaleString()}</Text>
+
+                <View style={styles.modalItemsWrap}>
+                  {(selectedOrder.items || []).map((item) => {
+                    const qty = Number(item.quantity || 0);
+                    const price = Number(item.price || 0);
+                    const lineTotal = qty * price;
+                    return (
+                      <View key={item.id} style={styles.modalItemCard}>
+                        {item.image ? (
+                          <Image source={{ uri: item.image }} style={styles.modalItemImage} />
+                        ) : (
+                          <View style={[styles.modalItemImage, styles.modalItemImagePlaceholder]}>
+                            <Text style={styles.modalItemImagePlaceholderText}>No image</Text>
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.modalItemName} numberOfLines={2}>{item.productName}</Text>
+                          <Text style={styles.modalItemMeta}>Vendor: {item.vendorName || 'Vendor'}</Text>
+                          <Text style={styles.modalItemMeta}>Qty: {qty}</Text>
+                          <Text style={styles.modalItemMeta}>Price: ₹{Math.round(price)}</Text>
+                        </View>
+                        <Text style={styles.modalItemTotal}>₹{Math.round(lineTotal)}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.modalTotalCard}>
+                  <Text style={styles.modalTotalLabel}>Order Total</Text>
+                  <Text style={styles.modalTotalValue}>₹{Math.round(selectedOrder.totalAmount || 0)}</Text>
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -356,6 +411,17 @@ const styles = StyleSheet.create({
     borderColor: customerColors.border,
   },
   helpText: { color: customerColors.primary, fontSize: 12, fontWeight: '700' },
+  summaryBtn: {
+    marginTop: customerSpacing.sm,
+    alignSelf: 'flex-start',
+    backgroundColor: customerColors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  summaryText: { color: customerColors.text, fontSize: 12, fontWeight: '700' },
   invoiceBtn: {
     marginTop: customerSpacing.sm,
     alignSelf: 'flex-start',
@@ -365,6 +431,64 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   invoiceText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: customerColors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    maxHeight: '88%',
+    padding: customerSpacing.lg,
+  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: { color: customerColors.text, fontSize: 18, fontWeight: '800' },
+  modalClose: { color: customerColors.primary, fontWeight: '700' },
+  modalMeta: { color: customerColors.muted, fontSize: 12, marginTop: 6 },
+  modalItemsWrap: { marginTop: customerSpacing.md, gap: 10 },
+  modalItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    backgroundColor: customerColors.card,
+    borderRadius: 12,
+    padding: 10,
+  },
+  modalItemImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: customerColors.surface,
+  },
+  modalItemImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  modalItemImagePlaceholderText: { color: customerColors.muted, fontSize: 9, fontWeight: '700' },
+  modalItemName: { color: customerColors.text, fontWeight: '700', fontSize: 12 },
+  modalItemMeta: { color: customerColors.muted, fontSize: 11, marginTop: 2 },
+  modalItemTotal: { color: customerColors.primary, fontWeight: '800', fontSize: 13 },
+  modalTotalCard: {
+    marginTop: customerSpacing.md,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    backgroundColor: customerColors.card,
+    borderRadius: 12,
+    padding: customerSpacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalTotalLabel: { color: customerColors.muted, fontWeight: '700' },
+  modalTotalValue: { color: customerColors.text, fontWeight: '800', fontSize: 18 },
 });
 
 function statusTone(status) {

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Act
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
-import { getStoreCategories, getStoreTypes, recognizeProductFromImage } from './storeApi';
+import { getStoreCategories, getStoreTypes, getStoreProducts, recognizeProductFromImage } from './storeApi';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
@@ -68,6 +68,8 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [categories, setCategories] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [types, setTypes] = useState([]);
+  const [searchProducts, setSearchProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [lensState, setLensState] = useState('idle');
   const [lensResult, setLensResult] = useState(null);
   const { isAuthenticated, clearSession } = useAuth();
@@ -130,6 +132,37 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     const needle = debouncedQuery.toLowerCase();
     return types.filter((item) => item.label?.toLowerCase().includes(needle));
   }, [types, debouncedQuery]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSearchProducts() {
+      const q = debouncedQuery.trim();
+      if (!q) {
+        if (mounted) setSearchProducts([]);
+        return;
+      }
+      setLoadingProducts(true);
+      try {
+        const data = await getStoreProducts({
+          query: q,
+          category: category === 'All' ? '' : category,
+        });
+        if (!mounted) return;
+        setSearchProducts(data.products || []);
+      } catch (error) {
+        if (!mounted) return;
+        setSearchProducts([]);
+      } finally {
+        if (mounted) setLoadingProducts(false);
+      }
+    }
+
+    loadSearchProducts();
+    return () => {
+      mounted = false;
+    };
+  }, [debouncedQuery, category]);
 
   const runImageRecognition = useCallback(async (asset) => {
     setLensResult(null);
@@ -250,6 +283,43 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
                 <Text style={styles.filterText}>Filter</Text>
               </TouchableOpacity>
             </View>
+
+            {debouncedQuery.trim() ? (
+              <View style={styles.searchResultsWrap}>
+                <Text style={styles.searchHeading}>Products matching "{debouncedQuery.trim()}"</Text>
+                {loadingProducts ? (
+                  <View style={styles.searchLoading}>
+                    <ActivityIndicator color={customerColors.primary} />
+                    <Text style={styles.searchMeta}>Searching products…</Text>
+                  </View>
+                ) : searchProducts.length ? (
+                  searchProducts.slice(0, 8).map((product) => (
+                    <TouchableOpacity
+                      key={product.id}
+                      style={styles.searchCard}
+                      onPress={() => onOpenProduct(product)}
+                    >
+                      {product.image ? (
+                        <Image source={{ uri: product.image }} style={styles.searchImage} />
+                      ) : (
+                        <View style={[styles.searchImage, styles.searchImagePlaceholder]}>
+                          <Text style={styles.searchImagePlaceholderText}>No image</Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.searchTitle} numberOfLines={2}>{product.name}</Text>
+                        <Text style={styles.searchMeta} numberOfLines={1}>
+                          {product.brand || product.subCategory || product.category || 'Product'}
+                        </Text>
+                      </View>
+                      <Text style={styles.searchPrice}>₹{Math.round(product.price || 0)}</Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.searchMeta}>No direct product matches found.</Text>
+                )}
+              </View>
+            ) : null}
           </>
         )}
         renderItem={({ item }) => (
@@ -380,6 +450,44 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { color: customerColors.text, fontSize: 16, fontWeight: '700' },
   sectionSubtitle: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
+  searchResultsWrap: {
+    marginTop: customerSpacing.md,
+    marginHorizontal: customerSpacing.lg,
+    padding: customerSpacing.md,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    backgroundColor: customerColors.card,
+    gap: 10,
+  },
+  searchHeading: { color: customerColors.text, fontWeight: '700', fontSize: 13 },
+  searchLoading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    backgroundColor: customerColors.surface,
+    borderRadius: 12,
+    padding: 8,
+  },
+  searchImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  searchImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: customerColors.border,
+  },
+  searchImagePlaceholderText: { color: customerColors.muted, fontSize: 9, fontWeight: '700' },
+  searchTitle: { color: customerColors.text, fontWeight: '700', fontSize: 12 },
+  searchMeta: { color: customerColors.muted, fontSize: 11 },
+  searchPrice: { color: customerColors.primary, fontWeight: '800', fontSize: 12 },
   filterButton: {
     backgroundColor: customerColors.card,
     borderWidth: 1,

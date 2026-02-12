@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const orders = await prisma.order.findMany({
     where: { customerId: guard.userId },
     include: {
-      items: { include: { product: true } },
+      items: { include: { product: true, vendor: true } },
       purchaseOrders: true,
       vendorInvoices: true,
     },
@@ -31,6 +31,7 @@ export async function GET(req: Request) {
       quantity: item.quantity,
       price: item.price,
       image: item.image || item.product?.image || null,
+      vendorName: item.vendor?.companyName || item.vendor?.fullName || "Vendor",
       status: item.status,
     })),
   }));

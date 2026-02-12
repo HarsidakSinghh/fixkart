@@ -14,13 +14,25 @@ export async function GET(req: Request) {
   };
 
   if (query) {
-    whereClause.AND.push({
-      OR: [
-      { title: { contains: query, mode: "insensitive" } },
-      { name: { contains: query, mode: "insensitive" } },
-      { sku: { contains: query, mode: "insensitive" } },
-      ],
-    });
+    const tokens = query
+      .trim()
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+
+    for (const token of tokens) {
+      whereClause.AND.push({
+        OR: [
+          { title: { contains: token, mode: "insensitive" } },
+          { name: { contains: token, mode: "insensitive" } },
+          { sku: { contains: token, mode: "insensitive" } },
+          { brand: { contains: token, mode: "insensitive" } },
+          { category: { contains: token, mode: "insensitive" } },
+          { subCategory: { contains: token, mode: "insensitive" } },
+          { subSubCategory: { contains: token, mode: "insensitive" } },
+        ],
+      });
+    }
   }
 
   if (category) {

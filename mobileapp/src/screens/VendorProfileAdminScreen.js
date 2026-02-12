@@ -107,6 +107,9 @@ export default function VendorProfileAdminScreen({ vendorId, onBack }) {
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.detailCard}>
             <View style={styles.detailHeader}>
+              <View style={styles.avatarWrap}>
+                <Text style={styles.avatarText}>{getInitials(vendor.companyName || vendor.fullName)}</Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.detailTitle}>{vendor.companyName || vendor.fullName || "Vendor"}</Text>
                 <Text style={styles.ratingText}>
@@ -114,35 +117,55 @@ export default function VendorProfileAdminScreen({ vendorId, onBack }) {
                     ? `★ ${Number(vendor.averageRating).toFixed(1)}/5 (${Number(vendor.reviewCount || 0)} reviews)`
                     : "No ratings yet"}
                 </Text>
-                <Text style={styles.detailMeta}>{vendor.email || "N/A"} • {vendor.phone || "N/A"}</Text>
-                <Text style={styles.detailMeta}>
+                <Text style={styles.detailMeta}>{vendor.email || "N/A"}</Text>
+                <Text style={styles.detailMeta}>{vendor.phone || "N/A"}</Text>
+                <Text style={styles.detailMetaAddress}>
                   {vendor.address || "N/A"}, {vendor.city || "N/A"}, {vendor.state || "N/A"} {vendor.postalCode || ""}
                 </Text>
               </View>
               <Badge text={vendor.status || "UNKNOWN"} tone={statusTone(vendor.status)} />
             </View>
 
-            <Text style={styles.sectionLabel}>Business</Text>
-            <Text style={styles.detailMeta}>
-              GST: {vendor.gstNumber || "N/A"} • {vendor.idProofType || "ID"}: {vendor.idProofNumber || "N/A"}
-            </Text>
-            <Text style={styles.detailMeta}>Category: {vendor.category || "N/A"}</Text>
+            <View style={styles.detailSubCard}>
+              <Text style={styles.sectionLabel}>Business</Text>
+              <Text style={styles.detailMeta}>
+                GST: {vendor.gstNumber || "N/A"} • {vendor.idProofType || "ID"}: {vendor.idProofNumber || "N/A"}
+              </Text>
+              <Text style={styles.detailMeta}>Category: {vendor.category || "N/A"}</Text>
+            </View>
 
-            <Text style={styles.sectionLabel}>Bank</Text>
-            <Text style={styles.detailMeta}>{vendor.bankName || "N/A"}</Text>
-            <Text style={styles.detailMeta}>
-              A/C: {vendor.accountNumber || "N/A"} • IFSC: {vendor.ifscCode || "N/A"}
-            </Text>
+            <View style={styles.detailSubCard}>
+              <Text style={styles.sectionLabel}>Bank</Text>
+              <Text style={styles.detailMeta}>{vendor.bankName || "N/A"}</Text>
+              <Text style={styles.detailMeta}>
+                A/C: {vendor.accountNumber || "N/A"} • IFSC: {vendor.ifscCode || "N/A"}
+              </Text>
+            </View>
 
-            <Text style={styles.sectionLabel}>Documents</Text>
-            <View style={styles.docRow}>
-              {vendor.gstCertificateUrl ? <DocPreview label="GST" uri={vendor.gstCertificateUrl} /> : null}
-              {vendor.panCardUrl ? <DocPreview label="PAN" uri={vendor.panCardUrl} /> : null}
-              {vendor.idProofUrl ? <DocPreview label="ID Proof" uri={vendor.idProofUrl} /> : null}
-              {vendor.locationPhotoUrl ? <DocPreview label="Location" uri={vendor.locationPhotoUrl} /> : null}
-              {!vendor.gstCertificateUrl && !vendor.panCardUrl && !vendor.idProofUrl && !vendor.locationPhotoUrl ? (
-                <Text style={styles.detailMeta}>No documents uploaded.</Text>
+            <View style={styles.detailSubCard}>
+              <Text style={styles.sectionLabel}>Location</Text>
+              <Text style={styles.detailMeta}>GPS: {formatGps(vendor.gpsLat, vendor.gpsLng)}</Text>
+              {vendor.gpsLat != null && vendor.gpsLng != null ? (
+                <TouchableOpacity
+                  style={styles.mapBtn}
+                  onPress={() => Linking.openURL(`https://maps.google.com/?q=${vendor.gpsLat},${vendor.gpsLng}`)}
+                >
+                  <Text style={styles.mapBtnText}>Open in Maps</Text>
+                </TouchableOpacity>
               ) : null}
+            </View>
+
+            <View style={styles.detailSubCard}>
+              <Text style={styles.sectionLabel}>Documents</Text>
+              <View style={styles.docRow}>
+                {vendor.gstCertificateUrl ? <DocPreview label="GST" uri={vendor.gstCertificateUrl} /> : null}
+                {vendor.panCardUrl ? <DocPreview label="PAN" uri={vendor.panCardUrl} /> : null}
+                {vendor.idProofUrl ? <DocPreview label="ID Proof" uri={vendor.idProofUrl} /> : null}
+                {vendor.locationPhotoUrl ? <DocPreview label="Location" uri={vendor.locationPhotoUrl} /> : null}
+                {!vendor.gstCertificateUrl && !vendor.panCardUrl && !vendor.idProofUrl && !vendor.locationPhotoUrl ? (
+                  <Text style={styles.detailMeta}>No documents uploaded.</Text>
+                ) : null}
+              </View>
             </View>
           </View>
 
@@ -192,6 +215,18 @@ function statusTone(status) {
   return "info";
 }
 
+function formatGps(lat, lng) {
+  if (lat == null || lng == null) return "Not available";
+  return `${lat}, ${lng}`;
+}
+
+function getInitials(name = "") {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "V";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
 function DocPreview({ uri, label }) {
   const isPdf = uri?.includes("application/pdf") || uri?.toLowerCase().endsWith(".pdf");
   return (
@@ -224,11 +259,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: spacing.md,
+    marginBottom: spacing.sm,
   },
-  detailTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
-  ratingText: { marginTop: 4, color: "#B45309", fontSize: 12, fontWeight: "700" },
-  detailMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
-  sectionLabel: { marginTop: spacing.md, color: colors.text, fontWeight: "700" },
+  avatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panelAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { color: colors.primary, fontWeight: "800", fontSize: 14 },
+  detailTitle: { fontSize: 17, fontWeight: "800", color: colors.text },
+  ratingText: { marginTop: 5, color: "#B45309", fontSize: 12, fontWeight: "700" },
+  detailMeta: { color: colors.muted, fontSize: 12, marginTop: 5 },
+  detailMetaAddress: { color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 },
+  detailSubCard: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    backgroundColor: colors.panelAlt,
+    padding: spacing.sm,
+  },
+  sectionLabel: { color: colors.text, fontWeight: "700", marginBottom: 3 },
+  mapBtn: {
+    marginTop: spacing.xs,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    backgroundColor: colors.panelAlt,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+  },
+  mapBtnText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -236,7 +303,7 @@ const styles = StyleSheet.create({
     columnGap: spacing.md,
     marginBottom: spacing.md,
   },
-  docRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
+  docRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
   docCard: {
     width: 98,
     borderWidth: 1,

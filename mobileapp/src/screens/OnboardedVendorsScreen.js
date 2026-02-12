@@ -77,6 +77,16 @@ export default function OnboardedVendorsScreen() {
           <Text style={styles.detailMeta}>{detail.bankName || "N/A"}</Text>
           <Text style={styles.detailMeta}>A/C: {detail.accountNumber || "N/A"} • IFSC: {detail.ifscCode || "N/A"}</Text>
 
+          <Text style={styles.sectionLabel}>Location</Text>
+          <Text style={styles.detailMeta}>
+            GPS: {detail.gpsLat != null && detail.gpsLng != null ? `${detail.gpsLat}, ${detail.gpsLng}` : "Not available"}
+          </Text>
+          {detail.gpsLat != null && detail.gpsLng != null ? (
+            <Text style={styles.mapLink} onPress={() => Linking.openURL(`https://maps.google.com/?q=${detail.gpsLat},${detail.gpsLng}`)}>
+              Open in Maps
+            </Text>
+          ) : null}
+
           <Text style={styles.sectionLabel}>Documents</Text>
           <View style={styles.docRow}>
             {detail.gstCertificateUrl ? <DocPreview label="GST" uri={detail.gstCertificateUrl} /> : null}
@@ -115,6 +125,7 @@ const styles = StyleSheet.create({
   openProfile: { marginTop: 8, color: colors.primary, fontSize: 12, fontWeight: "700" },
   detailMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
   sectionLabel: { marginTop: spacing.md, color: colors.text, fontWeight: "700" },
+  mapLink: { marginTop: 6, color: colors.primary, fontSize: 12, fontWeight: "700" },
   docRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   docCard: {
     width: 98,
