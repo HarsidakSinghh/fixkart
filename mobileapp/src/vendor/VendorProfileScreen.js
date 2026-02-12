@@ -2,13 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Image, ScrollView } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getVendorProfile } from './vendorApi';
-import * as SecureStore from 'expo-secure-store';
 import StatusPill from '../components/StatusPill';
 
-export default function VendorProfileScreen({ onStatusLoaded, onOpenNotifications, onOpenPushDebug, onOpenSalesmen }) {
+export default function VendorProfileScreen({ onStatusLoaded, onOpenPushDebug }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -16,12 +14,6 @@ export default function VendorProfileScreen({ onStatusLoaded, onOpenNotification
       const data = await getVendorProfile();
       setProfile(data.vendor || null);
       onStatusLoaded?.(data.vendor?.status || 'PENDING');
-      try {
-        const notifRaw = await SecureStore.getItemAsync('vendor_notifications');
-        if (notifRaw) setNotifications(JSON.parse(notifRaw));
-      } catch (_) {
-        // ignore
-      }
     } catch (error) {
       console.error('Failed to load vendor profile', error);
     } finally {
@@ -53,23 +45,17 @@ export default function VendorProfileScreen({ onStatusLoaded, onOpenNotification
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.heroCard}>
-        <Text style={styles.title}>{profile.companyName || profile.fullName}</Text>
-        <Text style={styles.subtitle}>{profile.email}</Text>
-        <Text style={styles.subtitle}>{profile.phone}</Text>
-        <StatusPill label={profile.status} tone={statusTone(profile.status)} />
-        {onOpenNotifications ? (
-          <TouchableOpacity style={styles.notifyBtn} onPress={onOpenNotifications}>
-            <Text style={styles.notifyText}>Notifications</Text>
-          </TouchableOpacity>
-        ) : null}
+        <View style={styles.heroTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>{profile.companyName || profile.fullName}</Text>
+            <Text style={styles.subtitle}>{profile.email}</Text>
+            <Text style={styles.subtitle}>{profile.phone}</Text>
+          </View>
+          <StatusPill label={profile.status} tone={statusTone(profile.status)} />
+        </View>
         {onOpenPushDebug ? (
           <TouchableOpacity style={styles.notifyBtn} onPress={onOpenPushDebug}>
             <Text style={styles.notifyText}>Push Debug</Text>
-          </TouchableOpacity>
-        ) : null}
-        {onOpenSalesmen ? (
-          <TouchableOpacity style={styles.notifyBtn} onPress={onOpenSalesmen}>
-            <Text style={styles.notifyText}>Manage Salesmen</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -99,6 +85,14 @@ export default function VendorProfileScreen({ onStatusLoaded, onOpenNotification
 
       <InfoSection title="Location">
         <InfoRow label="GPS" value={formatGps(profile)} />
+        {profile.gpsLat != null && profile.gpsLng != null ? (
+          <TouchableOpacity
+            style={styles.mapBtn}
+            onPress={() => Linking.openURL(`https://maps.google.com/?q=${profile.gpsLat},${profile.gpsLng}`)}
+          >
+            <Text style={styles.mapBtnText}>Open in Maps</Text>
+          </TouchableOpacity>
+        ) : null}
       </InfoSection>
 
       <InfoSection title="Documents">
@@ -108,18 +102,6 @@ export default function VendorProfileScreen({ onStatusLoaded, onOpenNotification
         <DocRow label="Location Photo" uri={profile.locationPhotoUrl} />
       </InfoSection>
 
-      <InfoSection title="Notifications">
-        {notifications.length === 0 ? (
-          <Text style={styles.noticeText}>No recent notifications.</Text>
-        ) : (
-          notifications.map((n) => (
-            <View key={n.id} style={styles.noteRow}>
-              <Text style={styles.noteTitle}>{n.title}</Text>
-              <Text style={styles.noteMessage}>{n.message}</Text>
-            </View>
-          ))
-        )}
-      </InfoSection>
       <View style={{ height: 120 }} />
     </ScrollView>
   );
@@ -206,8 +188,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+  heroTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   title: { fontSize: 20, fontWeight: '800', color: vendorColors.text },
-  subtitle: { color: vendorColors.muted, marginTop: 6, fontSize: 12 },
+  subtitle: { color: vendorColors.muted, marginTop: 5, fontSize: 12 },
   notifyBtn: {
     marginTop: vendorSpacing.sm,
     alignSelf: 'flex-start',
@@ -228,10 +211,21 @@ const styles = StyleSheet.create({
     marginTop: vendorSpacing.md,
   },
   sectionTitle: { color: vendorColors.text, fontWeight: '700', marginBottom: vendorSpacing.sm },
-  sectionBody: { gap: 8 },
+  sectionBody: { gap: 10 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   rowLabel: { color: vendorColors.muted, fontSize: 12, flex: 1 },
   rowValue: { color: vendorColors.text, fontSize: 12, fontWeight: '600', flex: 1, textAlign: 'right' },
+  mapBtn: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: vendorColors.surface,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  mapBtnText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -255,12 +249,4 @@ const styles = StyleSheet.create({
   docAction: { color: vendorColors.primary, fontSize: 12, marginTop: 4 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: vendorColors.muted },
-  noticeText: { color: vendorColors.muted, fontSize: 12 },
-  noteRow: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: vendorColors.border,
-  },
-  noteTitle: { color: vendorColors.text, fontWeight: '700', fontSize: 12 },
-  noteMessage: { color: vendorColors.muted, marginTop: 4, fontSize: 11 },
 });

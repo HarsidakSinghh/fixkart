@@ -131,13 +131,15 @@ export default function ComplaintsScreen() {
                 </TouchableOpacity>
               </View>
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.metaText}>Customer: {selectedComplaint.customerName || "Customer"}</Text>
-                {selectedComplaint.customerPhone ? <Text style={styles.metaText}>Phone: {selectedComplaint.customerPhone}</Text> : null}
-                <Text style={styles.metaText}>Order: {selectedComplaint.orderId || "-"}</Text>
-                <Text style={styles.metaText}>Status: {selectedComplaint.status || "OPEN"}</Text>
-                {selectedComplaint.createdAt ? (
-                  <Text style={styles.metaText}>Time: {new Date(selectedComplaint.createdAt).toLocaleString()}</Text>
-                ) : null}
+                <View style={styles.infoCard}>
+                  <Text style={styles.metaText}>Customer: {selectedComplaint.customerName || "Customer"}</Text>
+                  {selectedComplaint.customerPhone ? <Text style={styles.metaText}>Phone: {selectedComplaint.customerPhone}</Text> : null}
+                  <Text style={styles.metaText}>Order: {selectedComplaint.orderId || "-"}</Text>
+                  <Text style={styles.metaText}>Status: {selectedComplaint.status || "OPEN"}</Text>
+                  {selectedComplaint.createdAt ? (
+                    <Text style={styles.metaText}>Time: {new Date(selectedComplaint.createdAt).toLocaleString()}</Text>
+                  ) : null}
+                </View>
 
                 <TouchableOpacity
                   style={styles.viewOrderBtn}
@@ -150,10 +152,13 @@ export default function ComplaintsScreen() {
                   <Text style={styles.viewOrderText}>View Order</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.noteTitle}>Note</Text>
-                <Text style={styles.noteText}>{selectedComplaint.message || selectedComplaint.subject || "-"}</Text>
+                <View style={styles.infoCard}>
+                  <Text style={styles.noteTitle}>Customer Note</Text>
+                  <Text style={styles.noteText}>{selectedComplaint.message || selectedComplaint.subject || "-"}</Text>
+                </View>
+
                 {getComplaintImages(selectedComplaint).length ? (
-                  <View>
+                  <View style={styles.infoCard}>
                     <Text style={styles.noteTitle}>Attachments ({getComplaintImages(selectedComplaint).length})</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
                       {getComplaintImages(selectedComplaint).map((url, index) => (
@@ -165,7 +170,9 @@ export default function ComplaintsScreen() {
                     <Text style={styles.linkText}>Tap any image to open full size</Text>
                   </View>
                 ) : (
-                  <Text style={styles.metaText}>No image attached.</Text>
+                  <View style={styles.infoCard}>
+                    <Text style={styles.metaText}>No image attached.</Text>
+                  </View>
                 )}
               </ScrollView>
               <View style={styles.modalActions}>
@@ -221,8 +228,16 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   modalTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
   closeText: { color: colors.primary, fontWeight: "700" },
+  infoCard: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: spacing.sm,
+  },
   metaText: { color: colors.muted, fontSize: 12, marginTop: 6 },
-  noteTitle: { color: colors.text, fontWeight: "700", marginTop: spacing.md },
+  noteTitle: { color: colors.text, fontWeight: "700", marginTop: 2 },
   noteText: { color: colors.text, marginTop: 6, fontSize: 13 },
   attachmentImage: {
     marginTop: spacing.sm,

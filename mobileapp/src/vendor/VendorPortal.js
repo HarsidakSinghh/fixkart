@@ -8,8 +8,6 @@ import VendorStatsScreen from './VendorStatsScreen';
 import VendorInventoryScreen from './VendorInventoryScreen';
 import VendorProfileScreen from './VendorProfileScreen';
 import VendorOrdersScreen from './VendorOrdersScreen';
-import VendorComplaintsScreen from './VendorComplaintsScreen';
-import VendorNotificationsScreen from './VendorNotificationsScreen';
 import NotificationDebugScreen from '../screens/NotificationDebugScreen';
 import VendorSalesmenScreen from './VendorSalesmenScreen';
 import { getVendorProfile, getVendorOrders } from './vendorApi';
@@ -19,7 +17,7 @@ const TABS = [
   { key: 'listings', label: 'Listings', icon: 'grid' },
   { key: 'inventory', label: 'Inventory', icon: 'box' },
   { key: 'orders', label: 'Orders', icon: 'shopping-bag' },
-  { key: 'complaints', label: 'Support', icon: 'help-circle' },
+  { key: 'salesmen', label: 'Salesman', icon: 'users' },
   { key: 'profile', label: 'Profile', icon: 'user' },
 ];
 
@@ -27,9 +25,7 @@ export default function VendorPortal() {
   const [active, setActive] = useState('dashboard');
   const [status, setStatus] = useState('PENDING');
   const [ordersBadge, setOrdersBadge] = useState(0);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showPushDebug, setShowPushDebug] = useState(false);
-  const [showSalesmen, setShowSalesmen] = useState(false);
 
   const handleStatus = useCallback((nextStatus) => {
     if (nextStatus) {
@@ -75,29 +71,19 @@ export default function VendorPortal() {
     content = <VendorInventoryScreen />;
   } else if (active === 'orders') {
     content = <VendorOrdersScreen />;
-  } else if (active === 'complaints') {
-    content = <VendorComplaintsScreen />;
+  } else if (active === 'salesmen') {
+    content = <VendorSalesmenScreen />;
   } else {
     content = (
       <VendorProfileScreen
         onStatusLoaded={handleStatus}
-        onOpenNotifications={() => setShowNotifications(true)}
         onOpenPushDebug={() => setShowPushDebug(true)}
-        onOpenSalesmen={() => setShowSalesmen(true)}
       />
     );
   }
 
-  if (showNotifications) {
-    return <VendorNotificationsScreen onBack={() => setShowNotifications(false)} />;
-  }
-
   if (showPushDebug) {
     return <NotificationDebugScreen onBack={() => setShowPushDebug(false)} />;
-  }
-
-  if (showSalesmen) {
-    return <VendorSalesmenScreen onBack={() => setShowSalesmen(false)} />;
   }
 
   return (

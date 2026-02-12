@@ -8,6 +8,7 @@ import VendorSalesmanTrackScreen from './VendorSalesmanTrackScreen';
 export default function VendorSalesmenScreen({ onBack }) {
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', code: '', aadhaarCardUrl: '', panCardUrl: '' });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingAadhaar, setUploadingAadhaar] = useState(false);
@@ -190,84 +191,105 @@ export default function VendorSalesmenScreen({ onBack }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.heroCard}>
-        {onBack ? (
-          <TouchableOpacity onPress={onBack}>
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
-        ) : null}
-        <Text style={styles.title}>Salesmen</Text>
-        <Text style={styles.subtitle}>Create and manage your field team</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Add Salesman</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Full name (optional)"
-          placeholderTextColor={vendorColors.muted}
-          value={form.name}
-          onChangeText={(v) => setForm((prev) => ({ ...prev, name: v }))}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Phone number"
-          placeholderTextColor={vendorColors.muted}
-          keyboardType="phone-pad"
-          value={form.phone}
-          onChangeText={(v) => setForm((prev) => ({ ...prev, phone: v }))}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="4-digit code"
-          placeholderTextColor={vendorColors.muted}
-          keyboardType="number-pad"
-          value={form.code}
-          onChangeText={(v) => setForm((prev) => ({ ...prev, code: v }))}
-          maxLength={4}
-        />
-        <View style={styles.idProofBlock}>
-          <Text style={styles.idProofLabel}>Aadhaar Card (required)</Text>
-          <View style={styles.idProofRow}>
-            {aadhaarPreview ? (
-              <Image source={{ uri: aadhaarPreview }} style={styles.idProofImage} />
-            ) : (
-              <View style={[styles.idProofImage, styles.idProofPlaceholder]}>
-                <Text style={styles.idProofPlaceholderText}>No file</Text>
-              </View>
-            )}
-            <TouchableOpacity style={styles.uploadProofBtn} onPress={() => pickDoc('aadhaar')} disabled={uploadingAadhaar}>
-              <Text style={styles.uploadProofText}>{uploadingAadhaar ? 'Uploading…' : 'Upload Aadhaar'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View style={styles.idProofBlock}>
-          <Text style={styles.idProofLabel}>PAN Card (required)</Text>
-          <View style={styles.idProofRow}>
-            {panPreview ? (
-              <Image source={{ uri: panPreview }} style={styles.idProofImage} />
-            ) : (
-              <View style={[styles.idProofImage, styles.idProofPlaceholder]}>
-                <Text style={styles.idProofPlaceholderText}>No file</Text>
-              </View>
-            )}
-            <TouchableOpacity style={styles.uploadProofBtn} onPress={() => pickDoc('pan')} disabled={uploadingPan}>
-              <Text style={styles.uploadProofText}>{uploadingPan ? 'Uploading…' : 'Upload PAN'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleCreate} disabled={submitting}>
-          <Text style={styles.primaryText}>{submitting ? 'Saving…' : 'Add Salesman'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.listTitle}>Registered Salesmen</Text>
       <FlatList
+        style={{ flex: 1 }}
         data={salesmen}
         keyExtractor={(item) => item.id}
         refreshing={loading}
         onRefresh={loadSalesmen}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.heroCard}>
+              {onBack ? (
+                <TouchableOpacity onPress={onBack}>
+                  <Text style={styles.backText}>← Back</Text>
+                </TouchableOpacity>
+              ) : null}
+              <Text style={styles.title}>Salesmen</Text>
+              <Text style={styles.subtitle}>Create and manage your field team</Text>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.addHeaderRow}>
+                <Text style={styles.sectionTitle}>Team Management</Text>
+                {showAddForm ? (
+                  <TouchableOpacity onPress={() => setShowAddForm(false)}>
+                    <Text style={styles.linkText}>Close</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              {!showAddForm ? (
+                <TouchableOpacity style={styles.openAddBtn} onPress={() => setShowAddForm(true)}>
+                  <Text style={styles.openAddText}>Add a salesman</Text>
+                </TouchableOpacity>
+              ) : (
+                <View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Full name (optional)"
+                    placeholderTextColor={vendorColors.muted}
+                    value={form.name}
+                    onChangeText={(v) => setForm((prev) => ({ ...prev, name: v }))}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Phone number"
+                    placeholderTextColor={vendorColors.muted}
+                    keyboardType="phone-pad"
+                    value={form.phone}
+                    onChangeText={(v) => setForm((prev) => ({ ...prev, phone: v }))}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="4-digit code"
+                    placeholderTextColor={vendorColors.muted}
+                    keyboardType="number-pad"
+                    value={form.code}
+                    onChangeText={(v) => setForm((prev) => ({ ...prev, code: v }))}
+                    maxLength={4}
+                  />
+                  <View style={styles.idProofBlock}>
+                    <Text style={styles.idProofLabel}>Aadhaar Card (required)</Text>
+                    <View style={styles.idProofRow}>
+                      {aadhaarPreview ? (
+                        <Image source={{ uri: aadhaarPreview }} style={styles.idProofImage} />
+                      ) : (
+                        <View style={[styles.idProofImage, styles.idProofPlaceholder]}>
+                          <Text style={styles.idProofPlaceholderText}>No file</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity style={styles.uploadProofBtn} onPress={() => pickDoc('aadhaar')} disabled={uploadingAadhaar}>
+                        <Text style={styles.uploadProofText}>{uploadingAadhaar ? 'Uploading…' : 'Upload Aadhaar'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.idProofBlock}>
+                    <Text style={styles.idProofLabel}>PAN Card (required)</Text>
+                    <View style={styles.idProofRow}>
+                      {panPreview ? (
+                        <Image source={{ uri: panPreview }} style={styles.idProofImage} />
+                      ) : (
+                        <View style={[styles.idProofImage, styles.idProofPlaceholder]}>
+                          <Text style={styles.idProofPlaceholderText}>No file</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity style={styles.uploadProofBtn} onPress={() => pickDoc('pan')} disabled={uploadingPan}>
+                        <Text style={styles.uploadProofText}>{uploadingPan ? 'Uploading…' : 'Upload PAN'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.primaryBtn} onPress={handleCreate} disabled={submitting}>
+                    <Text style={styles.primaryText}>{submitting ? 'Saving…' : 'Add Salesman'}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.listTitle}>Registered Salesmen</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <View style={styles.listCard}>
             <View>
@@ -466,6 +488,15 @@ const styles = StyleSheet.create({
     borderColor: vendorColors.border,
   },
   sectionTitle: { color: vendorColors.text, fontWeight: '700', marginBottom: vendorSpacing.sm },
+  addHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  openAddBtn: {
+    backgroundColor: vendorColors.primary,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  openAddText: { color: '#FFFFFF', fontWeight: '800' },
   input: {
     borderWidth: 1,
     borderColor: vendorColors.border,

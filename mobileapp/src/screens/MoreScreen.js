@@ -12,6 +12,7 @@ export default function MoreScreen({ routes, onNavigate }) {
           key={route.key}
           title={route.label}
           subtitle={route.subtitle}
+          icon={route.icon}
           onPress={() => onNavigate(route.key)}
         />
       ))}

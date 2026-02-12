@@ -17,9 +17,9 @@ import { makeRedirectUri } from 'expo-auth-session';
 import { useAuth as useCustomAuth } from '../context/AuthContext';
 import { colors, spacing } from '../theme';
 import ScreenLayout from '../components/ScreenLayout';
-import { verifyVendorAccess, verifyVendorAccessWithToken } from '../vendor/vendorApi';
 import { salesmanLogin } from '../salesman/salesmanApi';
 import { getSessionRole } from '../services/authApi';
+import logoImage from '../../assets/logo1.png';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -218,7 +218,8 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
       >
         <View style={styles.content}>
           <View style={styles.header}>
-              <Image source={require('../../assets/logo1.png')} style={styles.logo} />
+            <Image source={logoImage} style={styles.logo} />
+            <Text style={styles.heading}>Sign in to FixKart</Text>
             <Text style={styles.subtitle}>
               {stage === 'email'
                 ? 'Sign in with email verification'
@@ -226,8 +227,9 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
             </Text>
           </View>
 
-          {isSignedIn && !isAuthenticated ? (
-            <View style={styles.noticeAlt}>
+          <View style={styles.formCard}>
+            {isSignedIn && !isAuthenticated ? (
+              <View style={styles.noticeAlt}>
               <Text style={styles.noticeText}>Restoring your session…</Text>
               {restoring ? (
                 <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.sm }} />
@@ -237,17 +239,17 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={styles.toggleButton}
+                style={styles.linkButton}
                 onPress={async () => {
                   await signOut();
                   await clearSession();
                 }}
               >
-                <Text style={styles.toggleText}>Sign out</Text>
+                <Text style={styles.linkText}>Sign out</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <View style={styles.form}>
+            ) : (
+              <View style={styles.form}>
               {isSalesmanMode ? (
                 <>
                   <Text style={styles.label}>Mobile Number</Text>
@@ -360,12 +362,12 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
 
               <View style={styles.roleSwitch}>
                 {!isSalesmanMode ? (
-                  <TouchableOpacity onPress={() => onModeChange('salesman')}>
-                    <Text style={styles.roleText}>Salesman login</Text>
+                  <TouchableOpacity style={styles.switchPill} onPress={() => onModeChange('salesman')}>
+                    <Text style={styles.switchPillText}>Salesman Login</Text>
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity onPress={() => onModeChange('customer')}>
-                    <Text style={styles.roleText}>Back to customer/admin/vendor</Text>
+                  <TouchableOpacity style={styles.switchPill} onPress={() => onModeChange('customer')}>
+                    <Text style={styles.switchPillText}>Back to Customer Login</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.registerButton} onPress={onRegisterVendor}>
@@ -376,17 +378,9 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <Text style={styles.closeText}>Close</Text>
               </TouchableOpacity>
-
-              <View style={styles.notice}>
-                <Text style={styles.noticeText}>
-                  ⚠️ Admin access is granted automatically for approved emails.
-                </Text>
-                <Text style={styles.noticeSubtext}>
-                  Vendor accounts are detected automatically after approval.
-                </Text>
-              </View>
             </View>
-          )}
+            )}
+          </View>
         </View>
       </KeyboardAvoidingView>
     </ScreenLayout>
@@ -405,7 +399,13 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.lg,
+  },
+  heading: {
+    marginTop: spacing.sm,
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text,
   },
   title: {
     fontSize: 32,
@@ -420,9 +420,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.muted,
     textAlign: 'center',
+    marginTop: 6,
+  },
+  formCard: {
+    width: '100%',
+    backgroundColor: colors.card,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    shadowColor: '#0A1B33',
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
   form: {
     width: '100%',
@@ -447,7 +461,7 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.primary,
     borderRadius: 12,
-    paddingVertical: spacing.md,
+    paddingVertical: 13,
     alignItems: 'center',
     marginTop: spacing.md,
   },
@@ -474,8 +488,8 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     alignItems: 'center',
-    marginTop: spacing.lg,
-    paddingVertical: spacing.md,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
   },
   toggleText: {
     color: colors.primary,
@@ -483,58 +497,65 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   roleSwitch: {
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  switchPill: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingVertical: 11,
     alignItems: 'center',
-    marginTop: spacing.md,
   },
-  roleText: {
-    color: colors.info,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  registerButton: {
-    marginTop: spacing.md,
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  registerText: {
+  switchPillText: {
     color: colors.primary,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  registerButton: {
+    backgroundColor: '#0E1726',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#0E1726',
+  },
+  registerText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   closeButton: {
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   closeText: {
     color: colors.muted,
     fontSize: 12,
   },
-  notice: {
-    backgroundColor: colors.warning + '20',
-    borderRadius: 12,
-    padding: spacing.md,
-    marginTop: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.warning,
-  },
   noticeAlt: {
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: spacing.md,
-    marginTop: spacing.lg,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  linkButton: {
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  linkText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   noticeText: {
     color: colors.text,
     fontSize: 12,
     fontWeight: '500',
     textAlign: 'center',
-  },
-  noticeSubtext: {
-    color: colors.muted,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: spacing.xs,
   },
 });

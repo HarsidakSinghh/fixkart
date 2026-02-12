@@ -10,9 +10,11 @@ import {
 import StatusPill from '../components/StatusPill';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
+import VendorComplaintsScreen from './VendorComplaintsScreen';
 
 export default function VendorOrdersScreen({ onSwitchToListings }) {
   const [orders, setOrders] = useState([]);
+  const [activeSection, setActiveSection] = useState('ORDERS');
   const [activeTab, setActiveTab] = useState('PENDING');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -210,55 +212,73 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={filteredOrders}
-        keyExtractor={(item) => item.orderId}
-        contentContainerStyle={styles.list}
-        renderItem={renderOrder}
-        refreshing={refreshing}
-        onRefresh={async () => {
-          setRefreshing(true);
-          try {
-            await loadOrders();
-          } finally {
-            setRefreshing(false);
+      <View style={styles.sectionSwitchWrap}>
+        {['ORDERS', 'SUPPORT'].map((section) => (
+          <TouchableOpacity
+            key={section}
+            style={[styles.sectionPill, activeSection === section && styles.sectionPillActive]}
+            onPress={() => setActiveSection(section)}
+          >
+            <Text style={[styles.sectionText, activeSection === section && styles.sectionTextActive]}>
+              {section}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {activeSection === 'SUPPORT' ? (
+        <VendorComplaintsScreen embedded hideHero />
+      ) : (
+        <FlatList
+          data={filteredOrders}
+          keyExtractor={(item) => item.orderId}
+          contentContainerStyle={styles.list}
+          renderItem={renderOrder}
+          refreshing={refreshing}
+          onRefresh={async () => {
+            setRefreshing(true);
+            try {
+              await loadOrders();
+            } finally {
+              setRefreshing(false);
+            }
+          }}
+          ListFooterComponent={
+            loading ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator color={vendorColors.primary} />
+                <Text style={styles.loadingText}>Loading orders…</Text>
+              </View>
+            ) : null
           }
-        }}
-        ListFooterComponent={
-          loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color={vendorColors.primary} />
-              <Text style={styles.loadingText}>Loading orders…</Text>
+          ListHeaderComponent={
+            <View>
+              <View style={styles.heroCard}>
+                <Text style={styles.heroTitle}>Orders</Text>
+                <Text style={styles.heroSubtitle}>Accept, ship with OTP, then wait for delivery closure</Text>
+                {onSwitchToListings ? (
+                  <TouchableOpacity style={styles.switchBtn} onPress={onSwitchToListings}>
+                    <Text style={styles.switchText}>Back to Listings</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View style={styles.tabsRow}>
+                {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'REJECTED'].map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
+                    onPress={() => setActiveTab(tab)}
+                  >
+                    <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                      {tab} ({tabCounts[tab] || 0})
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          ) : null
-        }
-        ListHeaderComponent={
-          <View>
-            <View style={styles.heroCard}>
-              <Text style={styles.heroTitle}>Orders</Text>
-              <Text style={styles.heroSubtitle}>Accept, ship with OTP, then wait for delivery closure</Text>
-              {onSwitchToListings ? (
-                <TouchableOpacity style={styles.switchBtn} onPress={onSwitchToListings}>
-                  <Text style={styles.switchText}>Back to Listings</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <View style={styles.tabsRow}>
-              {['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'REJECTED'].map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
-                  onPress={() => setActiveTab(tab)}
-                >
-                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                    {tab} ({tabCounts[tab] || 0})
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        }
-      />
+          }
+        />
+      )}
 
       {activeCode ? (
         <View style={styles.toast}>
@@ -279,9 +299,31 @@ function statusTone(status) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: vendorColors.bg },
+  sectionSwitchWrap: {
+    marginTop: vendorSpacing.md,
+    marginHorizontal: vendorSpacing.lg,
+    marginBottom: vendorSpacing.sm,
+    backgroundColor: vendorColors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    padding: 4,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  sectionPill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  sectionPillActive: { backgroundColor: vendorColors.primary },
+  sectionText: { color: vendorColors.muted, fontWeight: '800', fontSize: 12, letterSpacing: 0.2 },
+  sectionTextActive: { color: '#FFFFFF' },
   heroCard: {
     marginHorizontal: vendorSpacing.lg,
-    marginTop: vendorSpacing.md,
+    marginTop: vendorSpacing.sm,
     padding: vendorSpacing.lg,
     borderRadius: 20,
     backgroundColor: vendorColors.card,

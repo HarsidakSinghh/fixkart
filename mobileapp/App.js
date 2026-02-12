@@ -19,6 +19,7 @@ import OnboardedCustomersScreen from "./src/screens/OnboardedCustomersScreen";
 import ComplaintsScreen from "./src/screens/ComplaintsScreen";
 import RefundsScreen from "./src/screens/RefundsScreen";
 import MoreScreen from "./src/screens/MoreScreen";
+import SupportScreen from "./src/screens/SupportScreen";
 import ApprovalsScreen from "./src/screens/ApprovalsScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
@@ -56,96 +57,119 @@ function AdminAppContent() {
         key: "dashboard",
         label: "Dashboard",
         subtitle: "KPI overview",
+        icon: "grid",
         component: DashboardScreen,
       },
       approvals: {
         key: "approvals",
         label: "Approvals",
         subtitle: "Pending actions",
+        icon: "check-circle",
         component: ApprovalsScreen,
       },
       orders: {
         key: "orders",
         label: "Orders",
         subtitle: "Live pipeline",
+        icon: "shopping-bag",
         component: OrdersScreen,
       },
       ordersHistory: {
         key: "ordersHistory",
         label: "Orders History",
         subtitle: "Archived orders",
+        icon: "archive",
         component: OrdersHistoryScreen,
       },
       users: {
         key: "users",
         label: "Users",
         subtitle: "Admin access",
+        icon: "shield",
         component: UsersScreen,
       },
       products: {
         key: "products",
         label: "Products",
         subtitle: "Catalog control",
+        icon: "package",
         component: ProductsScreen,
       },
       inventory: {
         key: "inventory",
         label: "Inventory",
         subtitle: "Warehouse stock",
+        icon: "box",
         component: InventoryScreen,
       },
       inventoryApprovals: {
         key: "inventoryApprovals",
         label: "Inventory Approvals",
         subtitle: "Pending listings",
+        icon: "clipboard",
         component: InventoryApprovalsScreen,
       },
       vendors: {
         key: "vendors",
         label: "Vendors",
         subtitle: "Partner management",
+        icon: "truck",
         component: VendorsScreen,
       },
       onboardedVendors: {
         key: "onboardedVendors",
         label: "Onboarded Vendors",
         subtitle: "Approved partners",
+        icon: "user-check",
         component: OnboardedVendorsScreen,
       },
       customerApprovals: {
         key: "customerApprovals",
         label: "Customer Approvals",
         subtitle: "Pending access",
+        icon: "user-plus",
         component: CustomerApprovalsScreen,
       },
       onboardedCustomers: {
         key: "onboardedCustomers",
         label: "Onboarded Customers",
         subtitle: "Verified accounts",
+        icon: "users",
         component: OnboardedCustomersScreen,
+      },
+      support: {
+        key: "support",
+        label: "Support",
+        subtitle: "Complaints and refunds",
+        icon: "help-circle",
+        component: SupportScreen,
       },
       complaints: {
         key: "complaints",
         label: "Complaints",
         subtitle: "Escalations",
+        icon: "alert-triangle",
         component: ComplaintsScreen,
       },
       refunds: {
         key: "refunds",
         label: "Refunds",
         subtitle: "Finance desk",
+        icon: "rotate-ccw",
         component: RefundsScreen,
       },
       salesmen: {
         key: "salesmen",
         label: "Salesmen",
         subtitle: "Field team",
+        icon: "map-pin",
         component: SalesmenScreen,
       },
       more: {
         key: "more",
         label: "More",
         subtitle: "All sections",
+        icon: "menu",
         component: MoreScreen,
       },
     }),
@@ -153,10 +177,11 @@ function AdminAppContent() {
   );
 
   const bottomTabs = [
-    { ...routes.dashboard, icon: "grid" },
-    { ...routes.approvals, icon: "check-circle" },
-    { ...routes.orders, icon: "shopping-bag" },
-    { ...routes.more, icon: "menu" },
+    routes.dashboard,
+    routes.approvals,
+    routes.orders,
+    routes.support,
+    routes.more,
   ];
   const moreRoutes = [
     routes.ordersHistory,
@@ -166,8 +191,6 @@ function AdminAppContent() {
     routes.vendors,
     routes.onboardedVendors,
     routes.onboardedCustomers,
-    routes.complaints,
-    routes.refunds,
     routes.users,
   ];
 

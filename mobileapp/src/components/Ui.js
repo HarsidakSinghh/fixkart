@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { colors, spacing, font, shadow } from "../theme";
 
 export function ScreenTitle({ title, subtitle }) {
@@ -93,14 +94,19 @@ export function ActionRow({
   );
 }
 
-export function ListItem({ title, subtitle, onPress }) {
+export function ListItem({ title, subtitle, onPress, icon }) {
   return (
     <Pressable onPress={onPress} style={styles.listItem}>
+      {icon ? (
+        <View style={styles.listIconWrap}>
+          <Feather name={icon} size={16} color={colors.primary} />
+        </View>
+      ) : null}
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle}>{title}</Text>
         {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
       </View>
-      <Text style={styles.listArrow}>›</Text>
+      <Feather name="chevron-right" size={18} color={colors.muted} style={styles.listArrow} />
     </Pressable>
   );
 }
@@ -262,8 +268,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.line,
+    gap: 10,
   },
-  listArrow: { color: colors.muted, fontSize: 18, marginLeft: spacing.sm },
+  listIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panelAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listArrow: { marginLeft: spacing.sm },
   pill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
