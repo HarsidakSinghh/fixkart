@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const vendorFilter = searchParams.get("vendor");
   const subCategoryFilter = searchParams.get("subcategory");
 
-  const whereClause: any = {};
+  const whereClause: Record<string, unknown> = {};
 
   if (vendorFilter && vendorFilter !== "all") {
     whereClause.vendorId = vendorFilter;
@@ -85,6 +85,7 @@ export async function GET(req: Request) {
       vendorEmail: vendor?.email || "N/A",
       vendorPhone: vendor?.phone || "N/A",
       description: p.description || "No description provided.",
+      commissionPercent: Number((p.specs as Record<string, unknown> | null)?.commissionPercent || 0),
       createdAt: p.createdAt.toISOString(),
       status: p.status,
       isPublished: p.isPublished,

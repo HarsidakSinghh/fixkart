@@ -23,6 +23,25 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const vendorProductIds = (
+    await prisma.product.findMany({
+      where: { vendorId: vendor.userId },
+      select: { id: true },
+    })
+  ).map((p) => p.id);
+
+  const ratingRows = vendorProductIds.length
+    ? await prisma.productReview.findMany({
+        where: { productId: { in: vendorProductIds } },
+        select: { productId: true, rating: true },
+      })
+    : [];
+
+  const reviewCount = ratingRows.length;
+  const totalRating = ratingRows.reduce((sum, row) => sum + Number(row.rating || 0), 0);
+  const averageRating = reviewCount ? Number((totalRating / reviewCount).toFixed(1)) : 0;
+  const reviewedProductCount = new Set(ratingRows.map((row) => row.productId)).size;
+
   return NextResponse.json({
     vendor: {
       id: vendor.id,
@@ -53,6 +72,9 @@ export async function GET(req: Request) {
       locationPhotoUrl: vendor.locationPhotoUrl,
       gpsLat: vendor.gpsLat,
       gpsLng: vendor.gpsLng,
+      averageRating,
+      reviewCount,
+      reviewedProductCount,
       createdAt: vendor.createdAt,
       updatedAt: vendor.updatedAt,
     },

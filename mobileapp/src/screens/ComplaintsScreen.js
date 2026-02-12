@@ -132,6 +132,29 @@ export default function ComplaintsScreen() {
                 {selectedComplaint.createdAt ? (
                   <Text style={styles.metaText}>Time: {new Date(selectedComplaint.createdAt).toLocaleString()}</Text>
                 ) : null}
+
+                <Text style={styles.noteTitle}>Order Details</Text>
+                {selectedComplaint.orderCreatedAt ? (
+                  <Text style={styles.metaText}>
+                    Ordered On: {new Date(selectedComplaint.orderCreatedAt).toLocaleString()}
+                  </Text>
+                ) : null}
+                {selectedComplaint.orderStatus ? (
+                  <Text style={styles.metaText}>Order Status: {selectedComplaint.orderStatus}</Text>
+                ) : null}
+                {selectedComplaint.orderPaymentMethod ? (
+                  <Text style={styles.metaText}>Payment: {selectedComplaint.orderPaymentMethod}</Text>
+                ) : null}
+                {Number(selectedComplaint.orderTotalAmount || 0) > 0 ? (
+                  <Text style={styles.metaText}>Order Total: ₹{Math.round(selectedComplaint.orderTotalAmount || 0)}</Text>
+                ) : null}
+                {selectedComplaint.orderCustomerPhone ? (
+                  <Text style={styles.metaText}>Order Phone: {selectedComplaint.orderCustomerPhone}</Text>
+                ) : null}
+                {selectedComplaint.orderBillingAddress ? (
+                  <Text style={styles.metaText}>Billing Address: {selectedComplaint.orderBillingAddress}</Text>
+                ) : null}
+
                 <Text style={styles.noteTitle}>Note</Text>
                 <Text style={styles.noteText}>{selectedComplaint.message || selectedComplaint.subject || "-"}</Text>
                 {getComplaintImages(selectedComplaint).length ? (

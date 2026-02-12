@@ -6,6 +6,7 @@ import { getVendors, getVendorDetail } from "../services/api";
 import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import { View, Text, StyleSheet, Image, TouchableOpacity, Linking } from "react-native";
 import { colors, spacing } from "../theme";
+import VendorProfileAdminScreen from "./VendorProfileAdminScreen";
 
 export default function OnboardedVendorsScreen() {
   const fetchVendors = useCallback(async () => {
@@ -15,10 +16,15 @@ export default function OnboardedVendorsScreen() {
 
   const { items, error, refresh, loading } = useAsyncList(fetchVendors, []);
   const [detail, setDetail] = React.useState(null);
+  const [selectedVendorId, setSelectedVendorId] = React.useState(null);
 
   async function loadDetail(id) {
     const data = await getVendorDetail(id);
     setDetail(data.vendor);
+  }
+
+  if (selectedVendorId) {
+    return <VendorProfileAdminScreen vendorId={selectedVendorId} onBack={() => setSelectedVendorId(null)} />;
   }
 
   return (
@@ -37,10 +43,15 @@ export default function OnboardedVendorsScreen() {
           subtitle={`${vendor.city}  •  ${vendor.id}`}
           right={<Badge text={vendor.status} tone="success" />}
           meta={
-            <ActionRow
-              secondaryLabel="Details"
-              onSecondary={() => loadDetail(vendor.id)}
-            />
+            <View>
+              <Text style={styles.vendorLink} onPress={() => setSelectedVendorId(vendor.id)}>
+                {vendor.name}
+              </Text>
+              <ActionRow
+                secondaryLabel="Details"
+                onSecondary={() => loadDetail(vendor.id)}
+              />
+            </View>
           }
         />
       ))}
@@ -100,6 +111,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   detailTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
+  vendorLink: { color: colors.primary, fontWeight: "700", textDecorationLine: "underline" },
+  openProfile: { marginTop: 8, color: colors.primary, fontSize: 12, fontWeight: "700" },
   detailMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
   sectionLabel: { marginTop: spacing.md, color: colors.text, fontWeight: "700" },
   docRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
@@ -143,3 +156,6 @@ function DocPreview({ uri, label }) {
     </TouchableOpacity>
   );
 }
+              <Text style={styles.openProfile} onPress={() => setSelectedVendorId(detail.userId || detail.id)}>
+                Open full vendor profile
+              </Text>

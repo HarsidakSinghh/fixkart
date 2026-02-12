@@ -359,6 +359,7 @@ export async function getInventory() {
         category: p.category || "",
         subCategory: p.subCategory || "",
         price: Number(p.price || 0),
+        commissionPercent: Number(p.commissionPercent || 0),
         stock: Number(p.stock || 0),
         description: p.description || "",
         image: p.image || "",
@@ -380,6 +381,13 @@ export async function replyToProductReview(productId, reviewId, reply) {
   return authenticatedFetch(`/api/mobile/reviews/${productId}/${reviewId}/reply`, {
     method: "PATCH",
     body: JSON.stringify({ reply }),
+  });
+}
+
+export async function updateProductCommission(id, commissionPercent) {
+  return authenticatedFetch(`/api/mobile/products/${id}/commission`, {
+    method: "PATCH",
+    body: JSON.stringify({ commissionPercent: Number(commissionPercent) }),
   });
 }
 
@@ -418,9 +426,16 @@ export async function getRefunds() {
         productName: r.productName || "Product",
         productImage: r.productImage || "",
         customerName: r.customerName || "Customer",
+        vendorId: r.vendorId || "",
         vendorName: r.vendorName || "Vendor",
         reason: r.reason || "",
         createdAt: r.createdAt,
+        orderStatus: r.orderStatus || "",
+        orderTotalAmount: Number(r.orderTotalAmount || 0),
+        orderPaymentMethod: r.orderPaymentMethod || "",
+        orderCreatedAt: r.orderCreatedAt || null,
+        orderCustomerPhone: r.orderCustomerPhone || "",
+        orderBillingAddress: r.orderBillingAddress || "",
         billUrl: r.billUrl || null,
         transportSlipUrl: r.transportSlipUrl || null,
       })),
@@ -452,6 +467,7 @@ export async function getComplaints() {
         customerEmail: c.customerEmail || "",
         customerPhone: c.customerPhone || "",
         customerCompany: c.customerCompany || "",
+        vendorId: c.vendorId || "",
         orderId: c.orderId || "",
         orderItemId: c.orderItemId || "",
         message: c.message || "",
@@ -462,6 +478,12 @@ export async function getComplaints() {
           ? [c.imageUrl]
           : [],
         createdAt: c.createdAt,
+        orderStatus: c.orderStatus || "",
+        orderTotalAmount: Number(c.orderTotalAmount || 0),
+        orderPaymentMethod: c.orderPaymentMethod || "",
+        orderCreatedAt: c.orderCreatedAt || null,
+        orderCustomerPhone: c.orderCustomerPhone || "",
+        orderBillingAddress: c.orderBillingAddress || "",
         subject: c.message,
         priority: "MEDIUM",
         status: c.status || "OPEN",

@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
   });
 
-  const extractUrl = (val: any): string | null => {
+  const extractUrl = (val: unknown): string | null => {
     if (!val) return null;
     if (typeof val === "string") return val;
     if (Array.isArray(val) && val.length > 0) return val[0];
@@ -43,6 +43,13 @@ export async function GET(req: Request) {
     price: r.item?.price || 0,
     quantity: r.item?.quantity || 0,
     orderId: r.item?.orderId,
+    vendorId: r.item?.vendorId || "",
+    orderStatus: r.item?.order?.status || "",
+    orderTotalAmount: Number(r.item?.order?.totalAmount || 0),
+    orderPaymentMethod: r.item?.order?.paymentMethod || "",
+    orderCreatedAt: r.item?.order?.createdAt ? r.item.order.createdAt.toISOString() : null,
+    orderCustomerPhone: r.item?.order?.customerPhone || "",
+    orderBillingAddress: r.item?.order?.billingAddress || "",
     billUrl: extractUrl(r.item?.billUrl),
     transportSlipUrl: extractUrl(r.item?.transportSlipUrl),
   }));

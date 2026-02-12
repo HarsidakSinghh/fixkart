@@ -135,6 +135,29 @@ export default function RefundsScreen() {
                 {selectedRefund.createdAt ? (
                   <Text style={styles.metaText}>Time: {new Date(selectedRefund.createdAt).toLocaleString()}</Text>
                 ) : null}
+
+                <Text style={styles.orderTitle}>Order Details</Text>
+                {selectedRefund.orderCreatedAt ? (
+                  <Text style={styles.metaText}>
+                    Ordered On: {new Date(selectedRefund.orderCreatedAt).toLocaleString()}
+                  </Text>
+                ) : null}
+                {selectedRefund.orderStatus ? (
+                  <Text style={styles.metaText}>Order Status: {selectedRefund.orderStatus}</Text>
+                ) : null}
+                {selectedRefund.orderPaymentMethod ? (
+                  <Text style={styles.metaText}>Payment: {selectedRefund.orderPaymentMethod}</Text>
+                ) : null}
+                {Number(selectedRefund.orderTotalAmount || 0) > 0 ? (
+                  <Text style={styles.metaText}>Order Total: ₹{Math.round(selectedRefund.orderTotalAmount || 0)}</Text>
+                ) : null}
+                {selectedRefund.orderCustomerPhone ? (
+                  <Text style={styles.metaText}>Order Phone: {selectedRefund.orderCustomerPhone}</Text>
+                ) : null}
+                {selectedRefund.orderBillingAddress ? (
+                  <Text style={styles.metaText}>Billing Address: {selectedRefund.orderBillingAddress}</Text>
+                ) : null}
+
                 {selectedRefund.productImage ? (
                   <Image source={{ uri: selectedRefund.productImage }} style={styles.productImage} />
                 ) : null}
@@ -224,6 +247,7 @@ const styles = StyleSheet.create({
   modalTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
   closeText: { color: colors.primary, fontWeight: "700" },
   metaText: { color: colors.muted, fontSize: 12, marginTop: 6 },
+  orderTitle: { color: colors.text, fontWeight: "700", marginTop: spacing.md },
   productImage: {
     width: "100%",
     height: 180,

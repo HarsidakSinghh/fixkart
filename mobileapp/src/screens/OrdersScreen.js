@@ -8,6 +8,7 @@ import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import { getOrders, getDashboard, updateOrderStatus } from "../services/api";
 import { ActionRow } from "../components/Ui";
 import StatusPill from "../components/StatusPill";
+import VendorProfileAdminScreen from "./VendorProfileAdminScreen";
 
 export default function OrdersScreen() {
   const [activeTab, setActiveTab] = React.useState("PENDING");
@@ -24,6 +25,7 @@ export default function OrdersScreen() {
 
   const { items, error, refresh, loading } = useAsyncList(fetchOrders, []);
   const [selectedOrder, setSelectedOrder] = React.useState(null);
+  const [selectedVendorId, setSelectedVendorId] = React.useState(null);
 
   React.useEffect(() => {
     let mounted = true;
@@ -66,6 +68,10 @@ export default function OrdersScreen() {
       return status === "REJECTED" || status === "CANCELLED";
     }).length,
   };
+
+  if (selectedVendorId) {
+    return <VendorProfileAdminScreen vendorId={selectedVendorId} onBack={() => setSelectedVendorId(null)} />;
+  }
 
   return (
     <AdminScreenLayout>
@@ -162,7 +168,18 @@ export default function OrdersScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.itemName}>{item.productName}</Text>
                       <Text style={styles.itemMeta}>Qty: {item.quantity} • ₹{Math.round(item.price || 0)}</Text>
-                      <Text style={styles.itemMeta}>Vendor: {item.vendorName || "Vendor"}</Text>
+                      <Text style={styles.itemMeta}>
+                        Vendor:{" "}
+                        <Text
+                          style={styles.vendorLink}
+                          onPress={() => {
+                            setSelectedOrder(null);
+                            setSelectedVendorId(item.vendorId);
+                          }}
+                        >
+                          {item.vendorName || "Vendor"}
+                        </Text>
+                      </Text>
                       <Text style={styles.itemMeta}>
                         Commission: ₹{Math.round(item.commissionAmount || 0)} ({Number(item.commissionPercent || 0)}%)
                       </Text>
@@ -259,6 +276,7 @@ const styles = StyleSheet.create({
   itemImage: { width: 52, height: 52, borderRadius: 10, backgroundColor: colors.panelAlt },
   itemName: { color: colors.text, fontWeight: "700" },
   itemMeta: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  vendorLink: { color: colors.primary, fontWeight: "700", textDecorationLine: "underline" },
   modalActions: { marginTop: spacing.sm },
   approveBtn: {
     backgroundColor: colors.primary,

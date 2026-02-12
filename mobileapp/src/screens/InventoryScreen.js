@@ -3,7 +3,7 @@ import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, Touchable
 import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
-import { getInventory, getProductReviews, replyToProductReview } from "../services/api";
+import { getInventory, getProductReviews, replyToProductReview, updateProductCommission } from "../services/api";
 import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
 import { colors, spacing } from "../theme";
 
@@ -13,14 +13,17 @@ export default function InventoryScreen() {
     return data.inventory;
   }, []);
 
-  const { items, error, refresh, loading } = useAsyncList(fetchInventory, []);
+  const { items, setItems, error, refresh, loading } = useAsyncList(fetchInventory, []);
   const [selectedItem, setSelectedItem] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [replyInputs, setReplyInputs] = useState({});
+  const [commissionInput, setCommissionInput] = useState("");
+  const [savingCommission, setSavingCommission] = useState(false);
 
   async function openDetail(item) {
     setSelectedItem(item);
+    setCommissionInput(String(Number(item.commissionPercent || 0)));
     setReviewsLoading(true);
     try {
       const data = await getProductReviews(item.id);
@@ -29,6 +32,28 @@ export default function InventoryScreen() {
       setReviews([]);
     } finally {
       setReviewsLoading(false);
+    }
+  }
+
+  async function saveCommission() {
+    if (!selectedItem?.id) return;
+    const percent = Number(commissionInput);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+      Alert.alert("Invalid commission", "Commission must be between 0 and 100.");
+      return;
+    }
+    setSavingCommission(true);
+    try {
+      await updateProductCommission(selectedItem.id, percent);
+      setSelectedItem((prev) => (prev ? { ...prev, commissionPercent: percent } : prev));
+      setItems((prev) =>
+        prev.map((item) => (item.id === selectedItem.id ? { ...item, commissionPercent: percent } : item))
+      );
+      Alert.alert("Updated", "Commission percent updated successfully.");
+    } catch {
+      Alert.alert("Failed", "Could not update commission percent.");
+    } finally {
+      setSavingCommission(false);
     }
   }
 
@@ -85,8 +110,31 @@ export default function InventoryScreen() {
                 <Text style={styles.metaText}>Category: {selectedItem.category || "-"}</Text>
                 <Text style={styles.metaText}>Subcategory: {selectedItem.subCategory || "-"}</Text>
                 <Text style={styles.metaText}>Price: ₹{Math.round(selectedItem.price || 0)}</Text>
+                <Text style={styles.metaText}>
+                  Current Commission: {Number(selectedItem.commissionPercent || 0)}%
+                </Text>
                 <Text style={styles.metaText}>Stock: {Number(selectedItem.stock || 0)}</Text>
                 <Text style={styles.metaText}>Description: {selectedItem.description || "No description"}</Text>
+                <View style={styles.commissionWrap}>
+                  <Text style={styles.commissionLabel}>Update Commission %</Text>
+                  <TextInput
+                    value={commissionInput}
+                    onChangeText={setCommissionInput}
+                    keyboardType="numeric"
+                    placeholder="e.g. 12"
+                    placeholderTextColor={colors.muted}
+                    style={styles.commissionInput}
+                  />
+                  <TouchableOpacity
+                    style={[styles.commissionBtn, savingCommission ? { opacity: 0.7 } : null]}
+                    onPress={saveCommission}
+                    disabled={savingCommission}
+                  >
+                    <Text style={styles.commissionBtnText}>
+                      {savingCommission ? "Saving..." : "Save Commission"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
                 <Text style={styles.reviewTitle}>Customer Reviews</Text>
                 {reviewsLoading ? <Text style={styles.metaText}>Loading reviews…</Text> : null}
@@ -209,4 +257,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   replyBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  commissionWrap: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    padding: spacing.sm,
+    backgroundColor: colors.card,
+  },
+  commissionLabel: { color: colors.text, fontWeight: "700", fontSize: 12, marginBottom: 6 },
+  commissionInput: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: colors.text,
+    fontSize: 12,
+  },
+  commissionBtn: {
+    marginTop: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  commissionBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
 });

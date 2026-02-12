@@ -15,7 +15,45 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: res.error }, { status: 500 });
   }
 
-  return NextResponse.json({ complaints: res.data });
+  const complaints = Array.isArray(res.data) ? res.data : [];
+  const orderIds = Array.from(
+    new Set(
+      complaints
+        .map((c) => (typeof c?.orderId === "string" ? c.orderId : ""))
+        .filter((id) => id.length > 0)
+    )
+  );
+
+  const orders = orderIds.length
+    ? await prisma.order.findMany({
+        where: { id: { in: orderIds } },
+        select: {
+          id: true,
+          status: true,
+          totalAmount: true,
+          paymentMethod: true,
+          createdAt: true,
+          customerPhone: true,
+          billingAddress: true,
+        },
+      })
+    : [];
+  const orderMap = new Map(orders.map((o) => [o.id, o]));
+
+  const enriched = complaints.map((c) => {
+    const order = orderMap.get(String(c.orderId || ""));
+    return {
+      ...c,
+      orderStatus: order?.status || "",
+      orderTotalAmount: Number(order?.totalAmount || 0),
+      orderPaymentMethod: order?.paymentMethod || "",
+      orderCreatedAt: order?.createdAt ? order.createdAt.toISOString() : null,
+      orderCustomerPhone: order?.customerPhone || "",
+      orderBillingAddress: order?.billingAddress || "",
+    };
+  });
+
+  return NextResponse.json({ complaints: enriched });
 }
 
 export async function POST(req: Request) {
