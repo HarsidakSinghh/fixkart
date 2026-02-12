@@ -432,6 +432,11 @@ export async function getComplaints() {
         orderItemId: c.orderItemId || "",
         message: c.message || "",
         imageUrl: c.imageUrl || "",
+        imageUrls: Array.isArray(c.imageUrls)
+          ? c.imageUrls
+          : c.imageUrl
+          ? [c.imageUrl]
+          : [],
         createdAt: c.createdAt,
         subject: c.message,
         priority: "MEDIUM",

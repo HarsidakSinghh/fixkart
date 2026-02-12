@@ -9,7 +9,7 @@ export default function CustomerSupportScreen({ order, onBack }) {
   const [mode, setMode] = useState(null); // COMPLAINT | REFUND
   const [message, setMessage] = useState('');
   const [selectedItemId, setSelectedItemId] = useState(order?.items?.[0]?.id || '');
-  const [image, setImage] = useState(null);
+  const [images, setImages] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
@@ -26,11 +26,22 @@ export default function CustomerSupportScreen({ order, onBack }) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       base64: true,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
       quality: 0.7,
     });
     if (!result.canceled) {
-      setImage(result.assets[0]);
+      const picked = (result.assets || []).filter((a) => Boolean(a?.base64));
+      if (!picked.length) return;
+      setImages((prev) => {
+        const merged = [...prev, ...picked];
+        return merged.slice(0, 5);
+      });
     }
+  }
+
+  function removeImageAt(index) {
+    setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit() {
@@ -40,21 +51,24 @@ export default function CustomerSupportScreen({ order, onBack }) {
     }
     setSubmitting(true);
     try {
-      let imageUrl = null;
-      if (image?.base64) {
+      const imageUrls = [];
+      for (let idx = 0; idx < images.length; idx += 1) {
+        const image = images[idx];
+        if (!image?.base64) continue;
         try {
-          const uploadRes = await uploadComplaintImage(image.base64, `complaint-${Date.now()}`);
-          imageUrl = uploadRes?.url || null;
-        } catch (_) {
-          imageUrl = null;
+          const uploadRes = await uploadComplaintImage(image.base64, `complaint-${Date.now()}-${idx + 1}`);
+          if (uploadRes?.url) imageUrls.push(uploadRes.url);
+        } catch {
+          // ignore upload errors per-image
         }
       }
+      const primaryImageUrl = imageUrls[0] || null;
 
       if (mode === 'REFUND') {
         await submitRefund({
           orderItemId: selectedItemId,
           reason: message,
-          imageUrl,
+          imageUrl: primaryImageUrl,
         });
         toast.show('Refund requested', 'success');
       } else {
@@ -62,12 +76,13 @@ export default function CustomerSupportScreen({ order, onBack }) {
           orderId: order?.id,
           orderItemId: selectedItemId || null,
           message,
-          imageUrl,
+          imageUrl: primaryImageUrl,
+          imageUrls,
         });
         toast.show('Complaint submitted', 'success');
       }
       onBack?.();
-    } catch (error) {
+    } catch {
       Alert.alert('Failed', 'Unable to submit. Please try again.');
     } finally {
       setSubmitting(false);
@@ -125,9 +140,18 @@ export default function CustomerSupportScreen({ order, onBack }) {
 
         <Text style={styles.sectionTitle}>Proof (optional)</Text>
         <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
-          <Text style={styles.uploadText}>Upload Image</Text>
+          <Text style={styles.uploadText}>Add Photos ({images.length}/5)</Text>
         </TouchableOpacity>
-        {image?.uri ? <Image source={{ uri: image.uri }} style={styles.preview} /> : null}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
+          {images.map((image, index) => (
+            <View key={`${image.uri}-${index}`} style={styles.previewWrap}>
+              <Image source={{ uri: image.uri }} style={styles.preview} />
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeImageAt(index)}>
+                <Text style={styles.removeImageText}>X</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.secondaryBtn} onPress={onBack}>
@@ -232,7 +256,21 @@ const styles = StyleSheet.create({
     borderColor: customerColors.border,
   },
   uploadText: { color: customerColors.primary, fontWeight: '700', fontSize: 12 },
-  preview: { width: '100%', height: 160, borderRadius: 12, marginTop: 10 },
+  previewRow: { marginTop: 10, gap: 10 },
+  previewWrap: { position: 'relative' },
+  preview: { width: 130, height: 130, borderRadius: 12 },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#00000088',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   actionRow: { flexDirection: 'row', gap: 12, marginTop: customerSpacing.md },
   secondaryBtn: {
     flex: 1,

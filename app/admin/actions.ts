@@ -469,6 +469,23 @@ export async function getComplaints() {
         });
 
         // Map raw BSON to clean object
+        const parseComplaintImages = (value: unknown): string[] => {
+            if (!value) return [];
+            if (Array.isArray(value)) {
+                return value.filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+            }
+            if (typeof value !== "string" || !value.trim()) return [];
+            try {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+                }
+            } catch {
+                // Legacy single URL format.
+            }
+            return [value];
+        };
+
         const complaints = (rawComplaints as any[]).map((raw: any) => {
             // Handle Mongo Object ID
             const id = raw._id?.$oid ? raw._id.$oid : String(raw._id);
@@ -480,6 +497,8 @@ export async function getComplaints() {
                 else if (raw.createdAt.$date) createdAt = new Date(raw.createdAt.$date);
             }
 
+            const imageUrls = parseComplaintImages(raw.imageUrl);
+
             return {
                 id: id,
                 orderId: raw.orderId || "",
@@ -487,7 +506,8 @@ export async function getComplaints() {
                 vendorId: raw.vendorId || "",
                 customerId: raw.customerId || "",
                 message: raw.message || "",
-                imageUrl: raw.imageUrl || "",
+                imageUrl: imageUrls[0] || "",
+                imageUrls,
                 status: raw.status || "OPEN",
                 createdAt: createdAt
             };

@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { orderId, orderItemId, message, imageUrl } = body || {};
+  const { orderId, orderItemId, message, imageUrl, imageUrls } = body || {};
 
   if (!orderId || !message) {
     return NextResponse.json({ error: "Missing orderId or message" }, { status: 400 });
@@ -49,6 +49,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unable to resolve vendor" }, { status: 400 });
   }
 
+  const normalizedImageUrls = Array.isArray(imageUrls)
+    ? imageUrls.filter((u: unknown) => typeof u === "string" && u.trim().length > 0)
+    : typeof imageUrl === "string" && imageUrl.trim()
+    ? [imageUrl.trim()]
+    : [];
+  const storedImageUrl = normalizedImageUrls.length ? JSON.stringify(normalizedImageUrls) : null;
+
   const complaint = await prisma.$transaction(async (tx) => {
     const created = await tx.complaint.create({
       data: {
@@ -57,7 +64,7 @@ export async function POST(req: Request) {
         vendorId,
         customerId: guard.userId,
         message,
-        imageUrl: imageUrl || null,
+        imageUrl: storedImageUrl,
         status: "OPEN",
       },
     });

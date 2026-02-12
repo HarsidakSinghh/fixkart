@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getVendorComplaints, getVendorRefunds } from './vendorApi';
 import StatusPill from '../components/StatusPill';
@@ -50,6 +50,15 @@ export default function VendorComplaintsScreen() {
             <View key={item.id} style={styles.card}>
               <Text style={styles.title}>Order {item.orderId?.slice(-6).toUpperCase()}</Text>
               <Text style={styles.meta}>{item.message}</Text>
+              {getComplaintImages(item).length ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
+                  {getComplaintImages(item).map((url, index) => (
+                    <TouchableOpacity key={`${url}-${index}`} onPress={() => Linking.openURL(url)}>
+                      <Image source={{ uri: url }} style={styles.attachmentImage} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : null}
               <StatusPill label={item.status || 'OPEN'} tone={statusTone(item.status)} />
             </View>
           ))
@@ -72,6 +81,12 @@ export default function VendorComplaintsScreen() {
       </ScrollView>
     </View>
   );
+
+  function getComplaintImages(item) {
+    if (Array.isArray(item?.imageUrls) && item.imageUrls.length) return item.imageUrls;
+    if (item?.imageUrl) return [item.imageUrl];
+    return [];
+  }
 
   function statusTone(status) {
     if (status === 'RESOLVED') return 'success';
@@ -115,6 +130,15 @@ const styles = StyleSheet.create({
   },
   title: { color: vendorColors.text, fontWeight: '700' },
   meta: { color: vendorColors.muted, marginTop: 6, fontSize: 12 },
+  imageRow: { marginTop: vendorSpacing.sm, gap: 8, paddingBottom: 4 },
+  attachmentImage: {
+    width: 92,
+    height: 92,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.surface,
+  },
   emptyWrap: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: vendorColors.muted },
 });

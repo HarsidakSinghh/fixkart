@@ -9,6 +9,12 @@ import StatusPill from "../components/StatusPill";
 import { colors, spacing } from "../theme";
 
 export default function ComplaintsScreen() {
+  const getComplaintImages = (complaint) => {
+    if (Array.isArray(complaint?.imageUrls) && complaint.imageUrls.length) return complaint.imageUrls;
+    if (complaint?.imageUrl) return [complaint.imageUrl];
+    return [];
+  };
+
   const fetchComplaints = useCallback(async () => {
     const data = await getComplaints();
     return data.complaints;
@@ -49,9 +55,12 @@ export default function ComplaintsScreen() {
               {item.imageUrl ? (
                 <Text
                   style={{ color: "#6FA8FF", fontSize: 12, marginBottom: 6 }}
-                  onPress={() => Linking.openURL(item.imageUrl)}
+                  onPress={() => {
+                    const urls = getComplaintImages(item);
+                    if (urls[0]) Linking.openURL(urls[0]);
+                  }}
                 >
-                  View attachment
+                  View attachment{getComplaintImages(item).length > 1 ? `s (${getComplaintImages(item).length})` : ""}
                 </Text>
               ) : null}
               <ActionRow
@@ -125,11 +134,18 @@ export default function ComplaintsScreen() {
                 ) : null}
                 <Text style={styles.noteTitle}>Note</Text>
                 <Text style={styles.noteText}>{selectedComplaint.message || selectedComplaint.subject || "-"}</Text>
-                {selectedComplaint.imageUrl ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(selectedComplaint.imageUrl)}>
-                    <Image source={{ uri: selectedComplaint.imageUrl }} style={styles.attachmentImage} />
-                    <Text style={styles.linkText}>Open full image</Text>
-                  </TouchableOpacity>
+                {getComplaintImages(selectedComplaint).length ? (
+                  <View>
+                    <Text style={styles.noteTitle}>Attachments ({getComplaintImages(selectedComplaint).length})</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
+                      {getComplaintImages(selectedComplaint).map((url, index) => (
+                        <TouchableOpacity key={`${url}-${index}`} onPress={() => Linking.openURL(url)}>
+                          <Image source={{ uri: url }} style={styles.attachmentImage} />
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                    <Text style={styles.linkText}>Tap any image to open full size</Text>
+                  </View>
                 ) : (
                   <Text style={styles.metaText}>No image attached.</Text>
                 )}
@@ -192,13 +208,15 @@ const styles = StyleSheet.create({
   noteText: { color: colors.text, marginTop: 6, fontSize: 13 },
   attachmentImage: {
     marginTop: spacing.sm,
-    width: "100%",
-    height: 190,
+    width: 140,
+    height: 140,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.panelAlt,
+    marginRight: spacing.sm,
   },
+  imageRow: { marginTop: spacing.sm, paddingBottom: 4 },
   linkText: { color: colors.info, marginTop: 6, fontWeight: "700", fontSize: 12 },
   modalActions: { marginTop: spacing.sm, flexDirection: "row", gap: spacing.sm },
   resolveBtn: {
