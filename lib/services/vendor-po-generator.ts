@@ -50,6 +50,17 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
     const vendor = items[0].vendor;
     if (!vendor) return { success: false, error: "Vendor not found" };
 
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId: order.customerId },
+      select: { address: true, city: true, state: true, postalCode: true },
+    });
+
+    const deliveryAddress = customerProfile
+      ? [customerProfile.address, customerProfile.city, customerProfile.state, customerProfile.postalCode]
+          .filter(Boolean)
+          .join(", ")
+      : order.billingAddress || "";
+
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
@@ -121,8 +132,13 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
     const detailsY = sectionTop + 62;
     doc.setFont("helvetica", "bold");
     doc.text(`Reference Order: #${order.id.slice(0, 8).toUpperCase()}`, margin + 4, detailsY);
+    doc.text("Delivery Address:", margin + 4, detailsY + 6);
+    doc.setFont("helvetica", "normal");
+    doc.text(deliveryAddress || "N/A", margin + 38, detailsY + 6, {
+      maxWidth: pageWidth - margin * 2 - 42,
+    });
 
-    const tableStartY = detailsY + 6;
+    const tableStartY = detailsY + 16;
     const tableColumn = ["SI No.", "Description", "Qty", "Vendor Rate", "Amount"];
     const tableRows: Array<Array<string | number>> = [];
 
