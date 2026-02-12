@@ -151,6 +151,9 @@ export default function OrdersScreen() {
                 {selectedOrder.customerPhone ? <Text style={styles.modalSub}>Phone: {selectedOrder.customerPhone}</Text> : null}
                 {selectedOrder.customerAddress ? <Text style={styles.modalSub}>Address: {selectedOrder.customerAddress}</Text> : null}
                 <Text style={styles.modalSub}>Total: ₹{Math.round(selectedOrder.totalAmount || 0)}</Text>
+                <Text style={styles.modalSub}>
+                  Commission Earned: ₹{Math.round(selectedOrder.commissionEarned || 0)}
+                </Text>
 
                 <Text style={styles.sectionTitle}>Items</Text>
                 {(selectedOrder.items || []).map((item) => (
@@ -160,6 +163,9 @@ export default function OrdersScreen() {
                       <Text style={styles.itemName}>{item.productName}</Text>
                       <Text style={styles.itemMeta}>Qty: {item.quantity} • ₹{Math.round(item.price || 0)}</Text>
                       <Text style={styles.itemMeta}>Vendor: {item.vendorName || "Vendor"}</Text>
+                      <Text style={styles.itemMeta}>
+                        Commission: ₹{Math.round(item.commissionAmount || 0)} ({Number(item.commissionPercent || 0)}%)
+                      </Text>
                     </View>
                   </View>
                 ))}

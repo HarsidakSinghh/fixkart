@@ -219,6 +219,9 @@ export default function VendorInventoryScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Edit Listing Details</Text>
             <Text style={styles.modalSubtitle}>{detailItem?.title || detailItem?.name}</Text>
+            <Text style={styles.modalSubtitle}>
+              Commission: {detailItem ? formatCommission(detailItem) : '—'}
+            </Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {renderInput('Title', 'title')}
               {renderInput('Description', 'description', true)}

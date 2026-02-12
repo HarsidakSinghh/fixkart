@@ -43,20 +43,27 @@ export default function VendorStatsScreen() {
 
     orders.forEach((order) => {
       const created = new Date(order.createdAt);
-      if (order.orderId) orderIds.add(order.orderId);
 
       (order.items || []).forEach((item) => {
+        const status = String(item.status || order.status || '').toUpperCase();
+        // Do not reflect fresh placed orders until vendor accepts.
+        // Rejected/cancelled should never affect business stats.
+        if (status === 'PENDING' || status === 'REJECTED' || status === 'CANCELLED') {
+          return;
+        }
+
+        if (order.orderId) orderIds.add(order.orderId);
+
         const vendorPrice = Number(item.vendorPrice || item.price || 0);
         const amount = vendorPrice * Number(item.quantity || 0);
         totalEarnings += amount;
         if (created >= today) todayEarnings += amount;
 
-        const status = item.status || order.status || '';
-        if (status === 'DELIVERED' || status === 'COMPLETED' || status === 'READY') {
+        if (status === 'DELIVERED' || status === 'COMPLETED') {
           fulfilled += 1;
         } else if (status === 'SHIPPED') {
           inTransit += 1;
-        } else {
+        } else if (status === 'PROCESSING' || status === 'APPROVED' || status === 'READY') {
           pending += 1;
         }
       });

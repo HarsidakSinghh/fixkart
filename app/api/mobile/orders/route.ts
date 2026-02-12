@@ -35,6 +35,33 @@ export async function GET(req: Request) {
 
   const mapped = orders.map((o) => {
     const customer = customerMap.get(o.customerId);
+    const mappedItems = (o.items || []).map((item) => {
+      const basePrice = Number(item.product?.price || 0);
+      const specs = (item.product?.specs || {}) as Record<string, unknown>;
+      const commissionPercent = Number(specs.commissionPercent || 0);
+      const itemPrice = Number(item.price || 0);
+      const commissionPerUnit = commissionPercent > 0 ? Math.max(0, itemPrice - basePrice) : 0;
+      const commissionAmount = commissionPerUnit * (item.quantity || 0);
+
+      return {
+        id: item.id,
+        productId: item.productId,
+        productName: item.productName || item.product?.title || item.product?.name || "Product",
+        image: item.image || item.product?.image || null,
+        quantity: item.quantity || 0,
+        price: itemPrice,
+        vendorId: item.vendorId || "",
+        vendorName: item.vendor?.companyName || item.vendor?.fullName || "Vendor",
+        commissionPercent,
+        commissionAmount,
+      };
+    });
+
+    const commissionEarned = mappedItems.reduce(
+      (sum, item) => sum + Number(item.commissionAmount || 0),
+      0
+    );
+
     return {
       id: o.id,
       customerName: o.customerName || customer?.fullName || "Customer",
@@ -55,16 +82,8 @@ export async function GET(req: Request) {
       createdAt: o.createdAt.toISOString(),
       city: customer?.city || "",
       paymentMethod: o.paymentMethod || "",
-      items: (o.items || []).map((item) => ({
-        id: item.id,
-        productId: item.productId,
-        productName: item.productName || item.product?.title || item.product?.name || "Product",
-        image: item.image || item.product?.image || null,
-        quantity: item.quantity || 0,
-        price: item.price || 0,
-        vendorId: item.vendorId || "",
-        vendorName: item.vendor?.companyName || item.vendor?.fullName || "Vendor",
-      })),
+      commissionEarned,
+      items: mappedItems,
     };
   });
 
@@ -79,8 +98,10 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const { items, billing, paymentMethod } = body || {};
+  type IncomingOrderItem = { productId: string; qty?: number | string };
+  const incomingItems = Array.isArray(items) ? (items as IncomingOrderItem[]) : [];
 
-  if (!Array.isArray(items) || items.length === 0) {
+  if (!incomingItems.length) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
 
@@ -97,7 +118,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing billing details" }, { status: 400 });
   }
 
-  const productIds = items.map((item: any) => item.productId).filter(Boolean);
+  const productIds = incomingItems.map((item) => item.productId).filter(Boolean);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
   });
@@ -110,7 +131,7 @@ export async function POST(req: Request) {
   }
 
   let totalAmount = 0;
-  const orderItems = items.map((item: any) => {
+  const orderItems = incomingItems.map((item) => {
     const product = productMap.get(item.productId)!;
     const quantity = Math.max(1, Number(item.qty || 1));
 
@@ -118,7 +139,7 @@ export async function POST(req: Request) {
       throw new Error(`Insufficient stock for ${product.title || product.name}`);
     }
 
-    const specs: any = product.specs || {};
+    const specs = (product.specs || {}) as Record<string, unknown>;
     const commissionPercent = Number(specs.commissionPercent || 0);
     const basePrice = Number(product.price || 0);
     const price =
@@ -201,7 +222,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, orderId: result.id });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Order failed" }, { status: 400 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Order failed";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

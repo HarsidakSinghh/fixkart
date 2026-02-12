@@ -144,6 +144,7 @@ export async function getOrders(status) {
         city: o.city || "-",
         amount: String(Math.round(o.totalAmount || 0)),
         totalAmount: o.totalAmount || 0,
+        commissionEarned: Number(o.commissionEarned || 0),
         status: o.status,
         paymentMethod: o.paymentMethod || "",
         items: (o.items || []).map((item) => ({
@@ -155,6 +156,8 @@ export async function getOrders(status) {
           price: item.price || 0,
           vendorId: item.vendorId || "",
           vendorName: item.vendorName || "Vendor",
+          commissionPercent: Number(item.commissionPercent || 0),
+          commissionAmount: Number(item.commissionAmount || 0),
         })),
         placedAt: new Date(o.createdAt).toLocaleDateString(),
         createdAt: o.createdAt,
