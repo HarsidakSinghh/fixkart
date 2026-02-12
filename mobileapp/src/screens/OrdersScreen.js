@@ -50,6 +50,23 @@ export default function OrdersScreen() {
     return true;
   });
 
+  const tabCounts = {
+    PENDING: items.filter((order) => String(order.status || "").toUpperCase() === "PENDING").length,
+    PROCESSING: items.filter((order) => {
+      const status = String(order.status || "").toUpperCase();
+      return status === "PROCESSING" || status === "APPROVED";
+    }).length,
+    SHIPPED: items.filter((order) => String(order.status || "").toUpperCase() === "SHIPPED").length,
+    DELIVERED: items.filter((order) => {
+      const status = String(order.status || "").toUpperCase();
+      return status === "DELIVERED" || status === "COMPLETED";
+    }).length,
+    REJECTED: items.filter((order) => {
+      const status = String(order.status || "").toUpperCase();
+      return status === "REJECTED" || status === "CANCELLED";
+    }).length,
+  };
+
   return (
     <AdminScreenLayout>
       <ScreenTitle title="Orders" subtitle="Live pipeline" />
@@ -69,7 +86,9 @@ export default function OrdersScreen() {
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => setActiveTab(tab)}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              {tab} ({tabCounts[tab] || 0})
+            </Text>
           </TouchableOpacity>
         ))}
       </View>

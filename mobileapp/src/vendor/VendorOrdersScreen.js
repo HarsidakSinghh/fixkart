@@ -122,6 +122,20 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
     return true;
   });
 
+  const tabCounts = {
+    PENDING: orders.filter((order) => String(order.status || '').toUpperCase() === 'PENDING').length,
+    PROCESSING: orders.filter((order) => {
+      const status = String(order.status || '').toUpperCase();
+      return status === 'PROCESSING' || status === 'APPROVED';
+    }).length,
+    SHIPPED: orders.filter((order) => String(order.status || '').toUpperCase() === 'SHIPPED').length,
+    DELIVERED: orders.filter((order) => String(order.status || '').toUpperCase() === 'DELIVERED').length,
+    REJECTED: orders.filter((order) => {
+      const status = String(order.status || '').toUpperCase();
+      return status === 'REJECTED' || status === 'CANCELLED';
+    }).length,
+  };
+
   const renderOrder = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.orderHeader}>
@@ -230,7 +244,9 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
                   style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
                   onPress={() => setActiveTab(tab)}
                 >
-                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                    {tab} ({tabCounts[tab] || 0})
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>

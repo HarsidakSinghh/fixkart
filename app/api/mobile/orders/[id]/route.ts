@@ -45,7 +45,19 @@ export async function PATCH(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  if (order.status !== "SHIPPED") {
+  let canDeliver = order.status === "SHIPPED";
+  if (!canDeliver) {
+    const shippedItem = await prisma.orderItem.findFirst({
+      where: {
+        orderId: resolved.id,
+        status: { in: ["SHIPPED", "READY", "DELIVERED"] },
+      },
+      select: { id: true },
+    });
+    canDeliver = Boolean(shippedItem);
+  }
+
+  if (!canDeliver) {
     return NextResponse.json(
       { error: "Only SHIPPED orders can be marked DELIVERED by admin" },
       { status: 409 }
