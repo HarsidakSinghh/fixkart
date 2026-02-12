@@ -84,9 +84,11 @@ export default function CustomerSupportHistoryScreen({ onBack }) {
         )}
       </ScrollView>
 
-      <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-        <Text style={styles.backText}>Back to Profile</Text>
-      </TouchableOpacity>
+      {onBack ? (
+        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+          <Text style={styles.backText}>Back to Profile</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 

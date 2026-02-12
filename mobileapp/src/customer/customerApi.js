@@ -74,6 +74,13 @@ export async function uploadComplaintImage(imageBase64, filename) {
   });
 }
 
+export async function uploadCustomerProfilePhoto(imageBase64, filename) {
+  return authFetch('/api/mobile/uploads', {
+    method: 'POST',
+    body: JSON.stringify({ imageBase64, filename }),
+  });
+}
+
 export async function seedCustomerOrders() {
   return authFetch('/api/mobile/customer-orders/seed', { method: 'POST' });
 }

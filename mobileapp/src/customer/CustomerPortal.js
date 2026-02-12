@@ -11,8 +11,6 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 import { getCustomerOrders } from './customerApi';
 import CustomerSupportScreen from './CustomerSupportScreen';
 import CustomerSupportHistoryScreen from './CustomerSupportHistoryScreen';
-import CustomerNotificationsScreen from './CustomerNotificationsScreen';
-import NotificationDebugScreen from '../screens/NotificationDebugScreen';
 import CustomerTypeListingsScreen from './CustomerTypeListingsScreen';
 import { useAuth } from '../context/AuthContext';
 import { getCustomerProfile } from './customerApi';
@@ -20,6 +18,7 @@ import { getCustomerProfile } from './customerApi';
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
   { key: 'orders', label: 'Orders', icon: 'package' },
+  { key: 'support', label: 'Support', icon: 'help-circle' },
   { key: 'cart', label: 'Cart', icon: 'shopping-cart' },
   { key: 'profile', label: 'Profile', icon: 'user' },
 ];
@@ -31,9 +30,6 @@ export default function CustomerPortal({ onOpenLogin }) {
   const [showCheckout, setShowCheckout] = useState(false);
   const [orderBadge, setOrderBadge] = useState(0);
   const [supportOrder, setSupportOrder] = useState(null);
-  const [showSupportHistory, setShowSupportHistory] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showPushDebug, setShowPushDebug] = useState(false);
   const [profileGate, setProfileGate] = useState(false);
   const [profileChecking, setProfileChecking] = useState(false);
 
@@ -111,18 +107,6 @@ export default function CustomerPortal({ onOpenLogin }) {
     );
   }
 
-  if (showSupportHistory) {
-    return <CustomerSupportHistoryScreen onBack={() => setShowSupportHistory(false)} />;
-  }
-
-  if (showNotifications) {
-    return <CustomerNotificationsScreen onBack={() => setShowNotifications(false)} />;
-  }
-
-  if (showPushDebug) {
-    return <NotificationDebugScreen onBack={() => setShowPushDebug(false)} />;
-  }
-
   if (showCheckout) {
     return (
       <CustomerCheckoutScreen
@@ -146,14 +130,13 @@ export default function CustomerPortal({ onOpenLogin }) {
     );
   } else if (tab === 'orders') {
     content = <CustomerOrdersScreen onOpenSupport={setSupportOrder} />;
+  } else if (tab === 'support') {
+    content = <CustomerSupportHistoryScreen />;
   } else if (tab === 'cart') {
     content = <CartScreen onCheckout={() => setShowCheckout(true)} />;
   } else {
     content = (
       <CustomerProfileScreen
-        onOpenSupportHistory={() => setShowSupportHistory(true)}
-        onOpenNotifications={() => setShowNotifications(true)}
-        onOpenPushDebug={() => setShowPushDebug(true)}
         forceComplete={profileGate}
         onCompleted={() => {
           setProfileGate(false);
