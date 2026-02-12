@@ -22,13 +22,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  const existing = await prisma.purchaseOrder.findFirst({
-    where: { orderId, vendorId: guard.userId },
-  });
-  if (existing?.url) {
-    return NextResponse.json({ url: existing.url });
-  }
-
   const result = await generateVendorPO(orderId, guard.userId);
   if (!result.success || !result.url) {
     return NextResponse.json({ error: result.error || "Failed to generate PO" }, { status: 500 });

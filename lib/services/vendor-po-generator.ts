@@ -26,7 +26,7 @@ function loadLogoBase64() {
     const logoPath = path.resolve(process.cwd(), "mobileapp/assets/logo1.png");
     const buffer = fs.readFileSync(logoPath);
     return `data:image/png;base64,${buffer.toString("base64")}`;
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -50,16 +50,6 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
     const vendor = items[0].vendor;
     if (!vendor) return { success: false, error: "Vendor not found" };
 
-    const customerProfile = await prisma.customerProfile.findUnique({
-      where: { userId: order.customerId },
-    });
-
-    const deliveryAddress = customerProfile
-      ? [customerProfile.address, customerProfile.city, customerProfile.state, customerProfile.postalCode]
-          .filter(Boolean)
-          .join(", ")
-      : order.billingAddress || "";
-
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
@@ -75,20 +65,21 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
 
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("Purchase Order", margin + (logo ? 48 : 5), 28);
+    doc.text("Vendor Purchase Order", margin + (logo ? 48 : 5), 28);
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Order: #${order.id.slice(0, 8).toUpperCase()}`, pageWidth - margin - 5, 24, { align: "right" });
+    const poNumber = `PO-${order.id.slice(-6).toUpperCase()}-${vendor.id.slice(-4).toUpperCase()}`;
+    doc.text(`PO No: ${poNumber}`, pageWidth - margin - 5, 24, { align: "right" });
     doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - margin - 5, 30, { align: "right" });
 
-    let yPos = 36;
+    const yPos = 36;
     doc.line(margin, yPos, pageWidth - margin, yPos);
 
     const sectionTop = yPos;
     const colCenter = pageWidth / 2;
-    doc.line(colCenter, yPos, colCenter, yPos + 62);
-    doc.line(margin, yPos + 62, pageWidth - margin, yPos + 62);
+    doc.line(colCenter, yPos, colCenter, yPos + 58);
+    doc.line(margin, yPos + 58, pageWidth - margin, yPos + 58);
 
     // Buyer: Fixkart
     let leftY = sectionTop + 8;
@@ -127,31 +118,23 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
     rightY += 5;
     doc.text(`Email: ${vendor.email || "N/A"}`, rightColX, rightY);
 
-    const detailsY = sectionTop + 66;
+    const detailsY = sectionTop + 62;
     doc.setFont("helvetica", "bold");
-    doc.text("Delivery Address", margin + 4, detailsY);
-    doc.setFont("helvetica", "normal");
-    doc.text(deliveryAddress || "N/A", margin + 4, detailsY + 5, { maxWidth: pageWidth - margin * 2 - 8 });
+    doc.text(`Reference Order: #${order.id.slice(0, 8).toUpperCase()}`, margin + 4, detailsY);
 
-    const tableStartY = detailsY + 18;
-    const tableColumn = ["SI No.", "Description", "Qty", "Rate", "Amount"];
-    const tableRows: any[] = [];
+    const tableStartY = detailsY + 6;
+    const tableColumn = ["SI No.", "Description", "Qty", "Vendor Rate", "Amount"];
+    const tableRows: Array<Array<string | number>> = [];
 
     const total = items.reduce((sum, item) => {
-      const specs = item.product?.specs as any;
-      const commissionPercent = Number(specs?.commissionPercent || 0);
-      const basePrice =
-        typeof item.product?.price === "number"
-          ? item.product.price
-          : commissionPercent > 0
-          ? item.price / (1 + commissionPercent / 100)
-          : item.price;
-      const amount = basePrice * item.quantity;
+      // PO for vendor must show vendor/base price only (no platform commission).
+      const vendorRate = typeof item.product?.price === "number" ? item.product.price : item.price;
+      const amount = vendorRate * item.quantity;
       tableRows.push([
         tableRows.length + 1,
         item.productName || item.product?.title || "Item",
         item.quantity,
-        `INR ${basePrice.toFixed(2)}`,
+        `INR ${vendorRate.toFixed(2)}`,
         `INR ${amount.toFixed(2)}`,
       ]);
       return sum + amount;
@@ -164,11 +147,11 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
       theme: "grid",
       styles: { fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
       headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: "bold" },
-      columnStyles: { 0: { cellWidth: 14 }, 1: { cellWidth: 70 }, 4: { halign: "right" } },
+      columnStyles: { 0: { cellWidth: 14 }, 1: { cellWidth: 80 }, 4: { halign: "right" } },
       margin: { left: margin, right: margin },
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY;
+    const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? tableStartY + 20;
     doc.setFont("helvetica", "bold");
     doc.text(`Total: INR ${total.toFixed(2)}`, pageWidth - margin - 5, finalY + 10, { align: "right" });
 
@@ -200,7 +183,6 @@ export async function generateVendorPO(orderId: string, vendorId: string): Promi
 
     const cloudUrl = getPrivateDownloadUrl(uploadResult.public_id, "pdf", "raw");
 
-    const poNumber = `PO-${order.id.slice(-6).toUpperCase()}-${vendor.id.slice(-4).toUpperCase()}`;
     const existing = await prisma.purchaseOrder.findFirst({
       where: { orderId: order.id, vendorId: vendor.userId },
     });
