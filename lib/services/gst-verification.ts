@@ -216,7 +216,7 @@ export async function verifyGstinWithAppyFlow(inputGstin: string): Promise<Verif
         continue;
       }
 
-      if (payloadObj.error === true) {
+      if (payloadObj.error === true || String(payloadObj.error).toLowerCase() === "true") {
         lastError = String(payloadObj.message || payloadObj.error || "Verification unsuccessful");
         continue;
       }

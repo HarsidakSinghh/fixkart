@@ -269,6 +269,21 @@ export async function reverifyVendorGst(id) {
   });
 }
 
+export async function verifyVendorGstPreview(id) {
+  if (USE_MOCK) return { success: true };
+  return authenticatedFetch(`/api/mobile/vendors/${id}/gst-verify-preview`, {
+    method: "POST",
+  });
+}
+
+export async function saveVendorGstVerification(id, payload = {}) {
+  if (USE_MOCK) return { success: true };
+  return authenticatedFetch(`/api/mobile/vendors/${id}/gst-verify`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getCustomers(status = "PENDING") {
   if (USE_MOCK) {
     return { customers: status === "APPROVED" ? onboardedCustomersMock : customerApprovalsMock };

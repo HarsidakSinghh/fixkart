@@ -1,10 +1,10 @@
-import React, { useCallback } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, Linking, ScrollView } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, Image, TouchableOpacity, Linking, ScrollView, ActivityIndicator, Alert } from "react-native";
 import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, StatCard } from "../components/Ui";
 import { ErrorState, SkeletonList } from "../components/StateViews";
 import { colors, spacing } from "../theme";
-import { getVendorDetail, getOrders, getRefunds, getComplaints, reverifyVendorGst } from "../services/api";
+import { getVendorDetail, getOrders, getRefunds, getComplaints, verifyVendorGstPreview, saveVendorGstVerification } from "../services/api";
 import { useAsyncList } from "../services/useAsyncList";
 
 export default function VendorProfileAdminScreen({ vendorId, onBack }) {
@@ -91,6 +91,69 @@ export default function VendorProfileAdminScreen({ vendorId, onBack }) {
   const { items, error, refresh, loading } = useAsyncList(fetchVendorProfile, null);
   const data = items && typeof items === "object" ? items : null;
   const vendor = data?.vendor || null;
+  const [gstPreview, setGstPreview] = useState(null);
+  const [gstLoading, setGstLoading] = useState(false);
+  const [gstSaving, setGstSaving] = useState(false);
+
+  useEffect(() => {
+    setGstPreview(null);
+    setGstLoading(false);
+    setGstSaving(false);
+  }, [vendorId]);
+
+  const savedGst = useMemo(() => {
+    if (!vendor) return null;
+    const hasStored =
+      Boolean(vendor.gstLegalName) ||
+      Boolean(vendor.gstTradeName) ||
+      Boolean(vendor.gstBusinessAddress) ||
+      Boolean(vendor.gstVerifiedAt);
+    if (!hasStored) return null;
+    return {
+      gstVerificationStatus: vendor.gstVerificationStatus || "VERIFIED",
+      gstVerificationError: vendor.gstVerificationError || null,
+      gstVerifiedAt: vendor.gstVerifiedAt,
+      gstNumber: vendor.gstNumber,
+      gstLegalName: vendor.gstLegalName,
+      gstTradeName: vendor.gstTradeName,
+      gstBusinessAddress: vendor.gstBusinessAddress,
+      gstNameMatches: vendor.gstNameMatches,
+      source: "saved",
+    };
+  }, [vendor]);
+
+  const gstView = gstPreview || savedGst;
+  const isApprovedWithSavedInfo = String(vendor?.status || "").toUpperCase() === "APPROVED" && Boolean(savedGst);
+
+  async function handleVerify() {
+    if (!vendor?.id) return;
+    setGstLoading(true);
+    try {
+      const res = await verifyVendorGstPreview(vendor.id);
+      setGstPreview({ ...res, source: "preview" });
+    } catch (err) {
+      const message = String(err?.message || "GST verification failed");
+      Alert.alert("GST Verification Failed", message);
+    } finally {
+      setGstLoading(false);
+    }
+  }
+
+  async function handleSaveGst() {
+    if (!vendor?.id) return;
+    setGstSaving(true);
+    try {
+      await saveVendorGstVerification(vendor.id, gstPreview || {});
+      setGstPreview(null);
+      await refresh();
+      Alert.alert("Saved", "GST details saved for this vendor.");
+    } catch (err) {
+      const message = String(err?.message || "Failed to save GST details");
+      Alert.alert("Save Failed", message);
+    } finally {
+      setGstSaving(false);
+    }
+  }
 
   return (
     <AdminScreenLayout>
@@ -136,35 +199,64 @@ export default function VendorProfileAdminScreen({ vendorId, onBack }) {
 
             <View style={styles.detailSubCard}>
               <Text style={styles.sectionLabel}>GST Verification (AppyFlow)</Text>
-              <TouchableOpacity
-                style={styles.reverifyBtn}
-                onPress={async () => {
-                  try {
-                    await reverifyVendorGst(vendor.id);
-                    await refresh();
-                  } catch {
-                    // keep existing UI stable if verify fails
-                  }
-                }}
-              >
-                <Text style={styles.reverifyBtnText}>Re-verify GST</Text>
-              </TouchableOpacity>
-              <Badge text={vendor.gstVerificationStatus || "NOT_VERIFIED"} tone={gstStatusTone(vendor.gstVerificationStatus)} />
-              <Text style={styles.detailMeta}>Submitted GSTIN: {vendor.gstNumber || "N/A"}</Text>
-              <Text style={styles.detailMeta}>API Legal Name: {vendor.gstLegalName || "N/A"}</Text>
-              <Text style={styles.detailMeta}>API Trade Name: {vendor.gstTradeName || "N/A"}</Text>
-              <Text style={styles.detailMeta}>API Address: {vendor.gstBusinessAddress || "N/A"}</Text>
-              <Text style={styles.detailMeta}>
-                Name Match: {vendor.gstNameMatches == null ? "Unknown" : vendor.gstNameMatches ? "Matched" : "Mismatch"}
-              </Text>
-              <Text style={styles.detailMeta}>
-                Address Match: {vendor.gstAddressMatches == null ? "Unknown" : vendor.gstAddressMatches ? "Matched" : "Mismatch"}
-              </Text>
-              <Text style={styles.detailMeta}>
-                Verified At: {vendor.gstVerifiedAt ? new Date(vendor.gstVerifiedAt).toLocaleString() : "Not verified yet"}
-              </Text>
-              {vendor.gstVerificationError ? (
-                <Text style={styles.gstErrorText}>Verification Error: {vendor.gstVerificationError}</Text>
+              {gstLoading ? (
+                <View style={styles.fetchBar}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.fetchBarText}>Fetching GST info from AppyFlow...</Text>
+                </View>
+              ) : null}
+
+              {isApprovedWithSavedInfo ? null : (
+                <View style={styles.gstBtnRow}>
+                  <TouchableOpacity
+                    style={styles.verifyBtn}
+                    onPress={handleVerify}
+                    disabled={gstLoading || gstSaving}
+                  >
+                    <Text style={styles.verifyBtnText}>{gstView ? "Re-verify GST" : "Verify GST"}</Text>
+                  </TouchableOpacity>
+
+                  {gstPreview ? (
+                    <TouchableOpacity
+                      style={[styles.saveBtn, gstSaving ? styles.btnDisabled : null]}
+                      onPress={handleSaveGst}
+                      disabled={gstSaving || gstLoading}
+                    >
+                      <Text style={styles.saveBtnText}>{gstSaving ? "Saving..." : "Save GST Info"}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+
+              <GstRow label="Submitted GSTIN" value={vendor.gstNumber || "N/A"} mono bordered={false} />
+              {gstView ? (
+                <View style={styles.gstGrid}>
+                  <GstRow label="Verification Status" value={gstView.gstVerificationStatus || "NOT_VERIFIED"} />
+                  <GstRow label="API Legal Name" value={gstView.gstLegalName || "N/A"} />
+                  <GstRow label="API Trade Name" value={gstView.gstTradeName || "N/A"} />
+                  <GstRow label="API Address" value={gstView.gstBusinessAddress || "N/A"} />
+                  <GstRow
+                    label="Name Match"
+                    value={
+                      gstView.gstNameMatches == null
+                        ? "Unknown"
+                        : gstView.gstNameMatches
+                          ? "Matched"
+                          : "Mismatch"
+                    }
+                  />
+                  <GstRow
+                    label="Verified At"
+                    value={
+                      gstView.gstVerifiedAt ? new Date(gstView.gstVerifiedAt).toLocaleString() : "Not verified yet"
+                    }
+                  />
+                </View>
+              ) : (
+                <Text style={styles.gstHint}>Tap Verify GST to fetch details from AppyFlow.</Text>
+              )}
+              {gstView?.gstVerificationError ? (
+                <Text style={styles.gstErrorText}>Verification Error: {gstView.gstVerificationError}</Text>
               ) : null}
             </View>
 
@@ -249,13 +341,6 @@ function statusTone(status) {
   return "info";
 }
 
-function gstStatusTone(status) {
-  const normalized = String(status || "").toUpperCase();
-  if (normalized === "VERIFIED") return "success";
-  if (normalized === "NOT_PROVIDED" || normalized === "NOT_VERIFIED") return "info";
-  return "warning";
-}
-
 function formatGps(lat, lng) {
   if (lat == null || lng == null) return "Not available";
   return `${lat}, ${lng}`;
@@ -285,13 +370,22 @@ function DocPreview({ uri, label }) {
   );
 }
 
+function GstRow({ label, value, mono = false, bordered = true }) {
+  return (
+    <View style={[styles.gstRow, !bordered ? styles.gstRowPlain : null]}>
+      <Text style={styles.gstRowLabel}>{label}</Text>
+      <Text style={[styles.gstRowValue, mono ? styles.gstRowMono : null]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   backBtn: { marginBottom: spacing.sm },
   backText: { color: colors.primary, fontWeight: "700" },
   detailCard: {
     backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: spacing.md,
+    borderRadius: 20,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.line,
     marginBottom: spacing.lg,
@@ -318,26 +412,80 @@ const styles = StyleSheet.create({
   detailMeta: { color: colors.muted, fontSize: 12, marginTop: 5 },
   detailMetaAddress: { color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 },
   detailSubCard: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 14,
-    backgroundColor: colors.panelAlt,
-    padding: spacing.sm,
+    borderRadius: 16,
+    backgroundColor: "#FAFCFF",
+    padding: spacing.md,
   },
-  sectionLabel: { color: colors.text, fontWeight: "700", marginBottom: 3 },
-  reverifyBtn: {
-    alignSelf: "flex-start",
+  sectionLabel: { color: colors.text, fontWeight: "800", marginBottom: 8, fontSize: 13 },
+  fetchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: "#EEF4FB",
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 10,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  fetchBarText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
+  gstBtnRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  verifyBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 12,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    backgroundColor: colors.card,
-    marginBottom: spacing.xs,
+    paddingVertical: 9,
+    backgroundColor: "#EAF1FB",
+    alignItems: "center",
   },
-  reverifyBtnText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
-  gstErrorText: { color: colors.danger, fontSize: 12, marginTop: spacing.xs, fontWeight: "600" },
+  verifyBtnText: { color: colors.primary, fontWeight: "800", fontSize: 12 },
+  saveBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#1E4F8C",
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    backgroundColor: "#1E4F8C",
+    alignItems: "center",
+  },
+  saveBtnText: { color: "#FFFFFF", fontWeight: "800", fontSize: 12 },
+  btnDisabled: { opacity: 0.6 },
+  gstGrid: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: colors.card,
+  },
+  gstRow: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  gstRowPlain: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    marginBottom: spacing.sm,
+  },
+  gstRowLabel: { color: colors.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+  gstRowValue: { color: colors.text, fontSize: 12, marginTop: 2, lineHeight: 18 },
+  gstRowMono: { fontFamily: "monospace" },
+  gstHint: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  gstErrorText: { color: colors.danger, fontSize: 12, marginTop: spacing.sm, fontWeight: "600" },
   mapBtn: {
     marginTop: spacing.xs,
     alignSelf: "flex-start",
