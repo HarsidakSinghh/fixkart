@@ -23,6 +23,19 @@ export async function GET(req: Request) {
 
   const complaintsRaw = await prisma.complaint.findMany({
     where: { vendorId: guard.userId },
+    select: {
+      id: true,
+      orderId: true,
+      orderItemId: true,
+      vendorId: true,
+      customerId: true,
+      message: true,
+      imageUrl: true,
+      status: true,
+      createdAt: true,
+      vendorResponse: true,
+      actionTaken: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 
