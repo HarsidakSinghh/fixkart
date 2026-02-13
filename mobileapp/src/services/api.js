@@ -262,6 +262,13 @@ export async function updateVendorStatus(id, status) {
   });
 }
 
+export async function reverifyVendorGst(id) {
+  if (USE_MOCK) return { success: true };
+  return authenticatedFetch(`/api/mobile/vendors/${id}/gst-verify`, {
+    method: "POST",
+  });
+}
+
 export async function getCustomers(status = "PENDING") {
   if (USE_MOCK) {
     return { customers: status === "APPROVED" ? onboardedCustomersMock : customerApprovalsMock };

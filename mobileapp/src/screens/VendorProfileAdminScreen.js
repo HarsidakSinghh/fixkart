@@ -4,7 +4,7 @@ import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, StatCard } from "../components/Ui";
 import { ErrorState, SkeletonList } from "../components/StateViews";
 import { colors, spacing } from "../theme";
-import { getVendorDetail, getOrders, getRefunds, getComplaints } from "../services/api";
+import { getVendorDetail, getOrders, getRefunds, getComplaints, reverifyVendorGst } from "../services/api";
 import { useAsyncList } from "../services/useAsyncList";
 
 export default function VendorProfileAdminScreen({ vendorId, onBack }) {
@@ -136,6 +136,19 @@ export default function VendorProfileAdminScreen({ vendorId, onBack }) {
 
             <View style={styles.detailSubCard}>
               <Text style={styles.sectionLabel}>GST Verification (AppyFlow)</Text>
+              <TouchableOpacity
+                style={styles.reverifyBtn}
+                onPress={async () => {
+                  try {
+                    await reverifyVendorGst(vendor.id);
+                    await refresh();
+                  } catch {
+                    // keep existing UI stable if verify fails
+                  }
+                }}
+              >
+                <Text style={styles.reverifyBtnText}>Re-verify GST</Text>
+              </TouchableOpacity>
               <Badge text={vendor.gstVerificationStatus || "NOT_VERIFIED"} tone={gstStatusTone(vendor.gstVerificationStatus)} />
               <Text style={styles.detailMeta}>Submitted GSTIN: {vendor.gstNumber || "N/A"}</Text>
               <Text style={styles.detailMeta}>API Legal Name: {vendor.gstLegalName || "N/A"}</Text>
@@ -313,6 +326,17 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   sectionLabel: { color: colors.text, fontWeight: "700", marginBottom: 3 },
+  reverifyBtn: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    backgroundColor: colors.card,
+    marginBottom: spacing.xs,
+  },
+  reverifyBtnText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
   gstErrorText: { color: colors.danger, fontSize: 12, marginTop: spacing.xs, fontWeight: "600" },
   mapBtn: {
     marginTop: spacing.xs,
