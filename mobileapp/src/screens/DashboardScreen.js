@@ -1,16 +1,28 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { View, StyleSheet, Text, RefreshControl, Pressable } from "react-native";
 import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, StatCard, RowCard, Badge } from "../components/Ui";
 import { colors, spacing } from "../theme";
 import { useAsyncList } from "../services/useAsyncList";
+import MiniBarChart from "../components/MiniBarChart";
 import { getDashboard, getInventoryApprovals, getRefunds, getComplaints } from "../services/api";
 import { ErrorState } from "../components/StateViews";
+
+const REVENUE_FILTERS = [
+  { key: "7d", label: "Last 7 Days" },
+  { key: "monthly", label: "Monthly" },
+  { key: "yearly", label: "Yearly" },
+];
 
 export default function DashboardScreen({ onNavigate }) {
   const [dashboard, setDashboard] = useState({
     kpis: null,
     revenueByDay: [],
+    revenueSeries: {
+      "7d": [],
+      monthly: [],
+      yearly: [],
+    },
     recentVendors: [],
     alerts: [],
   });
@@ -21,6 +33,7 @@ export default function DashboardScreen({ onNavigate }) {
   });
 
   const [refreshing, setRefreshing] = useState(false);
+  const [revenueFilter, setRevenueFilter] = useState("7d");
 
   const fetchDashboard = useCallback(async () => {
     const data = await getDashboard();
@@ -73,6 +86,26 @@ export default function DashboardScreen({ onNavigate }) {
   }, [fetchDashboard, loadQueue]);
 
   const kpis = dashboard.kpis || {};
+  const revenueSeries = dashboard.revenueSeries || {};
+  const activeRevenueData = useMemo(
+    () => {
+      const series = revenueSeries[revenueFilter];
+      if (Array.isArray(series) && series.length > 0) return series;
+      if (revenueFilter === "7d" && Array.isArray(dashboard.revenueByDay)) {
+        return dashboard.revenueByDay.map((d, idx) => ({
+          key: `${d.name}-${idx}`,
+          label: d.name,
+          value: Number(d.total || 0),
+        }));
+      }
+      return [];
+    },
+    [revenueSeries, revenueFilter, dashboard.revenueByDay]
+  );
+  const activeRevenueTotal = useMemo(
+    () => activeRevenueData.reduce((sum, item) => sum + Number(item.value || 0), 0),
+    [activeRevenueData]
+  );
 
   if (error) {
     return (
@@ -98,13 +131,13 @@ export default function DashboardScreen({ onNavigate }) {
             label="Pending Vendors"
             value={kpis.vendorPending || 0}
             tone="warning"
-            onPress={() => onNavigate && onNavigate("vendors")}
+            onPress={() => onNavigate && onNavigate("approvals", { tab: "vendors" })}
           />
           <QueueCard
             label="Inventory Approvals"
             value={queue.inventory}
             tone="warning"
-            onPress={() => onNavigate && onNavigate("inventoryApprovals")}
+            onPress={() => onNavigate && onNavigate("approvals", { tab: "inventory" })}
           />
           <QueueCard
             label="Refund Requests"
@@ -131,11 +164,29 @@ export default function DashboardScreen({ onNavigate }) {
 
         <SectionHeader title="Revenue Pulse" />
         <View style={styles.panel}>
-          <Text style={styles.chartPlaceholder}>📊 Revenue Chart (7 Days)</Text>
-          {dashboard.revenueByDay && dashboard.revenueByDay.length > 0 ? (
-            <Text style={styles.chartSubtext}>
-              {dashboard.revenueByDay.map(d => `${d.name}: ₹${d.total}`).join(' | ')}
-            </Text>
+          <View style={styles.filterRow}>
+            {REVENUE_FILTERS.map((filter) => {
+              const active = revenueFilter === filter.key;
+              return (
+                <Pressable
+                  key={filter.key}
+                  style={[styles.filterChip, active && styles.filterChipActive]}
+                  onPress={() => setRevenueFilter(filter.key)}
+                >
+                  <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                    {filter.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {loading && !refreshing ? (
+            <Text style={styles.chartEmpty}>Loading revenue graph...</Text>
+          ) : activeRevenueData.length > 0 ? (
+            <View style={styles.chartWrap}>
+              <MiniBarChart data={activeRevenueData} />
+              <Text style={styles.chartSubtext}>Total: ₹{Math.round(activeRevenueTotal)}</Text>
+            </View>
           ) : (
             <Text style={styles.chartEmpty}>No revenue data yet</Text>
           )}
@@ -227,23 +278,51 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
-    alignItems: "center",
     borderWidth: 1,
     borderColor: colors.line,
   },
-  chartPlaceholder: {
-    color: colors.text,
-    fontSize: 16,
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+  },
+  filterChipActive: {
+    backgroundColor: colors.info,
+    borderColor: colors.info,
+  },
+  filterChipText: {
+    color: colors.muted,
+    fontSize: 11,
     fontWeight: "600",
-    marginBottom: spacing.sm,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  filterChipTextActive: {
+    color: colors.white,
+  },
+  chartWrap: {
+    width: "100%",
   },
   chartSubtext: {
     color: colors.muted,
     fontSize: 12,
+    textAlign: "right",
+    marginTop: spacing.sm,
   },
   chartEmpty: {
     color: colors.muted,
     fontSize: 12,
+    textAlign: "center",
+    paddingVertical: spacing.md,
   },
   alertWrap: {
     flexDirection: "row",

@@ -50,6 +50,7 @@ function LoadingScreen({ message = "Loading FixKart...", showLogo = false }) {
 
 function AdminAppContent() {
   const [active, setActive] = useState("dashboard");
+  const [routeParamsByKey, setRouteParamsByKey] = useState({});
 
   const routes = useMemo(
     () => ({
@@ -192,18 +193,35 @@ function AdminAppContent() {
   ];
 
   const ActiveComponent = routes[active]?.component || DashboardScreen;
+  const handleNavigate = useCallback((target, params = {}) => {
+    if (!target) return;
+
+    if (typeof target === "string") {
+      setActive(target);
+      setRouteParamsByKey((prev) => ({ ...prev, [target]: params || {} }));
+      return;
+    }
+
+    if (typeof target === "object" && target.key) {
+      setActive(target.key);
+      setRouteParamsByKey((prev) => ({ ...prev, [target.key]: target.params || {} }));
+    }
+  }, []);
 
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
       <View style={styles.content}>
         {active === "more" ? (
-          <MoreScreen routes={moreRoutes} onNavigate={setActive} />
+          <MoreScreen routes={moreRoutes} onNavigate={handleNavigate} />
         ) : (
-          <ActiveComponent onNavigate={setActive} />
+          <ActiveComponent
+            onNavigate={handleNavigate}
+            routeParams={routeParamsByKey[active] || {}}
+          />
         )}
       </View>
-      <BottomNav tabs={bottomTabs} activeKey={active} onChange={setActive} />
+      <BottomNav tabs={bottomTabs} activeKey={active} onChange={handleNavigate} />
     </View>
   );
 }

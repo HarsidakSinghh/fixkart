@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, TouchableOpacity, ScrollView, Image, TextInput, Alert } from "react-native";
 import AdminScreenLayout from "../components/AdminScreenLayout";
 import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
@@ -20,7 +20,7 @@ const TABS = [
   { key: "inventory", label: "Inventory" },
 ];
 
-export default function ApprovalsScreen() {
+export default function ApprovalsScreen({ routeParams }) {
   const [activeTab, setActiveTab] = useState("vendors");
   const [selectedInventory, setSelectedInventory] = useState(null);
   const [selectedVendorId, setSelectedVendorId] = useState(null);
@@ -38,6 +38,13 @@ export default function ApprovalsScreen() {
 
   const vendorsList = useAsyncList(fetchVendors, []);
   const inventoryList = useAsyncList(fetchInventory, []);
+
+  useEffect(() => {
+    const requestedTab = routeParams?.tab;
+    if (requestedTab === "vendors" || requestedTab === "inventory") {
+      setActiveTab(requestedTab);
+    }
+  }, [routeParams?.tab]);
 
   const counts = useMemo(
     () => ({

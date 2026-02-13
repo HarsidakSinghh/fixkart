@@ -84,6 +84,7 @@ async function cachedFetch(path, options = {}, ttlMs = 60000) {
 
 export async function getDashboard() {
   if (USE_MOCK) {
+    const mappedWeekly = weeklyRevenue.map((d, idx) => ({ key: `${d.day}-${idx}`, label: d.day, value: d.value }));
     return {
       kpis: {
         totalRevenue: dashboardStats.revenue,
@@ -96,6 +97,11 @@ export async function getDashboard() {
         vendorSuspended: dashboardStats.vendorsSuspended,
       },
       revenueByDay: weeklyRevenue.map((d) => ({ name: d.day, total: d.value })),
+      revenueSeries: {
+        "7d": mappedWeekly,
+        monthly: [],
+        yearly: [],
+      },
       recentVendors: vendorsMock,
       alerts: dashboardAlerts,
     };
@@ -109,6 +115,7 @@ export async function getDashboard() {
     };
   } catch (error) {
     console.error("Error fetching dashboard:", error);
+    const mappedWeekly = weeklyRevenue.map((d, idx) => ({ key: `${d.day}-${idx}`, label: d.day, value: d.value }));
     return {
       kpis: {
         totalRevenue: dashboardStats.revenue,
@@ -121,6 +128,11 @@ export async function getDashboard() {
         vendorSuspended: dashboardStats.vendorsSuspended,
       },
       revenueByDay: weeklyRevenue.map((d) => ({ name: d.day, total: d.value })),
+      revenueSeries: {
+        "7d": mappedWeekly,
+        monthly: [],
+        yearly: [],
+      },
       recentVendors: vendorsMock,
       alerts: dashboardAlerts,
     };

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Modal, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Modal, Image, ScrollView, Alert } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
-import { getCustomerOrders, seedCustomerOrders, getCustomerInvoice } from './customerApi';
+import { getCustomerOrders, seedCustomerOrders, getCustomerInvoice, cancelPendingOrder } from './customerApi';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
 import { ErrorState } from '../components/StateViews';
@@ -9,6 +9,7 @@ import StatusPill from '../components/StatusPill';
 import * as WebBrowser from 'expo-web-browser';
 
 const STATUS_STEPS = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
+const CANCEL_REASONS = ['Ordered wrong item', 'Ordered by mistake', "Don't need now"];
 const STATUS_ALIAS = {
   APPROVED: 'PROCESSING',
   READY: 'SHIPPED',
@@ -16,10 +17,16 @@ const STATUS_ALIAS = {
   CANCELLED: 'REJECTED',
 };
 
-function getStepIndex(status) {
-  const normalized = STATUS_ALIAS[status] || status;
+function getTimeline(status) {
+  const normalized = String(STATUS_ALIAS[status] || status || '').toUpperCase();
+  if (normalized === 'CANCELLED') {
+    return { steps: ['PENDING', 'CANCELLED'], stepIndex: 1, isTerminalDanger: true };
+  }
+  if (normalized === 'REJECTED') {
+    return { steps: ['PENDING', 'REJECTED'], stepIndex: 1, isTerminalDanger: true };
+  }
   const idx = STATUS_STEPS.indexOf(normalized);
-  return idx >= 0 ? idx : 0;
+  return { steps: STATUS_STEPS, stepIndex: idx >= 0 ? idx : 0, isTerminalDanger: false };
 }
 
 function itemStatusLabel(status) {
@@ -42,6 +49,7 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(null);
+  const [cancelling, setCancelling] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   const loadOrders = useCallback(async () => {
@@ -96,6 +104,52 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
     } finally {
       setDownloading(null);
     }
+  };
+
+  const handleCancelOrder = async (orderId, reason) => {
+    setCancelling(orderId);
+    try {
+      await cancelPendingOrder(orderId, reason);
+      await loadOrders();
+      Alert.alert('Order cancelled', 'Your pending order was cancelled successfully.');
+    } catch (e) {
+      Alert.alert('Unable to cancel', e?.message || 'Only pending orders can be cancelled.');
+    } finally {
+      setCancelling(null);
+    }
+  };
+
+  const openPendingCancelReasons = (order) => {
+    Alert.alert(
+      'Cancel pending order',
+      'Select a reason',
+      [
+        { text: CANCEL_REASONS[0], onPress: () => handleCancelOrder(order.id, CANCEL_REASONS[0]) },
+        { text: CANCEL_REASONS[1], onPress: () => handleCancelOrder(order.id, CANCEL_REASONS[1]) },
+        { text: CANCEL_REASONS[2], onPress: () => handleCancelOrder(order.id, CANCEL_REASONS[2]) },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleHelpPress = (order) => {
+    if (!onOpenSupport) return;
+    const normalized = String(STATUS_ALIAS[order?.status] || order?.status || '').toUpperCase();
+    if (normalized !== 'PENDING') {
+      onOpenSupport(order);
+      return;
+    }
+
+    Alert.alert(
+      'Help options',
+      'This order is still pending. Choose an action.',
+      [
+        { text: 'Cancel Order', onPress: () => openPendingCancelReasons(order) },
+        { text: 'Complaint / Refund', onPress: () => onOpenSupport(order) },
+        { text: 'Close', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (
@@ -167,7 +221,7 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
             </View>
           }
           renderItem={({ item }) => {
-            const stepIndex = getStepIndex(item.status);
+            const timeline = getTimeline(item.status);
             return (
               <View style={styles.card}>
                 <View style={styles.cardTop}>
@@ -187,15 +241,22 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
 
                 <Text style={styles.sectionTitle}>Tracking</Text>
                 <View style={styles.trackingRow}>
-                  {STATUS_STEPS.map((step, index) => (
+                  {timeline.steps.map((step, index) => (
                     <View key={step} style={styles.stepWrap}>
                       <View
                         style={[
                           styles.stepDot,
-                          index <= stepIndex && styles.stepDotActive,
+                          index <= timeline.stepIndex && styles.stepDotActive,
+                          timeline.isTerminalDanger && index <= timeline.stepIndex && styles.stepDotDanger,
                         ]}
                       />
-                      <Text style={[styles.stepLabel, index <= stepIndex && styles.stepLabelActive]}>
+                      <Text
+                        style={[
+                          styles.stepLabel,
+                          index <= timeline.stepIndex && styles.stepLabelActive,
+                          timeline.isTerminalDanger && index <= timeline.stepIndex && styles.stepLabelDanger,
+                        ]}
+                      >
                         {step}
                       </Text>
                     </View>
@@ -219,8 +280,14 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
                 </View>
 
                 {onOpenSupport ? (
-                  <TouchableOpacity style={styles.helpBtn} onPress={() => onOpenSupport(item)}>
-                    <Text style={styles.helpText}>Help / Complaint / Refund</Text>
+                  <TouchableOpacity
+                    style={[styles.helpBtn, cancelling === item.id && styles.helpBtnDisabled]}
+                    onPress={() => handleHelpPress(item)}
+                    disabled={cancelling === item.id}
+                  >
+                    <Text style={styles.helpText}>
+                      {cancelling === item.id ? 'Cancelling…' : 'Help / Complaint / Refund'}
+                    </Text>
                   </TouchableOpacity>
                 ) : null}
                 <TouchableOpacity style={styles.summaryBtn} onPress={() => setSelectedOrder(item)}>
@@ -393,8 +460,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   stepDotActive: { backgroundColor: customerColors.success },
+  stepDotDanger: { backgroundColor: customerColors.danger },
   stepLabel: { fontSize: 10, color: customerColors.muted },
   stepLabelActive: { color: customerColors.success, fontWeight: '700' },
+  stepLabelDanger: { color: customerColors.danger },
   itemsWrap: { marginTop: customerSpacing.md },
   itemRow: { marginTop: 4 },
   itemText: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
@@ -410,6 +479,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: customerColors.border,
   },
+  helpBtnDisabled: { opacity: 0.6 },
   helpText: { color: customerColors.primary, fontSize: 12, fontWeight: '700' },
   summaryBtn: {
     marginTop: customerSpacing.sm,

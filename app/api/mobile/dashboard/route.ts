@@ -10,8 +10,10 @@ export async function GET(req: Request) {
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const fiveYearsAgo = new Date();
+  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
 
-  const [vendorStats, orderStats, revenueResult, recentVendors, recentOrders, commissionOrders] =
+  const [vendorStats, orderStats, revenueResult, recentVendors, recentOrders, revenueOrders, commissionOrders] =
     await Promise.all([
       prisma.vendorProfile.groupBy({
         by: ["status"],
@@ -40,6 +42,13 @@ export async function GET(req: Request) {
       prisma.order.findMany({
         where: {
           createdAt: { gte: sevenDaysAgo },
+          status: { not: "REJECTED" },
+        },
+        select: { createdAt: true, totalAmount: true },
+      }),
+      prisma.order.findMany({
+        where: {
+          createdAt: { gte: fiveYearsAgo },
           status: { not: "REJECTED" },
         },
         select: { createdAt: true, totalAmount: true },
@@ -96,6 +105,42 @@ export async function GET(req: Request) {
     total,
   }));
 
+  const monthBuckets: Array<{ key: string; label: string; value: number }> = [];
+  const monthMap = new Map<string, { key: string; label: string; value: number }>();
+  for (let i = 11; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const label = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    const bucket = { key, label, value: 0 };
+    monthBuckets.push(bucket);
+    monthMap.set(key, bucket);
+  }
+
+  const yearBuckets: Array<{ key: string; label: string; value: number }> = [];
+  const yearMap = new Map<string, { key: string; label: string; value: number }>();
+  for (let i = 4; i >= 0; i--) {
+    const year = new Date().getFullYear() - i;
+    const key = String(year);
+    const bucket = { key, label: key, value: 0 };
+    yearBuckets.push(bucket);
+    yearMap.set(key, bucket);
+  }
+
+  revenueOrders.forEach((order) => {
+    const amount = Number(order.totalAmount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    const createdAt = new Date(order.createdAt);
+    if (Number.isNaN(createdAt.getTime())) return;
+
+    const monthKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}`;
+    if (monthMap.has(monthKey)) monthMap.get(monthKey)!.value += amount;
+
+    const yearKey = String(createdAt.getFullYear());
+    if (yearMap.has(yearKey)) yearMap.get(yearKey)!.value += amount;
+  });
+
   return NextResponse.json({
     kpis: {
       totalRevenue,
@@ -109,6 +154,11 @@ export async function GET(req: Request) {
       totalCommission: Math.round(totalCommission),
     },
     revenueByDay,
+    revenueSeries: {
+      "7d": revenueByDay.map((d) => ({ key: d.name, label: d.name, value: d.total })),
+      monthly: monthBuckets,
+      yearly: yearBuckets,
+    },
     recentVendors,
   });
 }
