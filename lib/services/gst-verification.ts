@@ -13,6 +13,36 @@ type VerifyResult = {
   };
 };
 
+const LEGAL_NAME_KEYS = [
+  "legal_name",
+  "legalname",
+  "lgnm",
+  "taxpayer_name",
+  "business_name",
+  "name",
+];
+
+const TRADE_NAME_KEYS = [
+  "trade_name",
+  "tradename",
+  "trdnm",
+  "tradeNam",
+  "tradeName",
+  "business_trade_name",
+];
+
+const ADDRESS_KEYS = [
+  "principal_address",
+  "business_address",
+  "principal_place_of_business",
+  "address",
+  "pradr",
+  "addr",
+];
+
+const STATE_KEYS = ["state", "state_name", "state_code", "stj", "stcd"];
+const PINCODE_KEYS = ["pincode", "pin", "pncd", "zip"];
+
 function toUpperTrim(value: unknown) {
   return String(value || "").trim().toUpperCase();
 }
@@ -35,28 +65,79 @@ function getByPaths(obj: unknown, paths: string[]) {
   return null;
 }
 
+function normalizeKey(value: string) {
+  return value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+function flattenAddress(value: unknown): string | null {
+  if (typeof value === "string") return asText(value);
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  const nestedAddr =
+    (obj.addr && typeof obj.addr === "object" ? (obj.addr as Record<string, unknown>) : null) ||
+    (obj.address && typeof obj.address === "object" ? (obj.address as Record<string, unknown>) : null);
+  const addrObj = nestedAddr || obj;
+  const parts = [
+    addrObj.floor,
+    addrObj.flno,
+    addrObj.bno,
+    addrObj.bnm,
+    addrObj.st,
+    addrObj.loc,
+    addrObj.dst,
+    addrObj.city,
+    addrObj.lt,
+    addrObj.lg,
+    addrObj.state,
+    addrObj.stcd,
+    addrObj.pncd,
+    addrObj.pincode,
+  ]
+    .map((v) => asText(v))
+    .filter(Boolean) as string[];
+  if (!parts.length) return null;
+  return parts.join(", ");
+}
+
+function deepFindByKeys(input: unknown, keys: string[]): unknown {
+  const wanted = new Set(keys.map(normalizeKey));
+  const queue: unknown[] = [input];
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current || typeof current !== "object") continue;
+    const obj = current as Record<string, unknown>;
+
+    for (const [k, v] of Object.entries(obj)) {
+      if (wanted.has(normalizeKey(k)) && v != null && v !== "") {
+        return v;
+      }
+      if (v && typeof v === "object") queue.push(v);
+    }
+  }
+  return null;
+}
+
 function normalizePayload(payload: unknown, requestedGstin: string) {
   const payloadObj = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
-  const root = payloadObj.data ?? payloadObj.result ?? payloadObj.results ?? payloadObj;
+  const rootCandidate = payloadObj.data ?? payloadObj.result ?? payloadObj.results ?? payloadObj;
+  const rootObj =
+    rootCandidate && typeof rootCandidate === "object"
+      ? (rootCandidate as Record<string, unknown>)
+      : {};
+  const root = (rootObj.taxpayerInfo as unknown) ?? rootObj;
   const gstNumber = toUpperTrim(
-    getByPaths(root, ["gstin", "gst_number", "gstNo", "gst_no", "gst"])
+    deepFindByKeys(root, ["gstin", "gst_number", "gstNo", "gst_no", "gst"])
   ) || requestedGstin;
+
+  const rawAddress = deepFindByKeys(root, ADDRESS_KEYS);
 
   return {
     gstNumber,
-    legalName: asText(getByPaths(root, ["legal_name", "lgnm", "taxpayer_name", "name"])),
-    tradeName: asText(getByPaths(root, ["trade_name", "tradeNam", "tradeName"])),
-    businessAddress: asText(
-      getByPaths(root, [
-        "principal_address",
-        "business_address",
-        "address",
-        "pradr.addr.bno",
-        "pradr.addr",
-      ])
-    ),
-    businessState: asText(getByPaths(root, ["state", "state_code", "stj", "pradr.addr.stcd"])),
-    businessPincode: asText(getByPaths(root, ["pincode", "pradr.addr.pncd"])),
+    legalName: asText(deepFindByKeys(root, LEGAL_NAME_KEYS)),
+    tradeName: asText(deepFindByKeys(root, TRADE_NAME_KEYS)),
+    businessAddress: flattenAddress(rawAddress) || asText(getByPaths(root, ["pradr.addr"])) || null,
+    businessState: asText(deepFindByKeys(root, STATE_KEYS)),
+    businessPincode: asText(deepFindByKeys(root, PINCODE_KEYS)),
   };
 }
 
@@ -141,9 +222,11 @@ export async function verifyGstinWithAppyFlow(inputGstin: string): Promise<Verif
       }
 
       const data = normalizePayload(payload, gstin);
+      const hasUsefulDetails =
+        Boolean(data.legalName) || Boolean(data.tradeName) || Boolean(data.businessAddress);
       return {
         ok: true,
-        status: "VERIFIED",
+        status: hasUsefulDetails ? "VERIFIED" : "VERIFIED_NO_DETAILS",
         raw: payload,
         data,
       };
