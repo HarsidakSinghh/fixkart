@@ -39,6 +39,13 @@ export async function GET(req: Request) {
             { orderItemId: { in: orderItemIds } },
           ],
         },
+        select: {
+          id: true,
+          orderId: true,
+          orderItemId: true,
+          status: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: "desc" },
       })
     : [];

@@ -405,7 +405,6 @@ model Complaint {
   status         String   @default("OPEN") 
   
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
 }
 
 model PushToken {
