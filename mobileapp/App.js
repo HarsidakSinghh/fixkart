@@ -185,13 +185,10 @@ function AdminAppContent() {
   ];
   const moreRoutes = [
     routes.ordersHistory,
-    routes.products,
     routes.inventory,
     routes.salesmen,
-    routes.vendors,
     routes.onboardedVendors,
     routes.onboardedCustomers,
-    routes.users,
   ];
 
   const ActiveComponent = routes[active]?.component || DashboardScreen;

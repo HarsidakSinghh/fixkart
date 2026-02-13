@@ -2,10 +2,19 @@ import React from "react";
 import { View, Pressable, Text, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { colors, spacing, shadow } from "../theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function BottomNav({ tabs, activeKey, onChange }) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={[styles.wrap, shadow.soft]}>
+    <View
+      style={[
+        styles.wrap,
+        shadow.soft,
+        { paddingBottom: spacing.lg + Math.max(insets.bottom, spacing.xs) },
+      ]}
+    >
       {tabs.map((tab) => {
         const active = tab.key === activeKey;
         return (
@@ -35,7 +44,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.line,
     borderTopWidth: 1,
     paddingVertical: spacing.md,
-    paddingBottom: spacing.lg,
   },
   item: { alignItems: "center", flex: 1 },
   label: { color: colors.muted, fontSize: 11, fontWeight: "700", letterSpacing: 0.3, marginTop: 6 },

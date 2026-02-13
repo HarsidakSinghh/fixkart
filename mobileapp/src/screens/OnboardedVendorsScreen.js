@@ -1,11 +1,11 @@
 import React, { useCallback } from "react";
+import { View, Text, StyleSheet } from "react-native";
 import AdminScreenLayout from "../components/AdminScreenLayout";
-import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../components/Ui";
+import { ScreenTitle, SectionHeader, RowCard, Badge } from "../components/Ui";
 import { useAsyncList } from "../services/useAsyncList";
-import { getVendors, getVendorDetail } from "../services/api";
+import { getVendors } from "../services/api";
 import { ErrorState, SkeletonList, EmptyState } from "../components/StateViews";
-import { View, Text, StyleSheet, Image, TouchableOpacity, Linking } from "react-native";
-import { colors, spacing } from "../theme";
+import { colors } from "../theme";
 import VendorProfileAdminScreen from "./VendorProfileAdminScreen";
 
 export default function OnboardedVendorsScreen() {
@@ -15,13 +15,7 @@ export default function OnboardedVendorsScreen() {
   }, []);
 
   const { items, error, refresh, loading } = useAsyncList(fetchVendors, []);
-  const [detail, setDetail] = React.useState(null);
   const [selectedVendorId, setSelectedVendorId] = React.useState(null);
-
-  async function loadDetail(id) {
-    const data = await getVendorDetail(id);
-    setDetail(data.vendor);
-  }
 
   if (selectedVendorId) {
     return <VendorProfileAdminScreen vendorId={selectedVendorId} onBack={() => setSelectedVendorId(null)} />;
@@ -36,6 +30,7 @@ export default function OnboardedVendorsScreen() {
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="No vendors yet" message="Approved vendors will appear here." />
       ) : null}
+
       {items.map((vendor) => (
         <RowCard
           key={vendor.id}
@@ -47,126 +42,14 @@ export default function OnboardedVendorsScreen() {
               <Text style={styles.vendorLink} onPress={() => setSelectedVendorId(vendor.id)}>
                 {vendor.name}
               </Text>
-              <ActionRow
-                secondaryLabel="Details"
-                onSecondary={() => loadDetail(vendor.id)}
-              />
             </View>
           }
         />
       ))}
-
-      {detail ? (
-        <View style={styles.detailCard}>
-          <View style={styles.detailHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.detailTitle}>{detail.companyName || detail.fullName}</Text>
-              <Text style={styles.detailMeta}>{detail.email} • {detail.phone}</Text>
-              <Text style={styles.detailMeta}>{detail.address}, {detail.city}, {detail.state} {detail.postalCode}</Text>
-            </View>
-            <Badge text={detail.status} tone="success" />
-          </View>
-
-          <Text style={styles.sectionLabel}>Business</Text>
-          <Text style={styles.detailMeta}>
-            GST: {detail.gstNumber || "N/A"} • {detail.idProofType || "ID"}: {detail.idProofNumber || "N/A"}
-          </Text>
-          <Text style={styles.detailMeta}>Category: {detail.category || "N/A"}</Text>
-
-          <Text style={styles.sectionLabel}>Bank</Text>
-          <Text style={styles.detailMeta}>{detail.bankName || "N/A"}</Text>
-          <Text style={styles.detailMeta}>A/C: {detail.accountNumber || "N/A"} • IFSC: {detail.ifscCode || "N/A"}</Text>
-
-          <Text style={styles.sectionLabel}>Location</Text>
-          <Text style={styles.detailMeta}>
-            GPS: {detail.gpsLat != null && detail.gpsLng != null ? `${detail.gpsLat}, ${detail.gpsLng}` : "Not available"}
-          </Text>
-          {detail.gpsLat != null && detail.gpsLng != null ? (
-            <Text style={styles.mapLink} onPress={() => Linking.openURL(`https://maps.google.com/?q=${detail.gpsLat},${detail.gpsLng}`)}>
-              Open in Maps
-            </Text>
-          ) : null}
-
-          <Text style={styles.sectionLabel}>Documents</Text>
-          <View style={styles.docRow}>
-            {detail.gstCertificateUrl ? <DocPreview label="GST" uri={detail.gstCertificateUrl} /> : null}
-            {detail.panCardUrl ? <DocPreview label="PAN" uri={detail.panCardUrl} /> : null}
-            {detail.idProofUrl ? <DocPreview label="ID Proof" uri={detail.idProofUrl} /> : null}
-            {detail.locationPhotoUrl ? <DocPreview label="Location" uri={detail.locationPhotoUrl} /> : null}
-            {!detail.gstCertificateUrl &&
-            !detail.panCardUrl &&
-            !detail.idProofUrl &&
-            !detail.locationPhotoUrl ? (
-              <Text style={styles.detailMeta}>No documents uploaded.</Text>
-            ) : null}
-          </View>
-        </View>
-      ) : null}
     </AdminScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  detailCard: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.line,
-    marginTop: spacing.lg,
-  },
-  detailHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-  },
-  detailTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
   vendorLink: { color: colors.primary, fontWeight: "700", textDecorationLine: "underline" },
-  openProfile: { marginTop: 8, color: colors.primary, fontSize: 12, fontWeight: "700" },
-  detailMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
-  sectionLabel: { marginTop: spacing.md, color: colors.text, fontWeight: "700" },
-  mapLink: { marginTop: 6, color: colors.primary, fontSize: 12, fontWeight: "700" },
-  docRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
-  docCard: {
-    width: 98,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    padding: spacing.xs,
-    backgroundColor: colors.panelAlt,
-  },
-  docImage: { width: "100%", height: 70, borderRadius: 8, backgroundColor: colors.panelAlt },
-  docPlaceholder: {
-    width: "100%",
-    height: 70,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.card,
-  },
-  docLabel: { marginTop: 6, fontSize: 11, color: colors.muted, fontWeight: "600" },
-  docAction: { marginTop: 4, fontSize: 11, color: colors.primary, fontWeight: "700" },
 });
-
-function DocPreview({ uri, label }) {
-  const isPdf = uri?.includes("application/pdf") || uri?.toLowerCase().endsWith(".pdf");
-  return (
-    <TouchableOpacity
-      style={styles.docCard}
-      onPress={() => Linking.openURL(uri)}
-    >
-      {isPdf ? (
-        <View style={styles.docPlaceholder}>
-          <Text style={styles.docLabel}>PDF</Text>
-        </View>
-      ) : (
-        <Image source={{ uri }} style={styles.docImage} />
-      )}
-      <Text style={styles.docLabel}>{label}</Text>
-      <Text style={styles.docAction}>View</Text>
-    </TouchableOpacity>
-  );
-}
-              <Text style={styles.openProfile} onPress={() => setSelectedVendorId(detail.userId || detail.id)}>
-                Open full vendor profile
-              </Text>

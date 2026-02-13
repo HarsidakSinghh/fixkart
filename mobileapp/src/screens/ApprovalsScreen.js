@@ -5,11 +5,10 @@ import { ScreenTitle, SectionHeader, RowCard, Badge, ActionRow } from "../compon
 import { colors, spacing } from "../theme";
 import { useAsyncList } from "../services/useAsyncList";
 import { ErrorState } from "../components/StateViews";
+import VendorProfileAdminScreen from "./VendorProfileAdminScreen";
 import {
   getVendors,
   updateVendorStatus,
-  getCustomers,
-  updateCustomerStatus,
   getInventoryApprovals,
   approveProduct,
   rejectProduct,
@@ -19,12 +18,12 @@ import {
 const TABS = [
   { key: "vendors", label: "Vendors" },
   { key: "inventory", label: "Inventory" },
-  { key: "customers", label: "Customers" },
 ];
 
 export default function ApprovalsScreen() {
   const [activeTab, setActiveTab] = useState("vendors");
   const [selectedInventory, setSelectedInventory] = useState(null);
+  const [selectedVendorId, setSelectedVendorId] = useState(null);
   const [commissionInput, setCommissionInput] = useState("");
   const [savingCommission, setSavingCommission] = useState(false);
 
@@ -32,36 +31,25 @@ export default function ApprovalsScreen() {
     const data = await getVendors("PENDING");
     return data.vendors;
   }, []);
-  const fetchCustomers = useCallback(async () => {
-    const data = await getCustomers("PENDING");
-    return data.customers;
-  }, []);
   const fetchInventory = useCallback(async () => {
     const data = await getInventoryApprovals();
     return data.products;
   }, []);
 
   const vendorsList = useAsyncList(fetchVendors, []);
-  const customersList = useAsyncList(fetchCustomers, []);
   const inventoryList = useAsyncList(fetchInventory, []);
 
   const counts = useMemo(
     () => ({
       vendors: vendorsList.items.length,
-      customers: customersList.items.length,
       inventory: inventoryList.items.length,
     }),
-    [vendorsList.items.length, customersList.items.length, inventoryList.items.length]
+    [vendorsList.items.length, inventoryList.items.length]
   );
 
   const handleVendorAction = async (vendorId, status) => {
     await updateVendorStatus(vendorId, status);
     vendorsList.setItems((prev) => prev.filter((v) => v.id !== vendorId));
-  };
-
-  const handleCustomerAction = async (customerId, status) => {
-    await updateCustomerStatus(customerId, status);
-    customersList.setItems((prev) => prev.filter((c) => c.id !== customerId));
   };
 
   const handleInventoryAction = async (productId, action) => {
@@ -98,23 +86,21 @@ export default function ApprovalsScreen() {
   const activeItems =
     activeTab === "vendors"
       ? vendorsList.items
-      : activeTab === "customers"
-      ? customersList.items
       : inventoryList.items;
 
   const activeError =
     activeTab === "vendors"
       ? vendorsList.error
-      : activeTab === "customers"
-      ? customersList.error
       : inventoryList.error;
 
   const activeRefresh =
     activeTab === "vendors"
       ? vendorsList.refresh
-      : activeTab === "customers"
-      ? customersList.refresh
       : inventoryList.refresh;
+
+  if (selectedVendorId) {
+    return <VendorProfileAdminScreen vendorId={selectedVendorId} onBack={() => setSelectedVendorId(null)} />;
+  }
 
   return (
     <AdminScreenLayout>
@@ -141,8 +127,6 @@ export default function ApprovalsScreen() {
         title={
           activeTab === "vendors"
             ? "Vendor Requests"
-            : activeTab === "customers"
-            ? "Customer Requests"
             : "Inventory Requests"
         }
       />
@@ -179,25 +163,6 @@ export default function ApprovalsScreen() {
           );
         }
 
-        if (activeTab === "customers") {
-          return (
-            <RowCard
-              key={item.id}
-              title={item.name}
-              subtitle={item.city || "-"}
-              right={<Badge text={item.status || "PENDING"} tone="warning" />}
-              meta={
-                <ActionRow
-                  primaryLabel="Approve"
-                  secondaryLabel="Reject"
-                  onPrimary={() => handleCustomerAction(item.id, "APPROVED")}
-                  onSecondary={() => handleCustomerAction(item.id, "REJECTED")}
-                />
-              }
-            />
-          );
-        }
-
         return (
           <RowCard
             key={item.id}
@@ -205,12 +170,17 @@ export default function ApprovalsScreen() {
             subtitle={item.city || "-"}
             right={<Badge text={item.status || "PENDING"} tone="warning" />}
             meta={
-              <ActionRow
-                primaryLabel="Approve"
-                secondaryLabel="Reject"
-                onPrimary={() => handleVendorAction(item.id, "APPROVED")}
-                onSecondary={() => handleVendorAction(item.id, "REJECTED")}
-              />
+              <View>
+                <ActionRow
+                  primaryLabel="Approve"
+                  secondaryLabel="Reject"
+                  onPrimary={() => handleVendorAction(item.id, "APPROVED")}
+                  onSecondary={() => handleVendorAction(item.id, "REJECTED")}
+                />
+                <TouchableOpacity onPress={() => setSelectedVendorId(item.id)} style={styles.viewDetailsBtn}>
+                  <Text style={styles.viewDetailsText}>View Details</Text>
+                </TouchableOpacity>
+              </View>
             }
           />
         );
@@ -323,6 +293,18 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: colors.text, fontSize: 16, fontWeight: "700" },
   emptySubtitle: { color: colors.muted, marginTop: 6, fontSize: 12 },
+  viewDetailsBtn: {
+    marginTop: spacing.xs,
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  viewDetailsText: {
+    color: colors.primary,
+    fontWeight: "700",
+    fontSize: 12,
+    textDecorationLine: "underline",
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.55)",

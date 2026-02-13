@@ -14,6 +14,7 @@ import CustomerSupportHistoryScreen from './CustomerSupportHistoryScreen';
 import CustomerTypeListingsScreen from './CustomerTypeListingsScreen';
 import { useAuth } from '../context/AuthContext';
 import { getCustomerProfile } from './customerApi';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
@@ -24,6 +25,7 @@ const TABS = [
 ];
 
 export default function CustomerPortal({ onOpenLogin }) {
+  const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState('home');
   const [detailProduct, setDetailProduct] = useState(null);
@@ -166,7 +168,12 @@ export default function CustomerPortal({ onOpenLogin }) {
     <View style={styles.container}>
       <View style={styles.content}>{content}</View>
       {profileGate ? null : (
-      <View style={styles.bottomBar}>
+      <View
+        style={[
+          styles.bottomBar,
+          { paddingBottom: customerSpacing.md + Math.max(insets.bottom, customerSpacing.xs) },
+        ]}
+      >
         {TABS.map((item) => (
           <TouchableOpacity
             key={item.key}
@@ -204,7 +211,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: customerSpacing.sm,
-    paddingBottom: customerSpacing.md,
     borderTopWidth: 1,
     borderTopColor: customerColors.border,
     backgroundColor: customerColors.card,

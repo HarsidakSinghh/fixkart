@@ -101,6 +101,17 @@ model VendorProfile {
   fullName       String
   companyName    String?
   gstNumber      String?
+  gstVerificationStatus String?  @default("NOT_VERIFIED")
+  gstVerificationError  String?
+  gstVerifiedAt         DateTime?
+  gstLegalName          String?
+  gstTradeName          String?
+  gstBusinessAddress    String?
+  gstBusinessState      String?
+  gstBusinessPincode    String?
+  gstNameMatches        Boolean?
+  gstAddressMatches     Boolean?
+  gstVerificationRaw    Json?
   phone          String
   email          String
   address        String

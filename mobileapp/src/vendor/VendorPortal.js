@@ -11,6 +11,7 @@ import VendorOrdersScreen from './VendorOrdersScreen';
 import NotificationDebugScreen from '../screens/NotificationDebugScreen';
 import VendorSalesmenScreen from './VendorSalesmenScreen';
 import { getVendorProfile, getVendorOrders } from './vendorApi';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'bar-chart-2' },
@@ -22,6 +23,7 @@ const TABS = [
 ];
 
 export default function VendorPortal() {
+  const insets = useSafeAreaInsets();
   const [active, setActive] = useState('dashboard');
   const [status, setStatus] = useState('PENDING');
   const [ordersBadge, setOrdersBadge] = useState(0);
@@ -90,7 +92,12 @@ export default function VendorPortal() {
     <View style={styles.container}>
       <UserHeader showLogout />
       <View style={styles.content}>{content}</View>
-      <View style={styles.bottomBar}>
+      <View
+        style={[
+          styles.bottomBar,
+          { paddingBottom: vendorSpacing.md + Math.max(insets.bottom, vendorSpacing.xs) },
+        ]}
+      >
         {TABS.map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -126,7 +133,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: vendorSpacing.sm,
-    paddingBottom: vendorSpacing.md,
     borderTopWidth: 1,
     borderTopColor: vendorColors.border,
     backgroundColor: vendorColors.card,

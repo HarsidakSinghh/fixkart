@@ -135,6 +135,27 @@ export default function VendorProfileAdminScreen({ vendorId, onBack }) {
             </View>
 
             <View style={styles.detailSubCard}>
+              <Text style={styles.sectionLabel}>GST Verification (AppyFlow)</Text>
+              <Badge text={vendor.gstVerificationStatus || "NOT_VERIFIED"} tone={gstStatusTone(vendor.gstVerificationStatus)} />
+              <Text style={styles.detailMeta}>Submitted GSTIN: {vendor.gstNumber || "N/A"}</Text>
+              <Text style={styles.detailMeta}>API Legal Name: {vendor.gstLegalName || "N/A"}</Text>
+              <Text style={styles.detailMeta}>API Trade Name: {vendor.gstTradeName || "N/A"}</Text>
+              <Text style={styles.detailMeta}>API Address: {vendor.gstBusinessAddress || "N/A"}</Text>
+              <Text style={styles.detailMeta}>
+                Name Match: {vendor.gstNameMatches == null ? "Unknown" : vendor.gstNameMatches ? "Matched" : "Mismatch"}
+              </Text>
+              <Text style={styles.detailMeta}>
+                Address Match: {vendor.gstAddressMatches == null ? "Unknown" : vendor.gstAddressMatches ? "Matched" : "Mismatch"}
+              </Text>
+              <Text style={styles.detailMeta}>
+                Verified At: {vendor.gstVerifiedAt ? new Date(vendor.gstVerifiedAt).toLocaleString() : "Not verified yet"}
+              </Text>
+              {vendor.gstVerificationError ? (
+                <Text style={styles.gstErrorText}>Verification Error: {vendor.gstVerificationError}</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.detailSubCard}>
               <Text style={styles.sectionLabel}>Bank</Text>
               <Text style={styles.detailMeta}>{vendor.bankName || "N/A"}</Text>
               <Text style={styles.detailMeta}>
@@ -215,6 +236,13 @@ function statusTone(status) {
   return "info";
 }
 
+function gstStatusTone(status) {
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "VERIFIED") return "success";
+  if (normalized === "NOT_PROVIDED" || normalized === "NOT_VERIFIED") return "info";
+  return "warning";
+}
+
 function formatGps(lat, lng) {
   if (lat == null || lng == null) return "Not available";
   return `${lat}, ${lng}`;
@@ -285,6 +313,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   sectionLabel: { color: colors.text, fontWeight: "700", marginBottom: 3 },
+  gstErrorText: { color: colors.danger, fontSize: 12, marginTop: spacing.xs, fontWeight: "600" },
   mapBtn: {
     marginTop: spacing.xs,
     alignSelf: "flex-start",
