@@ -372,7 +372,7 @@ function AppGate() {
       content = <SalesmanPortal />;
     }
   } else {
-    safeBg = customerColors.primary;
+    safeBg = customerColors.navbar || customerColors.primary;
     content = (
       <CustomerPortal
         onOpenLogin={() => {

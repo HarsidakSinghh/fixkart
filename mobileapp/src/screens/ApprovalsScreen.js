@@ -201,7 +201,22 @@ export default function ApprovalsScreen() {
                   <Image source={{ uri: selectedInventory.image }} style={styles.image} />
                 ) : null}
                 <Text style={styles.metaText}>Name: {selectedInventory.name || selectedInventory.item}</Text>
-                <Text style={styles.metaText}>Vendor: {selectedInventory.vendorName || selectedInventory.vendor}</Text>
+                <View style={styles.vendorRow}>
+                  <Text style={styles.metaText}>Vendor: </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const vid = selectedInventory.vendorId;
+                      if (!vid) return;
+                      setSelectedInventory(null);
+                      setSelectedVendorId(vid);
+                    }}
+                    disabled={!selectedInventory.vendorId}
+                  >
+                    <Text style={[styles.vendorLinkText, !selectedInventory.vendorId && styles.vendorLinkDisabled]}>
+                      {selectedInventory.vendorName || selectedInventory.vendor}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.metaText}>Category: {selectedInventory.category || "-"}</Text>
                 <Text style={styles.metaText}>Subcategory: {selectedInventory.subCategory || "-"}</Text>
                 <Text style={styles.metaText}>Price: ₹{Math.round(selectedInventory.price || 0)}</Text>
@@ -332,6 +347,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   metaText: { color: colors.muted, fontSize: 12, marginTop: 6 },
+  vendorRow: { flexDirection: "row", alignItems: "center", marginTop: 6, flexWrap: "wrap" },
+  vendorLinkText: { color: colors.primary, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
+  vendorLinkDisabled: { color: colors.muted, textDecorationLine: "none", fontWeight: "500" },
   modalActions: { marginTop: spacing.sm, flexDirection: "row", gap: spacing.sm },
   rejectBtn: {
     flex: 1,

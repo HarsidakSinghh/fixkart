@@ -89,6 +89,13 @@ export async function getCustomerProfile() {
   return authFetch('/api/mobile/customer/profile');
 }
 
+export async function cancelPendingOrder(orderId, reason) {
+  return authFetch(`/api/mobile/customer-orders/${orderId}/cancel`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function placeCustomerOrder(payload) {
   return authFetch('/api/mobile/orders', {
     method: 'POST',

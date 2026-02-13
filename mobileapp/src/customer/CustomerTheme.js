@@ -2,6 +2,7 @@ export const customerColors = {
   bg: '#F6FAFF',
   surface: '#EEF4FB',
   primary: '#265998',
+  navbar: 'rgb(0, 82, 155)',
   primaryDark: '#1D477A',
   accent: '#F9B233',
   text: '#0C1424',

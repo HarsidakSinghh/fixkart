@@ -13,7 +13,7 @@ const STATUS_ALIAS = {
   APPROVED: 'PROCESSING',
   READY: 'SHIPPED',
   COMPLETED: 'DELIVERED',
-  CANCELLED: 'PENDING',
+  CANCELLED: 'REJECTED',
 };
 
 function getStepIndex(status) {

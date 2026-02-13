@@ -170,23 +170,37 @@ export default function VendorProfileAdminScreen({ vendorId, onBack }) {
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.detailCard}>
             <View style={styles.detailHeader}>
-              <View style={styles.avatarWrap}>
-                <Text style={styles.avatarText}>{getInitials(vendor.companyName || vendor.fullName)}</Text>
+              <View style={styles.detailHeaderTop}>
+                <View style={styles.brandRow}>
+                  <View style={styles.avatarWrap}>
+                    <Text style={styles.avatarText}>{getInitials(vendor.companyName || vendor.fullName)}</Text>
+                  </View>
+                  <View style={styles.brandTextWrap}>
+                    <Text style={styles.detailTitle}>{vendor.companyName || vendor.fullName || "Vendor"}</Text>
+                    <Text style={styles.ratingText}>
+                      {Number(vendor.averageRating || 0) > 0
+                        ? `★ ${Number(vendor.averageRating).toFixed(1)}/5 (${Number(vendor.reviewCount || 0)} reviews)`
+                        : "No ratings yet"}
+                    </Text>
+                  </View>
+                </View>
+                <Badge text={vendor.status || "UNKNOWN"} tone={statusTone(vendor.status)} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.detailTitle}>{vendor.companyName || vendor.fullName || "Vendor"}</Text>
-                <Text style={styles.ratingText}>
-                  {Number(vendor.averageRating || 0) > 0
-                    ? `★ ${Number(vendor.averageRating).toFixed(1)}/5 (${Number(vendor.reviewCount || 0)} reviews)`
-                    : "No ratings yet"}
+
+              <View style={styles.contactCard}>
+                <Text style={styles.contactLabel}>Email</Text>
+                <Text style={styles.contactValue} numberOfLines={1} ellipsizeMode="middle">
+                  {vendor.email || "N/A"}
                 </Text>
-                <Text style={styles.detailMeta}>{vendor.email || "N/A"}</Text>
-                <Text style={styles.detailMeta}>{vendor.phone || "N/A"}</Text>
-                <Text style={styles.detailMetaAddress}>
+
+                <Text style={styles.contactLabel}>Phone</Text>
+                <Text style={styles.contactValue}>{vendor.phone || "N/A"}</Text>
+
+                <Text style={styles.contactLabel}>Address</Text>
+                <Text style={styles.contactAddress} numberOfLines={3}>
                   {vendor.address || "N/A"}, {vendor.city || "N/A"}, {vendor.state || "N/A"} {vendor.postalCode || ""}
                 </Text>
               </View>
-              <Badge text={vendor.status || "UNKNOWN"} tone={statusTone(vendor.status)} />
             </View>
 
             <View style={styles.detailSubCard}>
@@ -391,11 +405,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   detailHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
+    gap: spacing.sm,
     marginBottom: spacing.sm,
   },
+  detailHeaderTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  brandRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    minWidth: 0,
+  },
+  brandTextWrap: { flex: 1, minWidth: 0 },
   avatarWrap: {
     width: 44,
     height: 44,
@@ -407,10 +433,38 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: colors.primary, fontWeight: "800", fontSize: 14 },
-  detailTitle: { fontSize: 17, fontWeight: "800", color: colors.text },
+  detailTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
   ratingText: { marginTop: 5, color: "#B45309", fontSize: 12, fontWeight: "700" },
   detailMeta: { color: colors.muted, fontSize: 12, marginTop: 5 },
-  detailMetaAddress: { color: colors.muted, fontSize: 12, marginTop: 6, lineHeight: 18 },
+  contactCard: {
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    backgroundColor: "#F6F9FE",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  contactLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginTop: 6,
+  },
+  contactValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  contactAddress: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 2,
+  },
   detailSubCard: {
     marginTop: spacing.md,
     borderWidth: 1,

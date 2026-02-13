@@ -399,10 +399,13 @@ model Complaint {
   vendorId       String
   customerId     String
   message        String
+  vendorResponse String?
+  actionTaken    String?
   imageUrl       String?
   status         String   @default("OPEN") 
   
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model PushToken {

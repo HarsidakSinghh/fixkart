@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_CONFIG } from '../config';
-import { getCache, setCache } from '../services/cache';
+import { getCache, setCache, clearCache } from '../services/cache';
 
 const BASE_URL = API_CONFIG.baseUrl;
 
@@ -159,6 +159,16 @@ export async function getVendorComplaints() {
   const data = await authFetch('/api/mobile/vendor/complaints');
   setCache(cacheKey, data, 15000);
   return data;
+}
+
+export async function updateVendorComplaint(complaintId, payload) {
+  const res = await authFetch(`/api/mobile/vendor/complaints/${complaintId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  clearCache('vendor:complaints');
+  clearCache('vendor:orders');
+  return res;
 }
 
 export async function getVendorRefunds() {

@@ -2,25 +2,30 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { customerColors, customerSpacing } from './CustomerTheme';
-import { submitComplaint, submitRefund, uploadComplaintImage } from './customerApi';
+import { submitComplaint, submitRefund, uploadComplaintImage, cancelPendingOrder } from './customerApi';
 import { useToast } from '../components/Toast';
 
+const CANCEL_TAGS = ['Ordered wrong item', 'Ordered by mistake', "Don't need now"];
+
 export default function CustomerSupportScreen({ order, onBack }) {
-  const [mode, setMode] = useState(null); // COMPLAINT | REFUND
+  const [mode, setMode] = useState(null); // COMPLAINT | REFUND | CANCEL
   const [message, setMessage] = useState('');
   const [selectedItemId, setSelectedItemId] = useState(order?.items?.[0]?.id || '');
+  const [cancelTag, setCancelTag] = useState(CANCEL_TAGS[0]);
   const [images, setImages] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
   const items = order?.items || [];
+  const isPendingOrder = String(order?.status || '').toUpperCase() === 'PENDING';
 
   const isValid = useMemo(() => {
     if (!mode) return false;
-    if (!message.trim()) return false;
+    if (mode !== 'CANCEL' && !message.trim()) return false;
     if (mode === 'REFUND' && !selectedItemId) return false;
+    if (mode === 'CANCEL' && !cancelTag) return false;
     return true;
-  }, [message, mode, selectedItemId]);
+  }, [message, mode, selectedItemId, cancelTag]);
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -71,6 +76,12 @@ export default function CustomerSupportScreen({ order, onBack }) {
           imageUrl: primaryImageUrl,
         });
         toast.show('Refund requested', 'success');
+      } else if (mode === 'CANCEL') {
+        const fullReason = message.trim()
+          ? `${cancelTag}. ${message.trim()}`
+          : cancelTag;
+        await cancelPendingOrder(order?.id, fullReason);
+        toast.show('Order cancelled', 'success');
       } else {
         await submitComplaint({
           orderId: order?.id,
@@ -102,11 +113,26 @@ export default function CustomerSupportScreen({ order, onBack }) {
             <TouchableOpacity style={styles.choiceBtnAlt} onPress={() => setMode('REFUND')}>
               <Text style={styles.choiceTextAlt}>Request Refund</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.choiceBtnWarn}
+              onPress={() => {
+                if (!isPendingOrder) {
+                  Alert.alert(
+                    'Order already accepted',
+                    'Self-cancel works only when order is pending. Please use complaint support.'
+                  );
+                  return;
+                }
+                setMode('CANCEL');
+              }}
+            >
+              <Text style={styles.choiceTextWarn}>Cancel Pending Order</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.modeRow}>
             <Text style={styles.modeLabel}>
-              {mode === 'COMPLAINT' ? 'Complaint form' : 'Refund request'}
+              {mode === 'COMPLAINT' ? 'Complaint form' : mode === 'REFUND' ? 'Refund request' : 'Cancel pending order'}
             </Text>
             <TouchableOpacity onPress={() => setMode(null)}>
               <Text style={styles.modeSwitch}>Change</Text>
@@ -129,29 +155,58 @@ export default function CustomerSupportScreen({ order, onBack }) {
         ))}
 
         <Text style={styles.sectionTitle}>Description</Text>
-        <TextInput
-          style={styles.textArea}
-          placeholder="Describe the issue…"
-          placeholderTextColor={customerColors.muted}
-          value={message}
-          onChangeText={setMessage}
-          multiline
-        />
-
-        <Text style={styles.sectionTitle}>Proof (optional)</Text>
-        <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
-          <Text style={styles.uploadText}>Add Photos ({images.length}/5)</Text>
-        </TouchableOpacity>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
-          {images.map((image, index) => (
-            <View key={`${image.uri}-${index}`} style={styles.previewWrap}>
-              <Image source={{ uri: image.uri }} style={styles.preview} />
-              <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeImageAt(index)}>
-                <Text style={styles.removeImageText}>X</Text>
-              </TouchableOpacity>
+        {mode === 'CANCEL' ? (
+          <>
+            <Text style={styles.cancelHint}>Select reason</Text>
+            <View style={styles.cancelTagRow}>
+              {CANCEL_TAGS.map((tag) => (
+                <TouchableOpacity
+                  key={tag}
+                  style={[styles.cancelTag, cancelTag === tag && styles.cancelTagActive]}
+                  onPress={() => setCancelTag(tag)}
+                >
+                  <Text style={[styles.cancelTagText, cancelTag === tag && styles.cancelTagTextActive]}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          ))}
-        </ScrollView>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Optional note"
+              placeholderTextColor={customerColors.muted}
+              value={message}
+              onChangeText={setMessage}
+              multiline
+            />
+          </>
+        ) : (
+          <TextInput
+            style={styles.textArea}
+            placeholder="Describe the issue…"
+            placeholderTextColor={customerColors.muted}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+          />
+        )}
+
+        {mode !== 'CANCEL' ? (
+          <>
+            <Text style={styles.sectionTitle}>Proof (optional)</Text>
+            <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
+              <Text style={styles.uploadText}>Add Photos ({images.length}/5)</Text>
+            </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
+              {images.map((image, index) => (
+                <View key={`${image.uri}-${index}`} style={styles.previewWrap}>
+                  <Image source={{ uri: image.uri }} style={styles.preview} />
+                  <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeImageAt(index)}>
+                    <Text style={styles.removeImageText}>X</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.secondaryBtn} onPress={onBack}>
@@ -202,6 +257,15 @@ const styles = StyleSheet.create({
   },
   choiceText: { color: '#FFFFFF', fontWeight: '700' },
   choiceTextAlt: { color: customerColors.primary, fontWeight: '700' },
+  choiceBtnWarn: {
+    backgroundColor: '#FFF1F1',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F0C7C7',
+  },
+  choiceTextWarn: { color: '#B42318', fontWeight: '700' },
   modeLabel: { color: customerColors.muted, fontWeight: '600', fontSize: 12 },
   modeSwitch: { color: customerColors.primary, fontWeight: '700', fontSize: 12 },
   modeChip: {
@@ -245,6 +309,22 @@ const styles = StyleSheet.create({
     color: customerColors.text,
     backgroundColor: customerColors.card,
   },
+  cancelHint: { color: customerColors.muted, fontSize: 12, marginBottom: 8 },
+  cancelTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  cancelTag: {
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    backgroundColor: customerColors.surface,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  cancelTagActive: {
+    borderColor: customerColors.primary,
+    backgroundColor: '#EAF1FB',
+  },
+  cancelTagText: { color: customerColors.muted, fontSize: 11, fontWeight: '700' },
+  cancelTagTextActive: { color: customerColors.primary },
   uploadBtn: {
     marginTop: 6,
     alignSelf: 'flex-start',

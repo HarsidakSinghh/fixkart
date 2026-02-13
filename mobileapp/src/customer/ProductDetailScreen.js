@@ -23,7 +23,20 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
       onLogin();
       return;
     }
-    addItem(detail || product);
+    const item = detail || product;
+    const stock = Number(item?.quantity ?? 0);
+    if (stock <= 0) {
+      Alert.alert('Out of stock', 'This product is currently unavailable.');
+      return;
+    }
+
+    const result = addItem(item);
+    if (result?.added) {
+      Alert.alert('Added to cart', `${item?.title || item?.name || 'Product'} added successfully.`);
+      return;
+    }
+
+    Alert.alert('Stock limit reached', 'You already added the maximum available quantity.');
   };
 
   useEffect(() => {
@@ -142,31 +155,44 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
           {loading ? 'Loading description…' : view.description || view.features || 'No description available yet.'}
         </Text>
 
-        <Text style={styles.sectionTitle}>Ratings & Reviews</Text>
-        <Text style={styles.ratingSummary}>
-          {avgRating ? `${renderStars(Math.round(avgRating))} ${avgRating}/5` : 'No ratings yet'} {reviewCount ? `(${reviewCount} reviews)` : ''}
-        </Text>
-
-        <View style={styles.reviewForm}>
-          <Text style={styles.reviewLabel}>Your Rating</Text>
-          <View style={styles.starSelectRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => setSelectedRating(star)}>
-                <Text style={[styles.starSelect, star <= selectedRating ? styles.starActive : null]}>★</Text>
-              </TouchableOpacity>
-            ))}
+        <View style={styles.reviewSection}>
+          <View style={styles.reviewHeader}>
+            <Text style={styles.reviewSectionTitle}>Ratings & Reviews</Text>
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingBadgeText}>
+                {avgRating ? `${avgRating.toFixed(1)} / 5` : 'No ratings yet'}
+              </Text>
+            </View>
           </View>
-          <TextInput
-            value={reviewText}
-            onChangeText={setReviewText}
-            placeholder="Write your review"
-            placeholderTextColor={customerColors.muted}
-            multiline
-            style={styles.reviewInput}
-          />
-          <TouchableOpacity style={[styles.submitReviewBtn, savingReview ? { opacity: 0.7 } : null]} onPress={submitReview} disabled={savingReview}>
-            <Text style={styles.submitReviewText}>{savingReview ? 'Submitting…' : 'Submit Review'}</Text>
-          </TouchableOpacity>
+          <Text style={styles.ratingSummary}>
+            {avgRating ? `${renderStars(Math.round(avgRating))}` : '☆☆☆☆☆'} {reviewCount ? `(${reviewCount} reviews)` : ''}
+          </Text>
+
+          <View style={styles.reviewForm}>
+            <Text style={styles.reviewLabel}>Rate this product</Text>
+            <View style={styles.starSelectRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => setSelectedRating(star)}
+                  style={[styles.starPill, star <= selectedRating ? styles.starPillActive : null]}
+                >
+                  <Text style={[styles.starSelect, star <= selectedRating ? styles.starActive : null]}>★</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              value={reviewText}
+              onChangeText={setReviewText}
+              placeholder="Share details about quality, delivery, and usage"
+              placeholderTextColor={customerColors.muted}
+              multiline
+              style={styles.reviewInput}
+            />
+            <TouchableOpacity style={[styles.submitReviewBtn, savingReview ? { opacity: 0.7 } : null]} onPress={submitReview} disabled={savingReview}>
+              <Text style={styles.submitReviewText}>{savingReview ? 'Submitting…' : 'Post Review'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {reviewLoading ? <Text style={styles.reviewMeta}>Loading reviews…</Text> : null}
@@ -242,28 +268,67 @@ const styles = StyleSheet.create({
   addText: { color: '#FFFFFF', fontWeight: '700' },
   sectionTitle: { marginTop: customerSpacing.xl, fontWeight: '700', color: customerColors.text },
   description: { marginTop: customerSpacing.sm, color: customerColors.muted, lineHeight: 20 },
-  ratingSummary: { marginTop: 8, color: customerColors.text, fontWeight: '700' },
-  reviewForm: {
-    marginTop: 10,
+  reviewSection: {
+    marginTop: customerSpacing.lg,
     borderWidth: 1,
     borderColor: customerColors.border,
+    borderRadius: 16,
+    backgroundColor: customerColors.card,
+    padding: customerSpacing.md,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: customerSpacing.sm,
+  },
+  reviewSectionTitle: { color: customerColors.text, fontWeight: '800', fontSize: 15 },
+  ratingBadge: {
+    borderWidth: 1,
+    borderColor: '#D4E2F5',
+    backgroundColor: '#EEF4FB',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  ratingBadgeText: { color: customerColors.primary, fontWeight: '700', fontSize: 11 },
+  ratingSummary: { marginTop: 8, color: '#B45309', fontWeight: '700' },
+  reviewForm: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E4ECF8',
     borderRadius: 12,
     padding: customerSpacing.md,
+    backgroundColor: '#FAFCFF',
+  },
+  reviewLabel: { color: customerColors.text, fontWeight: '700', marginBottom: 8, fontSize: 13 },
+  starSelectRow: { flexDirection: 'row', gap: 8 },
+  starPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: customerColors.card,
   },
-  reviewLabel: { color: customerColors.text, fontWeight: '700', marginBottom: 8 },
-  starSelectRow: { flexDirection: 'row', gap: 8 },
-  starSelect: { fontSize: 24, color: customerColors.border },
+  starPillActive: {
+    borderColor: '#F6C453',
+    backgroundColor: '#FFF7E2',
+  },
+  starSelect: { fontSize: 20, color: customerColors.border },
   starActive: { color: '#F59E0B' },
   reviewInput: {
     marginTop: 10,
     borderWidth: 1,
     borderColor: customerColors.border,
     borderRadius: 10,
-    minHeight: 90,
-    padding: 10,
+    minHeight: 96,
+    padding: 12,
     color: customerColors.text,
     textAlignVertical: 'top',
+    backgroundColor: customerColors.card,
   },
   submitReviewBtn: {
     marginTop: 10,
@@ -277,10 +342,15 @@ const styles = StyleSheet.create({
   reviewCard: {
     marginTop: 12,
     borderWidth: 1,
-    borderColor: customerColors.border,
-    borderRadius: 12,
+    borderColor: '#E5ECF8',
+    borderRadius: 14,
     padding: customerSpacing.md,
     backgroundColor: customerColors.card,
+    shadowColor: customerColors.shadow,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   reviewName: { color: customerColors.text, fontWeight: '700' },
   reviewStars: { marginTop: 4, color: '#B45309', fontSize: 12, fontWeight: '700' },

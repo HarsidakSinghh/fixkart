@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, Modal, TextInput, Alert } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { getVendorComplaints, getVendorRefunds } from './vendorApi';
+import { getVendorComplaints, getVendorRefunds, updateVendorComplaint } from './vendorApi';
 import StatusPill from '../components/StatusPill';
 
 export default function VendorComplaintsScreen({ embedded = false, hideHero = false }) {
@@ -9,6 +9,8 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
   const [refunds, setRefunds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
 
   const loadComplaints = useCallback(async () => {
     setLoading(true);
@@ -52,8 +54,15 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
           <View key={item.id} style={styles.card}>
             <Text style={styles.title}>Order {String(item.orderId || '').slice(-6).toUpperCase()}</Text>
             <Text style={styles.meta} numberOfLines={2}>{item.message}</Text>
-            <StatusPill label={item.status || 'OPEN'} tone={statusTone(item.status)} />
-            <TouchableOpacity style={styles.viewDetailBtn} onPress={() => setSelectedDetail(buildComplaintDetail(item))}>
+            <StatusPill label={complaintStatusLabel(item.status)} tone={statusTone(item.status)} />
+            <TouchableOpacity
+              style={styles.viewDetailBtn}
+              onPress={() => {
+                const detail = buildComplaintDetail(item);
+                setFeedbackText(detail.vendorResponse || '');
+                setSelectedDetail(detail);
+              }}
+            >
               <Text style={styles.viewDetailText}>View Detail</Text>
             </TouchableOpacity>
           </View>
@@ -71,7 +80,13 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
             <Text style={styles.title}>Refund {String(item.orderItemId || item.id || '').slice(-6).toUpperCase()}</Text>
             <Text style={styles.meta} numberOfLines={2}>{item.reason}</Text>
             <StatusPill label={item.status || 'PENDING'} tone={refundTone(item.status)} />
-            <TouchableOpacity style={styles.viewDetailBtn} onPress={() => setSelectedDetail(buildRefundDetail(item))}>
+            <TouchableOpacity
+              style={styles.viewDetailBtn}
+              onPress={() => {
+                setFeedbackText('');
+                setSelectedDetail(buildRefundDetail(item));
+              }}
+            >
               <Text style={styles.viewDetailText}>View Detail</Text>
             </TouchableOpacity>
           </View>
@@ -91,7 +106,35 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
     return (
       <View style={styles.container}>
         {content}
-        <SupportDetailModal detail={selectedDetail} images={detailImages} onClose={() => setSelectedDetail(null)} />
+        <SupportDetailModal
+          detail={selectedDetail}
+          images={detailImages}
+          onClose={() => {
+            setSelectedDetail(null);
+            setFeedbackText('');
+          }}
+          feedbackText={feedbackText}
+          setFeedbackText={setFeedbackText}
+          actionLoading={actionLoading}
+          onAction={async (action) => {
+            if (!selectedDetail?.id || selectedDetail?.type !== 'Complaint') return;
+            if ((action === 'IN_REVIEW' || action === 'RESOLVED') && !feedbackText.trim()) {
+              Alert.alert('Feedback required', 'Please add a brief response for customer.');
+              return;
+            }
+            setActionLoading(true);
+            try {
+              await updateVendorComplaint(selectedDetail.id, { action, feedback: feedbackText.trim() });
+              await loadComplaints();
+              setSelectedDetail(null);
+              setFeedbackText('');
+            } catch {
+              Alert.alert('Failed', 'Could not update complaint right now.');
+            } finally {
+              setActionLoading(false);
+            }
+          }}
+        />
       </View>
     );
   }
@@ -99,7 +142,35 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
   return (
     <View style={styles.container}>
       {content}
-      <SupportDetailModal detail={selectedDetail} images={detailImages} onClose={() => setSelectedDetail(null)} />
+      <SupportDetailModal
+        detail={selectedDetail}
+        images={detailImages}
+        onClose={() => {
+          setSelectedDetail(null);
+          setFeedbackText('');
+        }}
+        feedbackText={feedbackText}
+        setFeedbackText={setFeedbackText}
+        actionLoading={actionLoading}
+        onAction={async (action) => {
+          if (!selectedDetail?.id || selectedDetail?.type !== 'Complaint') return;
+          if ((action === 'IN_REVIEW' || action === 'RESOLVED') && !feedbackText.trim()) {
+            Alert.alert('Feedback required', 'Please add a brief response for customer.');
+            return;
+          }
+          setActionLoading(true);
+          try {
+            await updateVendorComplaint(selectedDetail.id, { action, feedback: feedbackText.trim() });
+            await loadComplaints();
+            setSelectedDetail(null);
+            setFeedbackText('');
+          } catch {
+            Alert.alert('Failed', 'Could not update complaint right now.');
+          } finally {
+            setActionLoading(false);
+          }
+        }}
+      />
     </View>
   );
 
@@ -107,11 +178,13 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
     const orderItems = Array.isArray(item?.orderItems) ? item.orderItems : [];
     return {
       type: 'Complaint',
+      id: item?.id,
       customerName: 'Fixkart',
       orderId: item?.order?.id || item?.orderId || '-',
       status: item?.status || 'OPEN',
       createdAt: item?.createdAt || item?.order?.createdAt || null,
       note: item?.message || '-',
+      vendorResponse: item?.vendorResponse || '',
       itemName: item?.item?.productName || 'Item',
       itemImage: item?.item?.image || null,
       itemQty: Number(item?.item?.quantity || 0),
@@ -146,9 +219,18 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
   }
 
   function statusTone(status) {
-    if (status === 'RESOLVED') return 'success';
+    if (status === 'RESOLVED' || status === 'ORDER_REJECTED') return 'success';
     if (status === 'IN_REVIEW') return 'warning';
     return 'danger';
+  }
+
+  function complaintStatusLabel(status) {
+    const normalized = String(status || '').toUpperCase();
+    if (normalized === 'OPEN') return 'Open';
+    if (normalized === 'IN_REVIEW') return 'In Review';
+    if (normalized === 'RESOLVED') return 'Resolved';
+    if (normalized === 'ORDER_REJECTED') return 'Order Rejected';
+    return normalized || 'Open';
   }
 
   function refundTone(status) {
@@ -158,7 +240,15 @@ export default function VendorComplaintsScreen({ embedded = false, hideHero = fa
   }
 }
 
-function SupportDetailModal({ detail, images, onClose }) {
+function SupportDetailModal({
+  detail,
+  images,
+  onClose,
+  feedbackText,
+  setFeedbackText,
+  actionLoading,
+  onAction,
+}) {
   return (
     <Modal visible={!!detail} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -172,7 +262,9 @@ function SupportDetailModal({ detail, images, onClose }) {
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.metaText}>Customer: {detail?.customerName || 'Fixkart'}</Text>
             <Text style={styles.metaText}>Order: {detail?.orderId || '-'}</Text>
-            <Text style={styles.metaText}>Status: {detail?.status || '-'}</Text>
+            <Text style={styles.metaText}>
+              Status: {detail?.type === 'Complaint' ? complaintStatusLabel(detail?.status) : detail?.status || '-'}
+            </Text>
             {detail?.createdAt ? <Text style={styles.metaText}>Time: {new Date(detail.createdAt).toLocaleString()}</Text> : null}
 
             <Text style={styles.detailSection}>Item</Text>
@@ -215,6 +307,43 @@ function SupportDetailModal({ detail, images, onClose }) {
             <Text style={styles.detailSection}>Notes</Text>
             <Text style={styles.noteText}>{detail?.note || '-'}</Text>
 
+            {detail?.type === 'Complaint' ? (
+              <>
+                <Text style={styles.detailSection}>Vendor Feedback</Text>
+                <TextInput
+                  style={styles.feedbackInput}
+                  placeholder="Write your response to customer"
+                  placeholderTextColor={vendorColors.muted}
+                  multiline
+                  value={feedbackText}
+                  onChangeText={setFeedbackText}
+                />
+                <View style={styles.actionWrap}>
+                  <TouchableOpacity
+                    style={[styles.actionPill, styles.reviewPill, actionLoading && styles.actionDisabled]}
+                    onPress={() => onAction?.('IN_REVIEW')}
+                    disabled={actionLoading}
+                  >
+                    <Text style={styles.actionPillText}>Mark In Review</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionPill, styles.resolvePill, actionLoading && styles.actionDisabled]}
+                    onPress={() => onAction?.('RESOLVED')}
+                    disabled={actionLoading}
+                  >
+                    <Text style={styles.actionPillText}>Resolve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionPill, styles.rejectOrderPill, actionLoading && styles.actionDisabled]}
+                    onPress={() => onAction?.('REJECT_ORDER')}
+                    disabled={actionLoading}
+                  >
+                    <Text style={styles.actionPillText}>Accept & Reject Order</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : null}
+
             <Text style={styles.detailSection}>Attachments</Text>
             {images.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
@@ -232,6 +361,15 @@ function SupportDetailModal({ detail, images, onClose }) {
       </View>
     </Modal>
   );
+}
+
+function complaintStatusLabel(status) {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'OPEN') return 'Open';
+  if (normalized === 'IN_REVIEW') return 'In Review';
+  if (normalized === 'RESOLVED') return 'Resolved';
+  if (normalized === 'ORDER_REJECTED') return 'Order Rejected';
+  return normalized || 'Open';
 }
 
 const styles = StyleSheet.create({
@@ -329,6 +467,27 @@ const styles = StyleSheet.create({
   itemTitle: { color: vendorColors.text, fontWeight: '700', marginTop: 8 },
   itemMeta: { color: vendorColors.muted, fontSize: 12, marginTop: 4 },
   noteText: { color: vendorColors.text, fontSize: 13, lineHeight: 19 },
+  feedbackInput: {
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 10,
+    backgroundColor: vendorColors.card,
+    minHeight: 90,
+    padding: 10,
+    color: vendorColors.text,
+    textAlignVertical: 'top',
+  },
+  actionWrap: { marginTop: vendorSpacing.md, gap: 8 },
+  actionPill: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  reviewPill: { backgroundColor: '#FFF4E5', borderWidth: 1, borderColor: '#F2D6A5' },
+  resolvePill: { backgroundColor: '#EAF7EF', borderWidth: 1, borderColor: '#BEE2CA' },
+  rejectOrderPill: { backgroundColor: '#FFF1F1', borderWidth: 1, borderColor: '#F0C7C7' },
+  actionPillText: { color: vendorColors.text, fontWeight: '700', fontSize: 12 },
+  actionDisabled: { opacity: 0.6 },
   imageRow: { paddingBottom: 4, gap: 10 },
   attachmentImage: {
     width: 116,

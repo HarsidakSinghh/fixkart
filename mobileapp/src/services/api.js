@@ -324,6 +324,7 @@ export async function getInventoryApprovals() {
         id: p.id,
         item: p.name,
         name: p.name,
+        vendorId: p.vendorId || "",
         vendor: p.vendorName,
         vendorName: p.vendorName,
         vendorEmail: p.vendorEmail || "",

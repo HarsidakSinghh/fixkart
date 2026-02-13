@@ -150,6 +150,24 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
         </View>
         <View style={styles.orderMetaRight}>
           <StatusPill label={item.status || 'NEW'} tone={statusTone(item.status)} />
+          {item?.complaints?.total > 0 ? (
+            <StatusPill
+              label={
+                item?.complaints?.requiresAction
+                  ? `Complaint Open (${item.complaints.open})`
+                  : item?.complaints?.inReview > 0
+                  ? `Complaint Review (${item.complaints.inReview})`
+                  : `Complaint Closed (${item.complaints.resolved})`
+              }
+              tone={
+                item?.complaints?.requiresAction
+                  ? 'danger'
+                  : item?.complaints?.inReview > 0
+                  ? 'warning'
+                  : 'success'
+              }
+            />
+          ) : null}
           <Text style={styles.meta}>Total: ₹{Math.round(item.totals?.vendorTotal || 0)}</Text>
         </View>
       </View>
@@ -178,6 +196,11 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
           <TouchableOpacity style={styles.dispatchBtn} onPress={() => handleDispatch(item.orderId)}>
             <Text style={styles.dispatchText}>Ready (Generate OTP)</Text>
           </TouchableOpacity>
+          {item?.complaints?.requiresAction ? (
+            <TouchableOpacity style={styles.complaintBtn} onPress={() => setActiveSection('SUPPORT')}>
+              <Text style={styles.complaintBtnText}>Open Complaints</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
 
@@ -189,6 +212,11 @@ export default function VendorOrdersScreen({ onSwitchToListings }) {
             <Text style={styles.meta}>Qty: {orderItem.quantity} • Price: ₹{orderItem.vendorPrice}</Text>
             <View style={{ marginTop: vendorSpacing.xs }}>
               <StatusPill label={orderItem.status || 'NEW'} tone={statusTone(orderItem.status)} />
+              {orderItem.complaintStatus ? (
+                <View style={{ marginTop: 6 }}>
+                  <StatusPill label={`Complaint ${String(orderItem.complaintStatus).toUpperCase()}`} tone={complaintTone(orderItem.complaintStatus)} />
+                </View>
+              ) : null}
             </View>
           </View>
           {orderItem.dispatchCode ? (
@@ -295,6 +323,13 @@ function statusTone(status) {
   if (status === 'PROCESSING' || status === 'APPROVED') return 'warning';
   if (status === 'CANCELLED' || status === 'REJECTED') return 'danger';
   return 'warning';
+}
+
+function complaintTone(status) {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'OPEN') return 'danger';
+  if (normalized === 'IN_REVIEW') return 'warning';
+  return 'success';
 }
 
 const styles = StyleSheet.create({
@@ -411,6 +446,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   dispatchText: { color: '#FFFFFF', fontWeight: '700', fontSize: 11 },
+  complaintBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF4F4',
+    borderWidth: 1,
+    borderColor: '#F1CECE',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  complaintBtnText: { color: '#B42318', fontWeight: '700', fontSize: 11 },
   codeBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,

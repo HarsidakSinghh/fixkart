@@ -58,7 +58,7 @@ export default function CustomerHeader({
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: customerColors.primary,
+    backgroundColor: customerColors.navbar || customerColors.primary,
     paddingTop: customerSpacing.lg,
     paddingBottom: customerSpacing.md,
     paddingHorizontal: customerSpacing.lg,
