@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Alert } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image, Alert, ScrollView } from 'react-native';
 import { customerColors, customerSpacing } from './CustomerTheme';
 import { getTypeListings, getReviewSummaries } from './storeApi';
 import { useCart } from '../context/CartContext';
@@ -13,6 +13,8 @@ export default function CustomerTypeListingsScreen({
   onOpenLogin,
 }) {
   const [items, setItems] = useState([]);
+  const [selectedGrade, setSelectedGrade] = useState('All');
+  const [selectedType, setSelectedType] = useState('All');
   const [loading, setLoading] = useState(true);
   const { addItem } = useCart();
   const { isAuthenticated } = useAuth();
@@ -40,6 +42,36 @@ export default function CustomerTypeListingsScreen({
   useEffect(() => {
     load();
   }, [load]);
+
+  const gradeOptions = useMemo(() => {
+    const set = new Set(items.map((item) => String(item?.grade || '').trim()).filter(Boolean));
+    return ['All', ...Array.from(set)];
+  }, [items]);
+
+  const typeOptions = useMemo(() => {
+    const set = new Set(items.map((item) => String(item?.customType || '').trim()).filter(Boolean));
+    return ['All', ...Array.from(set)];
+  }, [items]);
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const grade = String(item?.grade || '').trim();
+        const type = String(item?.customType || '').trim();
+        const gradeOk = selectedGrade === 'All' || grade === selectedGrade;
+        const typeOk = selectedType === 'All' || type === selectedType;
+        return gradeOk && typeOk;
+      }),
+    [items, selectedGrade, selectedType]
+  );
+
+  useEffect(() => {
+    if (!gradeOptions.includes(selectedGrade)) setSelectedGrade('All');
+  }, [gradeOptions, selectedGrade]);
+
+  useEffect(() => {
+    if (!typeOptions.includes(selectedType)) setSelectedType('All');
+  }, [selectedType, typeOptions]);
 
   const handleAdd = (item) => {
     if (!isAuthenticated) {
@@ -69,6 +101,38 @@ export default function CustomerTypeListingsScreen({
         <Text style={styles.subtitle}>
           {typeCategory ? `${typeCategory} • Select from vendor listings` : 'Select from vendor listings'}
         </Text>
+        {gradeOptions.length > 1 ? (
+          <View style={styles.filterBlock}>
+            <Text style={styles.filterTitle}>Grades</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {gradeOptions.map((grade) => (
+                <TouchableOpacity
+                  key={`grade-${grade}`}
+                  style={[styles.filterChip, selectedGrade === grade && styles.filterChipActive]}
+                  onPress={() => setSelectedGrade(grade)}
+                >
+                  <Text style={[styles.filterChipText, selectedGrade === grade && styles.filterChipTextActive]}>{grade}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+        {typeOptions.length > 1 ? (
+          <View style={styles.filterBlock}>
+            <Text style={styles.filterTitle}>Types</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {typeOptions.map((t) => (
+                <TouchableOpacity
+                  key={`type-${t}`}
+                  style={[styles.filterChip, selectedType === t && styles.filterChipActive]}
+                  onPress={() => setSelectedType(t)}
+                >
+                  <Text style={[styles.filterChipText, selectedType === t && styles.filterChipTextActive]}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
       </View>
 
       {loading ? (
@@ -78,7 +142,7 @@ export default function CustomerTypeListingsScreen({
         </View>
       ) : (
         <FlatList
-          data={items}
+          data={filteredItems}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
@@ -87,6 +151,8 @@ export default function CustomerTypeListingsScreen({
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
                 <Text style={styles.cardVendor} numberOfLines={1}>{item.vendorName}</Text>
+                {item.grade ? <Text style={styles.cardSpec}>Grade: {item.grade}</Text> : null}
+                {item.customType ? <Text style={styles.cardSpec}>Type: {item.customType}</Text> : null}
                 {Number(item.averageRating || 0) >= 4 ? (
                   <Text style={styles.ratingText}>★ {Number(item.averageRating).toFixed(1)}/5</Text>
                 ) : null}
@@ -120,6 +186,23 @@ const styles = StyleSheet.create({
   backText: { color: customerColors.primary, fontWeight: '700' },
   title: { fontSize: 22, fontWeight: '800', color: customerColors.text, marginTop: 8 },
   subtitle: { color: customerColors.muted, marginTop: 6, fontSize: 12 },
+  filterBlock: { marginTop: 10 },
+  filterTitle: { color: customerColors.text, fontWeight: '700', fontSize: 12, marginBottom: 6 },
+  filterRow: { gap: 8, paddingRight: 10 },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    backgroundColor: customerColors.card,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  filterChipActive: {
+    borderColor: customerColors.primary,
+    backgroundColor: 'rgba(11, 97, 85, 0.08)',
+  },
+  filterChipText: { color: customerColors.muted, fontSize: 12, fontWeight: '700' },
+  filterChipTextActive: { color: customerColors.primary },
   grid: { paddingHorizontal: customerSpacing.lg, paddingBottom: 160, paddingTop: customerSpacing.md },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: customerColors.muted },
@@ -145,6 +228,7 @@ const styles = StyleSheet.create({
   cardBody: { flex: 1, justifyContent: 'space-between' },
   cardTitle: { color: customerColors.text, fontWeight: '700' },
   cardVendor: { color: customerColors.muted, fontSize: 12, marginTop: 4 },
+  cardSpec: { color: customerColors.muted, fontSize: 11, marginTop: 2 },
   ratingText: { color: '#B45309', fontSize: 12, fontWeight: '700', marginTop: 4 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, alignItems: 'center' },
   cardPrice: { color: customerColors.primary, fontWeight: '800' },

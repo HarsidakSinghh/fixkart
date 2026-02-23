@@ -9,16 +9,6 @@ function slugify(text: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-async function ensureUniqueSku(baseSku: string) {
-  const candidate = String(baseSku || "").trim();
-  if (!candidate) {
-    return `SKU-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-  }
-  const existing = await prisma.product.findUnique({ where: { sku: candidate } });
-  if (!existing) return candidate;
-  return `${candidate}-${Math.floor(Math.random() * 10000)}`;
-}
-
 export async function POST(req: Request) {
   const guard = await requireVendor(req);
   if (!guard.ok) {
@@ -38,10 +28,8 @@ export async function POST(req: Request) {
     });
     const fallbackBrand = vendor?.companyName || vendor?.fullName || null;
 
-    const createdIds: string[] = [];
-    const failed: Array<{ index: number; reason: string }> = [];
-
     const capped = listings.slice(0, 400);
+    const prepared = [];
     for (let i = 0; i < capped.length; i += 1) {
       const row = capped[i] || {};
       const name = String(row?.name || "").trim();
@@ -54,55 +42,64 @@ export async function POST(req: Request) {
       const description = String(row?.description || "").trim() || null;
       const cartonPieces = Number(row?.cartonPieces || 0);
       const size = String(row?.size || "").trim();
+      const grade = String(row?.grade || "").trim();
       const customType = String(row?.customType || row?.type || "").trim();
 
       if (!name || !image || !Number.isFinite(price) || price <= 0) {
-        failed.push({ index: i, reason: "Missing required fields" });
-        continue;
+        return NextResponse.json(
+          { error: `Invalid listing at row ${i + 1}. Name, image and positive price are required.` },
+          { status: 400 }
+        );
       }
 
-      const slug = `${slugify(name)}-${guard.userId.slice(-6)}-${Date.now()}-${i}`;
-      const rawSku = String(row?.sku || `${slugify(name)}-${guard.userId.slice(-4)}`).toUpperCase();
-      const sku = await ensureUniqueSku(rawSku);
-      try {
-        const created = await prisma.product.create({
-          data: {
-            vendorId: guard.userId,
-            name,
-            title: name,
-            slug,
-            description,
-            category,
-            subCategory,
-            image,
-            gallery: [image],
-            price,
-            quantity: Number.isFinite(stock) && stock >= 0 ? Math.floor(stock) : 0,
-            sku,
-            brand,
-            specs: {
-              cartonPieces: Number.isFinite(cartonPieces) && cartonPieces > 0 ? Math.floor(cartonPieces) : null,
-              size: size || null,
-              customType: customType || null,
-              commissionPercent: 5,
-            },
-            status: "PENDING",
-            isPublished: false,
-            isFeatured: false,
-          },
-        });
-        createdIds.push(created.id);
-      } catch (error: unknown) {
-        const reason = error instanceof Error ? error.message : "Create failed";
-        failed.push({ index: i, reason });
-      }
+      const slugBase = slugify(name) || `item-${i + 1}`;
+      const slug = `${slugBase}-${guard.userId.slice(-6)}-${Date.now()}-${i}`;
+      const sku = String(row?.sku || `${slugBase}-${guard.userId.slice(-4)}-${Date.now()}-${i}`)
+        .toUpperCase()
+        .replace(/[^A-Z0-9\-]/g, "-")
+        .slice(0, 120);
+
+      prepared.push({
+        vendorId: guard.userId,
+        name,
+        title: name,
+        slug,
+        description,
+        category,
+        subCategory,
+        image,
+        gallery: [image],
+        price,
+        quantity: Number.isFinite(stock) && stock >= 0 ? Math.floor(stock) : 0,
+        sku,
+        brand,
+        specs: {
+          cartonPieces: Number.isFinite(cartonPieces) && cartonPieces > 0 ? Math.floor(cartonPieces) : null,
+          size: size || null,
+          grade: grade || null,
+          customType: customType || null,
+          commissionPercent: 5,
+        },
+        status: "PENDING" as const,
+        isPublished: false,
+        isFeatured: false,
+      });
     }
+
+    const createdIds = await prisma.$transaction(async (tx) => {
+      const ids: string[] = [];
+      for (const data of prepared) {
+        const created = await tx.product.create({ data });
+        ids.push(created.id);
+      }
+      return ids;
+    });
 
     return NextResponse.json({
       success: true,
       createdCount: createdIds.length,
-      failedCount: failed.length,
-      failed,
+      failedCount: 0,
+      failed: [],
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to submit listings";

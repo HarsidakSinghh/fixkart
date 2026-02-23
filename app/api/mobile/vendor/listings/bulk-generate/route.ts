@@ -52,6 +52,16 @@ function formatProductName(base: string, size: string) {
   return `${cleanBase} ${size}`.trim();
 }
 
+function normalizeListingSignature(
+  name: string,
+  size: string
+) {
+  return [
+    String(name || "").toLowerCase().replace(/\s+/g, " ").trim(),
+    String(size || "").toLowerCase().replace(/\s+/g, "").trim(),
+  ].join("|");
+}
+
 function getAutoImageByType(typeName: string) {
   const key = String(typeName || "").toLowerCase();
   if (key.includes("bolt")) {
@@ -529,6 +539,30 @@ export async function POST(req: Request) {
       if (!uniqueMap.has(key)) uniqueMap.set(key, row);
     }
 
+    const existingProducts = await prisma.product.findMany({
+      where: { vendorId: guard.userId },
+      select: {
+        name: true,
+        title: true,
+        category: true,
+        subCategory: true,
+        specs: true,
+      },
+      take: 5000,
+      orderBy: { createdAt: "desc" },
+    });
+
+    const existingSignatures = new Set(
+      existingProducts.map((p) => {
+        const specs: any = p.specs || {};
+        const existingName = String(p.title || p.name || "").trim();
+        return normalizeListingSignature(
+          existingName,
+          String(specs?.size || "")
+        );
+      })
+    );
+
     const drafts: DraftListing[] = Array.from(uniqueMap.values())
       .slice(0, 300)
       .map((row) => {
@@ -547,6 +581,13 @@ export async function POST(req: Request) {
           image,
           commissionPercent: 5,
         };
+      })
+      .filter((draft) => {
+        const signature = normalizeListingSignature(
+          draft.name,
+          draft.size
+        );
+        return !existingSignatures.has(signature);
       });
 
     return NextResponse.json({

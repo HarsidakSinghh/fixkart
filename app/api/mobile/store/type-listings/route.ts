@@ -64,6 +64,9 @@ export async function GET(req: Request) {
       image: p.image,
       quantity: p.quantity || 0,
       vendorName: vendorMap.get(p.vendorId) || "Vendor",
+      specs,
+      grade: String(specs?.grade || "").trim(),
+      customType: String(specs?.customType || specs?.type || "").trim(),
     };
   });
 

@@ -336,7 +336,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
     setBulkSubmitting(true);
     try {
       const payload = bulkDrafts.map((item) => {
-        const grade = String(item.grade || '').trim();
+        const grade = String(item.grade || bulkGrade || '').trim();
+        const customType = String(item.customType || bulkCustomType || '').trim();
         const baseDescription = String(item.description || '').trim();
         const mergedDescription =
           grade && !/\bgrade\s*:/i.test(baseDescription)
@@ -348,7 +349,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
           stock: Number(item.stock || 0),
           cartonPieces: Number(item.cartonPieces || 0),
           description: mergedDescription,
-          customType: String(item.customType || '').trim(),
+          grade,
+          customType,
         };
       });
       const response = await submitBulkVendorListings(payload);
@@ -363,7 +365,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     } finally {
       setBulkSubmitting(false);
     }
-  }, [bulkDrafts]);
+  }, [bulkCustomType, bulkDrafts, bulkGrade]);
 
   const handleSubmit = async () => {
     const commissionValue = Number(form.commissionPercent);
@@ -692,6 +694,28 @@ export default function VendorHomeScreen({ canAdd, status }) {
           <View style={styles.bulkModalCard}>
             <Text style={styles.modalTitle}>Generated Listings Preview</Text>
             <Text style={styles.modalSubtitle}>{bulkDrafts.length} listings ready</Text>
+            <View style={styles.bulkMetaInputRow}>
+              <View style={[styles.inputGroup, styles.bulkMetaInput]}>
+                <Text style={styles.inputLabel}>Grade (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={bulkGrade}
+                  onChangeText={setBulkGrade}
+                  placeholder="Apply to all listings"
+                  placeholderTextColor={vendorColors.muted}
+                />
+              </View>
+              <View style={[styles.inputGroup, styles.bulkMetaInput]}>
+                <Text style={styles.inputLabel}>Type (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={bulkCustomType}
+                  onChangeText={setBulkCustomType}
+                  placeholder="Shown on product page"
+                  placeholderTextColor={vendorColors.muted}
+                />
+              </View>
+            </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
               {bulkDrafts.map((item) => (
@@ -702,8 +726,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
                     <Text style={styles.previewMeta}>Size: {item.size || '-'}</Text>
                     <Text style={styles.previewMeta}>Price: ₹{item.price || 0}</Text>
                     <Text style={styles.previewMeta}>Pieces/Carton: {item.cartonPieces || '-'}</Text>
-                    <Text style={styles.previewMeta}>Grade: {item.grade || '-'}</Text>
-                    <Text style={styles.previewMeta}>Type: {item.customType || '-'}</Text>
+                    <Text style={styles.previewMeta}>Grade: {item.grade || bulkGrade || '-'}</Text>
+                    <Text style={styles.previewMeta}>Type: {item.customType || bulkCustomType || '-'}</Text>
                   </View>
                   <View style={styles.previewActions}>
                     <TouchableOpacity style={styles.previewEditBtn} onPress={() => setEditingDraft(item)}>
@@ -1103,6 +1127,14 @@ const styles = StyleSheet.create({
   },
   previewTitle: { color: vendorColors.text, fontWeight: '700', fontSize: 12 },
   previewMeta: { color: vendorColors.muted, marginTop: 2, fontSize: 11 },
+  bulkMetaInputRow: {
+    flexDirection: 'row',
+    gap: vendorSpacing.sm,
+  },
+  bulkMetaInput: {
+    flex: 1,
+    marginBottom: vendorSpacing.sm,
+  },
   previewActions: { justifyContent: 'space-between' },
   previewEditBtn: {
     borderRadius: 8,
