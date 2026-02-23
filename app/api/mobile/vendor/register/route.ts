@@ -40,19 +40,15 @@ export async function POST(req: Request) {
     locationPhoto,
   } = body || {};
 
-  if (!businessName || !contactName || !contactPhone || !contactEmail) {
+  const resolvedContactEmail = String(contactEmail || guard.email || "").trim().toLowerCase();
+
+  if (!businessName || !contactName || !contactPhone || !resolvedContactEmail) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
   const categoryValue = Array.isArray(categories) ? categories.join(", ") : categories || null;
   const gst = String(gstNumber || "").trim().toUpperCase();
-
-  if (gst && !isValidGstin(gst)) {
-    return NextResponse.json(
-      { error: "Invalid GSTIN format. Please enter a valid 15-character GST number." },
-      { status: 400 }
-    );
-  }
+  const hasInvalidGstFormat = !!gst && !isValidGstin(gst);
 
   const docFields: Record<string, string | null> = {
     gstCertificateUrl: null,
@@ -64,7 +60,12 @@ export async function POST(req: Request) {
 
   // New multi-document payload from mobile app.
   if (documents && typeof documents === "object") {
-    const docs: any = documents;
+    const docs = documents as {
+      gst?: { data?: string | null };
+      pan?: { data?: string | null };
+      idProof?: { data?: string | null };
+      addressProof?: { data?: string | null };
+    };
     docFields.gstCertificateUrl = docs?.gst?.data || null;
     docFields.panCardUrl = docs?.pan?.data || null;
     docFields.idProofUrl = docs?.idProof?.data || null;
@@ -82,8 +83,10 @@ export async function POST(req: Request) {
     }
   }
 
-  let gstVerificationStatus = "NOT_PROVIDED";
-  let gstVerificationError: string | null = null;
+  let gstVerificationStatus = hasInvalidGstFormat ? "INVALID_FORMAT" : "NOT_PROVIDED";
+  let gstVerificationError: string | null = hasInvalidGstFormat
+    ? "Invalid GSTIN format provided by vendor."
+    : null;
   let gstVerifiedAt: Date | null = null;
   let gstLegalName: string | null = null;
   let gstTradeName: string | null = null;
@@ -94,7 +97,7 @@ export async function POST(req: Request) {
   let gstAddressMatches: boolean | null = null;
   let gstVerificationRaw: Prisma.InputJsonValue | null = null;
 
-  if (gst) {
+  if (gst && !hasInvalidGstFormat) {
     const verification = await verifyGstinWithAppyFlow(gst);
     gstVerificationStatus = verification.status;
 
@@ -120,7 +123,7 @@ export async function POST(req: Request) {
       fullName: contactName,
       companyName: businessName,
       phone: contactPhone,
-      email: contactEmail,
+      email: resolvedContactEmail,
       address: address || "",
       city: city || "",
       state: state || "",
@@ -155,7 +158,7 @@ export async function POST(req: Request) {
       fullName: contactName,
       companyName: businessName,
       phone: contactPhone,
-      email: contactEmail,
+      email: resolvedContactEmail,
       address: address || "",
       city: city || "",
       state: state || "",

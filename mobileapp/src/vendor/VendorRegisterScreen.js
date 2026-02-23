@@ -339,7 +339,15 @@ export default function VendorRegisterScreen({ onClose, onSubmitted }) {
         onClose();
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit registration.');
+      const message = String(error?.message || '');
+      let display = 'Failed to submit registration.';
+      try {
+        const parsed = JSON.parse(message);
+        display = parsed?.error || display;
+      } catch (_) {
+        if (message) display = message;
+      }
+      Alert.alert('Error', display);
     } finally {
       setSubmitting(false);
     }
