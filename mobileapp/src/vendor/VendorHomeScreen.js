@@ -70,6 +70,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [bulkDrafts, setBulkDrafts] = useState([]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null);
+  const [bulkCategoryPickerOpen, setBulkCategoryPickerOpen] = useState(false);
+  const [pendingBulkType, setPendingBulkType] = useState('');
 
   const loadCategories = useCallback(() => {
     const titles = VENDOR_INVENTORY.map((cat) => cat.title);
@@ -247,6 +249,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
         setBulkProgress(1);
         if (!drafts.length) {
           Alert.alert('No listings found', 'Could not detect listings from this file. Try a clearer file or edit manually.');
+        } else if (response?.requiresCategorySelection) {
+          setPendingBulkType(String(response?.suggestedType || '').trim());
+          setBulkCategoryPickerOpen(true);
         } else {
           setBulkPreviewOpen(true);
         }
@@ -271,6 +276,23 @@ export default function VendorHomeScreen({ canAdd, status }) {
       Alert.alert('Upload failed', 'Unable to read selected file.');
     }
   }, [canAdd, uriToDataUrl]);
+
+  const applyBulkCategory = useCallback((categoryName) => {
+    const normalizedType = pendingBulkType || 'New Product Type';
+    setBulkDrafts((prev) =>
+      prev.map((item) => ({
+        ...item,
+        category: categoryName,
+        subCategory: item.subCategory || normalizedType,
+        name:
+          item.name && item.name.toLowerCase().includes((normalizedType || '').toLowerCase())
+            ? item.name
+            : `${normalizedType.toLowerCase()} ${item.size || ''}`.trim(),
+      }))
+    );
+    setBulkCategoryPickerOpen(false);
+    setBulkPreviewOpen(true);
+  }, [pendingBulkType]);
 
   const removeDraft = useCallback((tempId) => {
     setBulkDrafts((prev) => prev.filter((item) => item.tempId !== tempId));
@@ -679,6 +701,29 @@ export default function VendorHomeScreen({ canAdd, status }) {
                 <Text style={styles.submitText}>{bulkSubmitting ? 'Submitting…' : 'Submit All'}</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={bulkCategoryPickerOpen} transparent animationType="fade" onRequestClose={() => setBulkCategoryPickerOpen(false)}>
+        <View style={styles.processingBackdrop}>
+          <View style={styles.categoryPickerCard}>
+            <Text style={styles.modalTitle}>Select Category</Text>
+            <Text style={styles.modalSubtitle}>
+              {`Type "${pendingBulkType || 'new product'}" was not found. Choose category for generated listings.`}
+            </Text>
+            <View style={styles.categoryPickerGrid}>
+              {categories
+                .filter((cat) => cat && cat !== 'All')
+                .map((cat) => (
+                  <TouchableOpacity key={`bulk-cat-${cat}`} style={styles.categoryChoice} onPress={() => applyBulkCategory(cat)}>
+                    <Text style={styles.categoryChoiceText}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setBulkCategoryPickerOpen(false)}>
+              <Text style={styles.cancelText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1151,4 +1196,29 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: vendorColors.primary,
   },
+  categoryPickerCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.card,
+    padding: vendorSpacing.lg,
+  },
+  categoryPickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  categoryChoice: {
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  categoryChoiceText: { color: vendorColors.text, fontWeight: '700', fontSize: 12 },
 });

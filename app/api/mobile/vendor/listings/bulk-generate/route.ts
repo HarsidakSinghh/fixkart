@@ -16,8 +16,14 @@ type DraftListing = {
   image: string;
   commissionPercent: number;
 };
+type OcrWord = {
+  WordText?: string;
+  Left?: number;
+  Top?: number;
+  Width?: number;
+  Height?: number;
+};
 
-const DEFAULT_CATEGORY = "Fastening & Joining";
 const DEFAULT_SUBCATEGORY = "Bolts";
 const DEFAULT_IMAGE =
   "https://res.cloudinary.com/demo/image/upload/v1/samples/metallic-structural-detail";
@@ -79,6 +85,26 @@ function parseDiaValue(diaText: string) {
   return Number(raw);
 }
 
+function normalizeOcrToken(input: string) {
+  return String(input || "")
+    .replace(/[Oo]/g, "0")
+    .replace(/[lI]/g, "1")
+    .trim();
+}
+
+function parseNumberToken(raw: string) {
+  const t = normalizeOcrToken(raw);
+  if (!t) return NaN;
+  if (/^\d+\/\d+$/.test(t)) {
+    const [a, b] = t.split("/");
+    const n = Number(a);
+    const d = Number(b);
+    if (!Number.isFinite(n) || !Number.isFinite(d) || d === 0) return NaN;
+    return n / d;
+  }
+  return Number(t);
+}
+
 function parseDiaLengthRateTable(text: string) {
   const lines = String(text || "")
     .split(/\r?\n/)
@@ -86,10 +112,7 @@ function parseDiaLengthRateTable(text: string) {
     .filter(Boolean);
   const out: Array<{ size: string; price: number }> = [];
 
-  const normalizeOcrLine = (line: string) =>
-    String(line || "")
-      .replace(/[Oo]/g, "0")
-      .replace(/[lI]/g, "1");
+  const normalizeOcrLine = (line: string) => normalizeOcrToken(line);
 
   const numericTokens = (line: string) =>
     (normalizeOcrLine(line).match(/\d+(?:\/\d+)?(?:\.\d+)?/g) || []).map((token) => token.trim());
@@ -147,6 +170,81 @@ function parseDiaLengthRateTable(text: string) {
   return out;
 }
 
+function clusterRowsByY(words: Array<{ x: number; y: number; text: string }>) {
+  const sorted = [...words].sort((a, b) => a.y - b.y);
+  const rows: Array<Array<{ x: number; y: number; text: string }>> = [];
+  const tolerance = 14;
+  for (const word of sorted) {
+    const last = rows[rows.length - 1];
+    if (!last) {
+      rows.push([word]);
+      continue;
+    }
+    const avgY = last.reduce((sum, w) => sum + w.y, 0) / last.length;
+    if (Math.abs(word.y - avgY) <= tolerance) {
+      last.push(word);
+    } else {
+      rows.push([word]);
+    }
+  }
+  return rows.map((row) => row.sort((a, b) => a.x - b.x));
+}
+
+function parseTableFromOverlay(words: OcrWord[]) {
+  const points = words
+    .map((w) => {
+      const text = String(w.WordText || "").trim();
+      const left = Number(w.Left || 0);
+      const top = Number(w.Top || 0);
+      const width = Number(w.Width || 0);
+      const height = Number(w.Height || 0);
+      return { text, x: left + width / 2, y: top + height / 2, left, top, width, height };
+    })
+    .filter((w) => w.text);
+  if (!points.length) return [];
+
+  const diaWord = points.find((w) => /\bDIA\b/i.test(w.text));
+  if (!diaWord) return [];
+
+  const headerBandY = diaWord.y;
+  const headerBandHeight = Math.max(16, diaWord.height * 1.8);
+  const headerNums = points
+    .filter((w) => Math.abs(w.y - headerBandY) <= headerBandHeight)
+    .map((w) => ({ ...w, n: parseNumberToken(w.text) }))
+    .filter((w) => Number.isFinite(w.n) && w.n >= 2 && w.n <= 200)
+    .sort((a, b) => a.x - b.x);
+  if (headerNums.length < 6) return [];
+
+  const colHeaders = headerNums.map((h) => ({ x: h.x, len: Number(h.n) }));
+  const minHeaderX = colHeaders[0].x;
+  const rowCandidates = points.filter((w) => w.y > headerBandY + headerBandHeight);
+  const clusteredRows = clusterRowsByY(rowCandidates.map((w) => ({ x: w.x, y: w.y, text: w.text })));
+
+  const seed: Array<{ size: string; price: number }> = [];
+  for (const row of clusteredRows) {
+    const diaCell = row.find((c) => c.x < minHeaderX - 10 && Number.isFinite(parseNumberToken(c.text)));
+    if (!diaCell) continue;
+    const diaTokenRaw = normalizeOcrToken(diaCell.text).replace(/"/g, "");
+    if (!/^\d+(?:\/\d+)?(?:\.\d+)?$/.test(diaTokenRaw)) continue;
+
+    for (const cell of row) {
+      if (cell === diaCell) continue;
+      const price = parseNumberToken(cell.text);
+      if (!Number.isFinite(price) || price <= 0) continue;
+      const nearest = colHeaders.reduce(
+        (best, col) => {
+          const dist = Math.abs(col.x - cell.x);
+          return dist < best.dist ? { dist, col } : best;
+        },
+        { dist: Number.POSITIVE_INFINITY, col: colHeaders[0] }
+      );
+      if (nearest.dist > 40) continue;
+      seed.push({ size: `${diaTokenRaw}*${nearest.col.len}`, price: Number(price) });
+    }
+  }
+  return seed;
+}
+
 function inferProductProfile(fileName = "", text = "") {
   const lines = String(text || "")
     .split(/\r?\n/)
@@ -163,6 +261,16 @@ function inferProductProfile(fileName = "", text = "") {
       category: "Fastening & Joining",
       subCategory: "Bolts",
       image: "https://fixkart-main.vercel.app/fastening/bolts.webp",
+      knownType: true,
+    };
+  }
+  if (hay.includes("machine screw")) {
+    return {
+      productBaseName: "Machine screw",
+      category: "",
+      subCategory: "Machine screw",
+      image: "https://fixkart-main.vercel.app/fastening/screws.jpg",
+      knownType: false,
     };
   }
   if (hay.includes("u-bolt") || hay.includes("u bolt")) {
@@ -171,6 +279,7 @@ function inferProductProfile(fileName = "", text = "") {
       category: "Fastening & Joining",
       subCategory: "U-Bolts",
       image: "https://fixkart-main.vercel.app/fastening/u-bolts.jpg",
+      knownType: true,
     };
   }
   if (hay.includes("stud")) {
@@ -179,6 +288,7 @@ function inferProductProfile(fileName = "", text = "") {
       category: "Fastening & Joining",
       subCategory: "Studs",
       image: "https://fixkart-main.vercel.app/fastening/studs.jpg",
+      knownType: true,
     };
   }
   if (hay.includes("threaded")) {
@@ -187,6 +297,7 @@ function inferProductProfile(fileName = "", text = "") {
       category: "Fastening & Joining",
       subCategory: "Threaded Rods",
       image: "https://fixkart-main.vercel.app/fastening/threaded-rods.jpg",
+      knownType: true,
     };
   }
   if (hay.includes("anchor")) {
@@ -195,14 +306,16 @@ function inferProductProfile(fileName = "", text = "") {
       category: "Fastening & Joining",
       subCategory: "Wedge anchor",
       image: "https://fixkart-main.vercel.app/fastening/anchor.webp",
+      knownType: true,
     };
   }
 
   return {
-    productBaseName: DEFAULT_SUBCATEGORY,
-    category: DEFAULT_CATEGORY,
-    subCategory: DEFAULT_SUBCATEGORY,
+    productBaseName: "New Product Type",
+    category: "",
+    subCategory: "",
     image: getAutoImageByType(DEFAULT_SUBCATEGORY),
+    knownType: false,
   };
 }
 
@@ -297,15 +410,43 @@ export async function POST(req: Request) {
     const brand = vendor?.companyName || vendor?.fullName || "Fixkart Vendor";
 
     let text = "";
+    let overlaySeed: Array<{ size: string; price: number }> = [];
     try {
       text = await extractTextWithOcrSpace(fileDataUrl);
+      // extra OCR pass with overlay coordinates for robust table mapping.
+      const overlayBody = new URLSearchParams();
+      overlayBody.set("base64Image", fileDataUrl);
+      overlayBody.set("language", "eng");
+      overlayBody.set("isOverlayRequired", "true");
+      overlayBody.set("OCREngine", "2");
+      overlayBody.set("isTable", "true");
+      overlayBody.set("scale", "true");
+      const overlayRes = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        headers: {
+          apikey: process.env.OCR_SPACE_API_KEY || "helloworld",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: overlayBody.toString(),
+      });
+      if (overlayRes.ok) {
+        const overlayPayload = (await overlayRes.json()) as {
+          ParsedResults?: Array<{ TextOverlay?: { Lines?: Array<{ Words?: OcrWord[] }> } }>;
+        };
+        const words =
+          overlayPayload?.ParsedResults?.flatMap((r) =>
+            (r?.TextOverlay?.Lines || []).flatMap((ln) => ln?.Words || [])
+          ) || [];
+        overlaySeed = parseTableFromOverlay(words);
+      }
     } catch {
       // Keep flow alive for preview screen; UI can still edit/remove before submit.
       text = fileName;
     }
     const profile = inferProductProfile(fileName, text);
     const image = profile.image;
-    const seed = parseDiaLengthRateTable(text);
+    const lineSeed = parseDiaLengthRateTable(text);
+    const seed = overlaySeed.length >= lineSeed.length ? overlaySeed : lineSeed;
 
     const uniqueMap = new Map<string, { size: string; price: number }>();
     for (const row of seed) {
@@ -320,8 +461,8 @@ export async function POST(req: Request) {
         return {
           tempId: uid("draft"),
           name,
-          category: profile.category,
-          subCategory: profile.subCategory,
+          category: profile.category || "",
+          subCategory: profile.subCategory || profile.productBaseName,
           size: row.size,
           price: Number(row.price),
           cartonPieces: DEFAULT_CARTON_PIECES,
@@ -337,6 +478,8 @@ export async function POST(req: Request) {
       success: true,
       parsedTextLength: text.length,
       drafts,
+      requiresCategorySelection: !profile.knownType,
+      suggestedType: profile.subCategory || profile.productBaseName,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to generate listings from file";
