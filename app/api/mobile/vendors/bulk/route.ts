@@ -56,45 +56,87 @@ export async function POST(req: Request) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const removedListings = await tx.product.updateMany({
+    // Keep FK integrity for historical rows by mapping vendor references to SYSTEM.
+    await tx.vendorProfile.upsert({
+      where: { userId: "SYSTEM" },
+      update: {},
+      create: {
+        userId: "SYSTEM",
+        status: "APPROVED",
+        fullName: "System Vendor",
+        companyName: "System Vendor",
+        phone: "0000000000",
+        email: "system@fixkart.local",
+        address: "N/A",
+        city: "N/A",
+        state: "N/A",
+        postalCode: "000000",
+      },
+    });
+
+    await tx.orderItem.updateMany({
       where: { vendorId: { in: vendorUserIds } },
+      data: { vendorId: "SYSTEM" },
+    });
+    await tx.purchaseOrder.updateMany({
+      where: { vendorId: { in: vendorUserIds } },
+      data: { vendorId: "SYSTEM" },
+    });
+    await tx.vendorInvoice.updateMany({
+      where: { vendorId: { in: vendorUserIds } },
+      data: { vendorId: "SYSTEM" },
+    });
+    await tx.refundRequest.updateMany({
+      where: { vendorId: { in: vendorUserIds } },
+      data: { vendorId: "SYSTEM" },
+    });
+    await tx.complaint.updateMany({
+      where: { vendorId: { in: vendorUserIds } },
+      data: { vendorId: "SYSTEM" },
+    });
+
+    const linkedRows = await tx.orderItem.findMany({
+      where: { vendorId: "SYSTEM" },
+      select: { productId: true },
+      distinct: ["productId"],
+    });
+    const linkedProductIds = linkedRows.map((r) => r.productId).filter(Boolean);
+
+    // Hard-delete listings that are not tied to orders.
+    const deletedListings = await tx.product.deleteMany({
+      where: {
+        vendorId: { in: vendorUserIds },
+        ...(linkedProductIds.length ? { id: { notIn: linkedProductIds } } : {}),
+      },
+    });
+
+    // Listings tied to historical orders are hidden + transferred to SYSTEM.
+    const hiddenListings = await tx.product.updateMany({
+      where: {
+        vendorId: { in: vendorUserIds },
+        ...(linkedProductIds.length ? { id: { in: linkedProductIds } } : { id: "__none__" }),
+      },
       data: {
+        vendorId: "SYSTEM",
         isPublished: false,
         status: "REJECTED",
       },
     });
 
-    // "Delete" in business terms: wipe profile info and disable account
-    // while preserving relational integrity for historic orders.
-    const vendorResult = await tx.vendorProfile.updateMany({
+    await tx.salesman.deleteMany({
+      where: { vendorId: { in: vendorUserIds } },
+    });
+    await tx.pushToken.deleteMany({
+      where: { userId: { in: vendorUserIds }, role: "vendor" },
+    });
+
+    const vendorResult = await tx.vendorProfile.deleteMany({
       where: { id: { in: resolvedVendorIds } },
-      data: {
-        status: "PENDING",
-        fullName: "Deleted Vendor",
-        companyName: null,
-        phone: "0000000000",
-        email: "",
-        address: "",
-        city: "",
-        state: "",
-        postalCode: "",
-        category: null,
-        gstNumber: null,
-        gstCertificateUrl: null,
-        panCardUrl: null,
-        idProofUrl: null,
-        aadharCardUrl: null,
-        locationPhotoUrl: null,
-        bankName: null,
-        accountHolder: null,
-        accountNumber: null,
-        ifscCode: null,
-      },
     });
 
     return {
       affectedVendors: vendorResult.count,
-      removedListings: removedListings.count, // hidden from app
+      removedListings: deletedListings.count + hiddenListings.count, // deleted or hidden from app
     };
   });
 
