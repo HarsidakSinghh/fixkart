@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/vendor-guard";
+import type { Prisma } from "@prisma/client";
 
 function slugify(text: string) {
   return String(text || "")
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     const fallbackBrand = vendor?.companyName || vendor?.fullName || null;
 
     const capped = listings.slice(0, 400);
-    const prepared = [];
+    const prepared: Prisma.ProductCreateInput[] = [];
     for (let i = 0; i < capped.length; i += 1) {
       const row = capped[i] || {};
       const name = String(row?.name || "").trim();
