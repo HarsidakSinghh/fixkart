@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView, TextInput, ActivityIndicator, Modal, Alert } from 'react-native';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { getVendorListings, updateVendorListing } from './vendorApi';
+import { getVendorListings, updateVendorListing, deleteVendorListing } from './vendorApi';
 import StatusPill from '../components/StatusPill';
 
 const STATUS_FILTERS = [
@@ -21,6 +21,7 @@ export default function VendorInventoryScreen() {
   const [detailModal, setDetailModal] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [detailForm, setDetailForm] = useState({});
+  const [deletingId, setDeletingId] = useState(null);
 
   const loadListings = useCallback(async () => {
     setLoading(true);
@@ -106,18 +107,53 @@ export default function VendorInventoryScreen() {
               <TouchableOpacity
                 style={styles.saveBtn}
                 onPress={async () => {
-                  const payload = {
-                    quantity: Number(drafts[item.id]?.quantity ?? item.quantity ?? 0),
-                    price: Number(drafts[item.id]?.price ?? item.price ?? 0),
-                  };
-                  const res = await updateVendorListing(item.id, payload);
-                  setListings((prev) =>
-                    prev.map((p) => (p.id === item.id ? { ...p, ...res.product } : p))
-                  );
-                  setEditingId(null);
+                  try {
+                    const payload = {
+                      quantity: Number(drafts[item.id]?.quantity ?? item.quantity ?? 0),
+                      price: Number(drafts[item.id]?.price ?? item.price ?? 0),
+                    };
+                    const res = await updateVendorListing(item.id, payload);
+                    setListings((prev) =>
+                      prev.map((p) => (p.id === item.id ? { ...p, ...res.product } : p))
+                    );
+                    setEditingId(null);
+                  } catch (_) {
+                    Alert.alert('Update failed', 'Could not save listing changes.');
+                  }
                 }}
               >
                 <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteBtn, deletingId === item.id ? { opacity: 0.7 } : null]}
+                disabled={deletingId === item.id}
+                onPress={() => {
+                  Alert.alert(
+                    'Delete listing',
+                    'Are you sure you want to delete this listing?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            setDeletingId(item.id);
+                            await deleteVendorListing(item.id);
+                            setListings((prev) => prev.filter((p) => p.id !== item.id));
+                            setEditingId(null);
+                          } catch (_) {
+                            Alert.alert('Delete failed', 'Could not delete this listing.');
+                          } finally {
+                            setDeletingId(null);
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.deleteText}>{deletingId === item.id ? 'Deleting...' : 'X Delete'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingId(null)}>
                 <Text style={styles.cancelText}>Cancel</Text>
@@ -498,6 +534,16 @@ const styles = StyleSheet.create({
     borderColor: vendorColors.border,
   },
   cancelText: { color: vendorColors.muted, fontWeight: '700', fontSize: 11 },
+  deleteBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E05252',
+    backgroundColor: 'rgba(224, 82, 82, 0.12)',
+  },
+  deleteText: { color: '#E05252', fontWeight: '700', fontSize: 11 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',

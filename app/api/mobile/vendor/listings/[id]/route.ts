@@ -129,3 +129,57 @@ export async function PATCH(
 
   return NextResponse.json({ success: true, product: updated });
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } | Promise<{ id: string }> }
+) {
+  const guard = await requireVendor(req);
+  if (!guard.ok) {
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
+  }
+
+  const resolved = await params;
+  const product = await prisma.product.findFirst({
+    where: { id: resolved.id, vendorId: guard.userId },
+    select: { id: true },
+  });
+
+  if (!product) {
+    return NextResponse.json({ error: "Product not found" }, { status: 404 });
+  }
+
+  const linkedOrderItems = await prisma.orderItem.count({
+    where: { productId: product.id },
+  });
+
+  if (linkedOrderItems > 0) {
+    const existingSpecs =
+      (await prisma.product.findUnique({
+        where: { id: product.id },
+        select: { specs: true },
+      }))?.specs || {};
+    const nextSpecs =
+      existingSpecs && typeof existingSpecs === "object" && !Array.isArray(existingSpecs)
+        ? { ...(existingSpecs as Record<string, any>), deletedByVendor: true }
+        : { deletedByVendor: true };
+
+    await prisma.product.update({
+      where: { id: product.id },
+      data: {
+        isPublished: false,
+        status: "REJECTED",
+        quantity: 0,
+        specs: nextSpecs,
+      },
+    });
+
+    return NextResponse.json({ success: true, archived: true });
+  }
+
+  await prisma.product.delete({
+    where: { id: product.id },
+  });
+
+  return NextResponse.json({ success: true, deleted: true });
+}

@@ -23,7 +23,14 @@ import logoImage from '../../assets/logo1.png';
 
 WebBrowser.maybeCompleteAuthSession();
 
-export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSuccess, onClose, onRegisterVendor }) {
+export default function LoginScreen({
+  mode = 'customer',
+  onModeChange,
+  onLoginSuccess,
+  onClose,
+  onRegisterVendor,
+  onVendorBlocked,
+}) {
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
   const { getToken, isSignedIn, signOut } = useClerkAuth();
   const { user } = useUser();
@@ -42,8 +49,29 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
 
   const jwtTemplate = process.env.EXPO_PUBLIC_CLERK_JWT_TEMPLATE || 'mobile';
   const isSalesmanMode = mode === 'salesman';
-  const isAdminMode = false;
-  const isVendorMode = false;
+
+  const handleVendorBlocked = useCallback(
+    async (vendorStatus) => {
+      try {
+        await signOut();
+      } catch (_) {}
+      try {
+        await clearSession();
+      } catch (_) {}
+      const statusLabel = String(vendorStatus || '').toUpperCase();
+      const message =
+        statusLabel === 'REJECTED'
+          ? 'Your vendor registration was rejected. Please check your email for details.'
+          : statusLabel === 'SUSPENDED'
+            ? 'Your vendor account is suspended. Please contact support.'
+            : 'Your vendor registration is pending approval. You can login after approval.';
+      Alert.alert('Vendor access unavailable', message);
+      if (typeof onVendorBlocked === 'function') {
+        onVendorBlocked();
+      }
+    },
+    [signOut, clearSession, onVendorBlocked]
+  );
 
   const syncExistingSession = useCallback(async () => {
     if (!isSignedIn || isAuthenticated) return;
@@ -56,6 +84,10 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
       let email = user?.primaryEmailAddress?.emailAddress;
       try {
         const session = await getSessionRole(token);
+        if (session?.vendorStatus && session.vendorStatus !== 'APPROVED') {
+          await handleVendorBlocked(session.vendorStatus);
+          return;
+        }
         role = session.role || 'customer';
         email = session.email || email;
       } catch (error) {
@@ -74,7 +106,17 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
     } finally {
       setRestoring(false);
     }
-  }, [isSignedIn, isAuthenticated, user, checkAdminStatus, getToken, saveSession, onLoginSuccess, jwtTemplate]);
+  }, [
+    isSignedIn,
+    isAuthenticated,
+    user,
+    checkAdminStatus,
+    getToken,
+    saveSession,
+    onLoginSuccess,
+    jwtTemplate,
+    handleVendorBlocked,
+  ]);
 
   useEffect(() => {
     syncExistingSession();
@@ -146,6 +188,10 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
         let role = 'customer';
         try {
           const session = await getSessionRole(token);
+          if (session?.vendorStatus && session.vendorStatus !== 'APPROVED') {
+            await handleVendorBlocked(session.vendorStatus);
+            return;
+          }
           role = session.role || 'customer';
         } catch (error) {
           const isAdmin = await checkAdminStatus(email);
@@ -171,7 +217,18 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
     } finally {
       setIsLoading(false);
     }
-  }, [pendingSignIn, code, email, checkAdminStatus, saveSession, onLoginSuccess, getToken, setActive, signOut, clearSession, jwtTemplate, isAdminMode, isVendorMode]);
+  }, [
+    pendingSignIn,
+    code,
+    email,
+    checkAdminStatus,
+    saveSession,
+    onLoginSuccess,
+    getToken,
+    setActive,
+    jwtTemplate,
+    handleVendorBlocked,
+  ]);
 
   const handleGoogleLogin = useCallback(async () => {
     setIsLoading(true);
@@ -192,6 +249,12 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
         return;
       }
 
+      const session = await getSessionRole(token);
+      if (session?.vendorStatus && session.vendorStatus !== 'APPROVED') {
+        await handleVendorBlocked(session.vendorStatus);
+        return;
+      }
+
       const primaryEmail = user?.primaryEmailAddress?.emailAddress || email;
       const userInfo = {
         id: user?.id,
@@ -208,7 +271,17 @@ export default function LoginScreen({ mode = 'customer', onModeChange, onLoginSu
     } finally {
       setIsLoading(false);
     }
-  }, [startOAuthFlow, setActive, getToken, jwtTemplate, saveSession, onLoginSuccess, user, email]);
+  }, [
+    startOAuthFlow,
+    setActive,
+    getToken,
+    jwtTemplate,
+    saveSession,
+    onLoginSuccess,
+    user,
+    email,
+    handleVendorBlocked,
+  ]);
 
   return (
     <ScreenLayout>

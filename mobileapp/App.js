@@ -233,6 +233,7 @@ function AppGate() {
   const [showLogin, setShowLogin] = useState(false);
   const [loginMode, setLoginMode] = useState('customer');
   const [showVendorRegister, setShowVendorRegister] = useState(false);
+  const [showVendorRegistrationNotice, setShowVendorRegistrationNotice] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showWelcome, setShowWelcome] = useState(true);
   const [roleSyncing, setRoleSyncing] = useState(false);
@@ -271,6 +272,17 @@ function AppGate() {
       setShowWelcome(false);
     }
   }, [isAuthenticated, isSalesmanAuthenticated]);
+
+  useEffect(() => {
+    if (!showVendorRegistrationNotice) return;
+    const timer = setTimeout(() => {
+      setShowVendorRegistrationNotice(false);
+      setLoginMode("customer");
+      setShowLogin(true);
+      setShowWelcome(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [showVendorRegistrationNotice]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -320,10 +332,30 @@ function AppGate() {
         }}
       />
     );
-  } else
-  if (showVendorRegister) {
+  } else if (showVendorRegistrationNotice) {
     safeBg = colors.bg;
-    content = <VendorRegisterScreen onClose={() => setShowVendorRegister(false)} />;
+    content = (
+      <View style={styles.vendorNoticeWrap}>
+        <View style={styles.vendorNoticeCard}>
+          <Text style={styles.vendorNoticeTitle}>Thank you for registration</Text>
+          <Text style={styles.vendorNoticeText}>
+            You will receive an email once your vendor request is accepted or rejected.
+          </Text>
+        </View>
+      </View>
+    );
+  } else if (showVendorRegister) {
+    safeBg = colors.bg;
+    content = (
+      <VendorRegisterScreen
+        onClose={() => setShowVendorRegister(false)}
+        onSubmitted={() => {
+          setShowVendorRegister(false);
+          setShowLogin(false);
+          setShowVendorRegistrationNotice(true);
+        }}
+      />
+    );
   } else if (showLogin) {
     safeBg = loginMode === 'customer' ? customerColors.primary : colors.bg;
     content = (
@@ -344,6 +376,10 @@ function AppGate() {
             setRoleSyncing(false);
             setPostLoginWait(false);
           }, 4000);
+        }}
+        onVendorBlocked={() => {
+          setShowLogin(true);
+          setPortalPersist("customer");
         }}
       />
     );
@@ -471,5 +507,33 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     letterSpacing: 1,
+  },
+  vendorNoticeWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  vendorNoticeCard: {
+    width: "100%",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+  },
+  vendorNoticeTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  vendorNoticeText: {
+    marginTop: 10,
+    color: colors.muted,
+    fontSize: 15,
+    textAlign: "center",
+    lineHeight: 22,
   },
 });

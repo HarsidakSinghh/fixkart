@@ -11,7 +11,7 @@ export const VENDOR_INVENTORY = [
     slug: toSlug("Fastening & Joining"),
     items: [
       {
-        name: "Anchors",
+        name: "Wedge anchor",
         imagePath: "/fastening\\anchor.webp",
         categoryId: "Cat-001",
         quantity: undefined

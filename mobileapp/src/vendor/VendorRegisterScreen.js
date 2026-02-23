@@ -1,25 +1,25 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { vendorColors, vendorSpacing } from './VendorTheme';
 import { getPublicCategories, registerVendorWithToken } from './vendorApi';
+import { uploadCustomerProfilePhoto } from '../customer/customerApi';
 import { useAuth } from '../context/AuthContext';
 import { useSignIn, useSignUp, useAuth as useClerkAuth, useOAuth, useUser } from '@clerk/clerk-expo';
 import { makeRedirectUri } from 'expo-auth-session';
 
 const DOCUMENT_SLOTS = [
-  { key: 'gst', label: 'GST Certificate', types: ['application/pdf', 'image/*'] },
-  { key: 'pan', label: 'PAN Card', types: ['application/pdf', 'image/*'] },
-  { key: 'idProof', label: 'ID Proof', types: ['application/pdf', 'image/*'] },
-  { key: 'addressProof', label: 'Address / Location Proof', types: ['application/pdf', 'image/*'] },
+  { key: 'gst', label: 'GST Certificate' },
+  { key: 'pan', label: 'PAN Card' },
+  { key: 'idProof', label: 'ID Proof' },
+  { key: 'addressProof', label: 'Address / Location Proof' },
 ];
 
-export default function VendorRegisterScreen({ onClose }) {
-  const { isAuthenticated, saveSession } = useAuth();
+export default function VendorRegisterScreen({ onClose, onSubmitted }) {
+  const { clearSession } = useAuth();
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
   const { signUp, isLoaded: signUpLoaded } = useSignUp();
-  const { getToken } = useClerkAuth();
+  const { getToken, signOut } = useClerkAuth();
   const { user } = useUser();
   const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
   const redirectUrl = makeRedirectUri({ scheme: 'fixkart', path: 'redirect' });
@@ -59,6 +59,7 @@ export default function VendorRegisterScreen({ onClose }) {
   const [verifying, setVerifying] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [uploadingSlot, setUploadingSlot] = useState('');
 
   useEffect(() => {
     const email = user?.primaryEmailAddress?.emailAddress;
@@ -78,49 +79,51 @@ export default function VendorRegisterScreen({ onClose }) {
     );
   };
 
-  const pickDocument = async (slotKey, types = ['application/pdf', 'image/*']) => {
-    const result = await DocumentPicker.getDocumentAsync({
-      copyToCacheDirectory: true,
-      type: types,
-    });
-
-    if (result.canceled) return;
-
-    const asset = result.assets?.[0];
-    if (!asset?.uri) return;
-
-    const mime = asset.mimeType || 'application/octet-stream';
-    const dataUrl = await uriToBase64(asset.uri, mime);
+  const setDocumentSlot = (slotKey, payload) => {
     setDocuments((prev) => ({
       ...prev,
-      [slotKey]: {
-        data: dataUrl,
-        name: asset.name || 'Document',
-        mime,
-      },
+      [slotKey]: payload,
     }));
+  };
+
+  const pickImageForSlot = async (slotKey, fallbackName = 'Image') => {
+    try {
+      setUploadingSlot(slotKey);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.55,
+        base64: true,
+        mediaTypes: ['images'],
+      });
+
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset?.base64) {
+        Alert.alert('Upload failed', 'Could not read this image. Please try another file.');
+        return;
+      }
+      const mime = asset.mimeType || 'image/jpeg';
+      const dataUri = `data:${mime};base64,${asset.base64}`;
+      const upload = await uploadCustomerProfilePhoto(
+        dataUri,
+        `vendor-${slotKey}-${Date.now()}`
+      );
+      setDocumentSlot(slotKey, {
+        data: upload?.url || dataUri,
+        name: asset.fileName || `${fallbackName}.jpg`,
+        mime,
+      });
+    } catch (error) {
+      Alert.alert('Upload failed', 'Could not read this image. Please try another file.');
+    } finally {
+      setUploadingSlot('');
+    }
   };
 
   const pickAddressPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.8,
-      base64: true,
-      mediaTypes: ['images'],
-    });
-
-    if (result.canceled) return;
-    const asset = result.assets?.[0];
-    if (!asset?.base64) return;
-    const mime = asset.mimeType || 'image/jpeg';
-    setDocuments((prev) => ({
-      ...prev,
-      addressProof: {
-        data: `data:${mime};base64,${asset.base64}`,
-        name: asset.fileName || 'Address Photo',
-        mime,
-      },
-    }));
+    await pickImageForSlot('addressProof', 'Address Photo');
   };
+
+  const openDocChooser = (slotKey) => pickImageForSlot(slotKey, `${slotKey}-image`);
 
   const sendOtp = useCallback(async () => {
     const email = form.contactEmail.trim().toLowerCase();
@@ -206,11 +209,6 @@ export default function VendorRegisterScreen({ onClose }) {
         console.log('[VendorRegister] Token length after verify:', token ? token.length : 0);
         if (token) {
           setVerifiedToken(token);
-          await saveSession(
-            { id: finalResult.userId || result.userId, email: pendingSignIn.email, isAdmin: false },
-            token,
-            false
-          );
         }
         setVerifiedEmail(pendingSignIn.email);
         setStage('verified');
@@ -245,11 +243,6 @@ export default function VendorRegisterScreen({ onClose }) {
             console.log('[VendorRegister] Token length after verify:', token ? token.length : 0);
             if (token) {
               setVerifiedToken(token);
-              await saveSession(
-                { id: fallback.userId, email: pendingSignIn.email, isAdmin: false },
-                token,
-                false
-              );
             }
             setVerifiedEmail(pendingSignIn.email);
             setStage('verified');
@@ -267,7 +260,7 @@ export default function VendorRegisterScreen({ onClose }) {
     } finally {
       setVerifying(false);
     }
-  }, [pendingSignIn, otp, setActive, getToken, saveSession]);
+  }, [pendingSignIn, otp, setActive, getToken]);
 
   const handleGoogleLogin = useCallback(async () => {
     setOauthLoading(true);
@@ -291,7 +284,6 @@ export default function VendorRegisterScreen({ onClose }) {
       setVerifiedToken(token);
       setVerifiedEmail(email || '');
       setForm((prev) => ({ ...prev, contactEmail: email || prev.contactEmail }));
-      await saveSession({ id: user?.id, email: email || '', isAdmin: false }, token, false);
       setStage('verified');
     } catch (error) {
       const message = error?.errors?.[0]?.message || error?.message || 'Google sign-in failed.';
@@ -299,7 +291,7 @@ export default function VendorRegisterScreen({ onClose }) {
     } finally {
       setOauthLoading(false);
     }
-  }, [startOAuthFlow, redirectUrl, setActive, getToken, user, form.contactEmail, saveSession]);
+  }, [startOAuthFlow, redirectUrl, setActive, getToken, user, form.contactEmail]);
 
   const handleSubmit = async () => {
     const email = (form.contactEmail || verifiedEmail || '').trim().toLowerCase();
@@ -337,7 +329,15 @@ export default function VendorRegisterScreen({ onClose }) {
       }
       await registerVendorWithToken(token, payload);
       Alert.alert('Submitted', 'Vendor registration submitted for approval.');
-      onClose();
+      try {
+        await clearSession();
+        await signOut();
+      } catch (_) {}
+      if (typeof onSubmitted === 'function') {
+        onSubmitted();
+      } else {
+        onClose();
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to submit registration.');
     } finally {
@@ -412,14 +412,19 @@ export default function VendorRegisterScreen({ onClose }) {
                 <Text style={styles.docCardTitle}>{slot.label}</Text>
                 <TouchableOpacity
                   style={styles.uploadBtn}
+                  disabled={uploadingSlot === slot.key}
                   onPress={() =>
                     slot.key === 'addressProof'
                       ? pickAddressPhoto()
-                      : pickDocument(slot.key, slot.types)
+                      : openDocChooser(slot.key)
                   }
                 >
                   <Text style={styles.uploadText}>
-                    {uploaded?.name ? `Replace: ${uploaded.name}` : `Upload ${slot.label}`}
+                    {uploadingSlot === slot.key
+                      ? 'Uploading...'
+                      : uploaded?.name
+                        ? `Replace: ${uploaded.name}`
+                        : `Upload ${slot.label}`}
                   </Text>
                 </TouchableOpacity>
                 {uploaded?.data && isImage ? (
@@ -473,14 +478,6 @@ export default function VendorRegisterScreen({ onClose }) {
       </View>
     );
   }
-}
-
-async function uriToBase64(uri, mimeType) {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  const arrayBuffer = await blob.arrayBuffer();
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-  return `data:${mimeType};base64,${base64}`;
 }
 
 async function getTokenWithRetry(getTokenFn) {

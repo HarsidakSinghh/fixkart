@@ -339,8 +339,12 @@ export async function getInventoryApprovals() {
 
   try {
     const data = await authenticatedFetch("/api/mobile/inventory-approvals");
+    const filtered = (data.products || []).filter((p) => {
+      const status = String(p?.status || "").toUpperCase();
+      return status !== "REJECTED";
+    });
     return {
-      products: data.products.map((p) => ({
+      products: filtered.map((p) => ({
         id: p.id,
         item: p.name,
         name: p.name,
@@ -361,7 +365,9 @@ export async function getInventoryApprovals() {
     };
   } catch (error) {
     console.error("Error fetching inventory approvals:", error);
-    return { products: inventoryApprovalsMock };
+    return {
+      products: inventoryApprovalsMock.filter((p) => String(p?.status || "").toUpperCase() !== "REJECTED"),
+    };
   }
 }
 

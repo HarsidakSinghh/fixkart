@@ -45,6 +45,14 @@ export async function GET(req: Request) {
     ...p,
     sold: soldMap.get(p.id) || 0,
   }));
+  const visibleProducts = withSold.filter((p) => {
+    const specs = p?.specs;
+    const deletedByVendor =
+      specs && typeof specs === "object" && !Array.isArray(specs)
+        ? Boolean((specs as Record<string, unknown>).deletedByVendor)
+        : false;
+    return !deletedByVendor;
+  });
 
-  return NextResponse.json({ products: withSold });
+  return NextResponse.json({ products: visibleProducts });
 }

@@ -26,7 +26,7 @@ const TABS = [
 
 export default function CustomerPortal({ onOpenLogin }) {
   const insets = useSafeAreaInsets();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isVendor, isAdmin } = useAuth();
   const [tab, setTab] = useState('home');
   const [detailProduct, setDetailProduct] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -52,7 +52,7 @@ export default function CustomerPortal({ onOpenLogin }) {
   }, []);
 
   const checkProfile = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || isVendor || isAdmin) {
       setProfileGate(false);
       return;
     }
@@ -74,7 +74,7 @@ export default function CustomerPortal({ onOpenLogin }) {
     } finally {
       setProfileChecking(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isVendor, isAdmin]);
 
   useEffect(() => {
     checkProfile();

@@ -122,6 +122,14 @@ export async function updateVendorListing(id, payload) {
   });
 }
 
+export async function deleteVendorListing(id) {
+  const res = await authFetch(`/api/mobile/vendor/listings/${id}`, {
+    method: 'DELETE',
+  });
+  clearCache('vendor:listings');
+  return res;
+}
+
 export async function submitVendorProduct(payload) {
   return authFetch('/api/mobile/vendor/product-request', {
     method: 'POST',
