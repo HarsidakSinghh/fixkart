@@ -4,20 +4,37 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const subCategory = searchParams.get("subCategory") || "";
+  const category = searchParams.get("category") || "";
 
   if (!subCategory) {
     return NextResponse.json({ error: "Missing subCategory" }, { status: 400 });
   }
 
+  const typeCondition = { contains: subCategory, mode: "insensitive" as const };
+  const categoryCondition = category
+    ? {
+        OR: [
+          { category: { contains: category, mode: "insensitive" as const } },
+          { subCategory: { contains: category, mode: "insensitive" as const } },
+          { subSubCategory: { contains: category, mode: "insensitive" as const } },
+        ],
+      }
+    : null;
+
   const products = await prisma.product.findMany({
     where: {
       isPublished: true,
       status: "APPROVED",
-      OR: [
-        { subSubCategory: { contains: subCategory, mode: "insensitive" } },
-        { subCategory: { contains: subCategory, mode: "insensitive" } },
-        { name: { contains: subCategory, mode: "insensitive" } },
-        { title: { contains: subCategory, mode: "insensitive" } },
+      AND: [
+        {
+          OR: [
+            { subSubCategory: typeCondition },
+            { subCategory: typeCondition },
+            { name: typeCondition },
+            { title: typeCondition },
+          ],
+        },
+        ...(categoryCondition ? [categoryCondition] : []),
       ],
     },
     orderBy: { createdAt: "desc" },

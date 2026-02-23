@@ -91,12 +91,13 @@ export async function getStoreCategories() {
   return data;
 }
 
-export async function getTypeListings(subCategory) {
+export async function getTypeListings(subCategory, category = '') {
   if (!BASE_URL) {
     throw new Error('Missing API base URL');
   }
   const params = new URLSearchParams();
   params.set('subCategory', subCategory);
+  if (category) params.set('category', category);
   const res = await fetch(`${BASE_URL}/api/mobile/store/type-listings?${params.toString()}`);
   if (!res.ok) {
     throw new Error(`Request failed: ${res.status}`);

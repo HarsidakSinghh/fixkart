@@ -41,7 +41,7 @@ function itemStatusLabel(status) {
 }
 
 export default function CustomerOrdersScreen({ onOpenSupport }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState('ALL');
   const [loading, setLoading] = useState(true);
@@ -51,10 +51,18 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
   const [downloading, setDownloading] = useState(null);
   const [cancelling, setCancelling] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [authRequired, setAuthRequired] = useState(false);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
     setError('');
+    setAuthRequired(false);
+    if (!isAuthenticated) {
+      setOrders([]);
+      setAuthRequired(true);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await getCustomerOrders();
       setOrders(data.orders || []);
@@ -69,12 +77,17 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
       } catch {
         // ignore
       }
-    } catch {
-      setError('Unable to load orders.');
+    } catch (e) {
+      const message = String(e?.message || '').toLowerCase();
+      if (message.includes('401') || message.includes('unauthor') || message.includes('forbidden')) {
+        setAuthRequired(true);
+      } else {
+        setError('Unable to load orders.');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     loadOrders();
@@ -163,6 +176,11 @@ export default function CustomerOrdersScreen({ onOpenSupport }) {
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={customerColors.primary} />
           <Text style={styles.loadingText}>Fetching your orders…</Text>
+        </View>
+      ) : authRequired ? (
+        <View style={styles.authWrap}>
+          <Text style={styles.authTitle}>Login to see orders</Text>
+          <Text style={styles.authSubtext}>Please sign in to view your order history.</Text>
         </View>
       ) : (
         <FlatList
@@ -405,6 +423,24 @@ const styles = StyleSheet.create({
   statusWrap: { alignSelf: 'flex-start', marginTop: 2 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 8, color: customerColors.muted },
+  authWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: customerSpacing.lg,
+  },
+  authTitle: {
+    color: customerColors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  authSubtext: {
+    color: customerColors.muted,
+    marginTop: 8,
+    textAlign: 'center',
+    fontSize: 14,
+  },
   emptyWrap: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: customerColors.text, fontWeight: '700' },
   emptySubtext: { color: customerColors.muted, marginTop: 6, textAlign: 'center' },

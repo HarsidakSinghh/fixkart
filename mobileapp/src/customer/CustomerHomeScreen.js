@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Act
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
-import { getStoreCategories, getStoreTypes, getStoreProducts, recognizeProductFromImage } from './storeApi';
+import { getStoreProducts, recognizeProductFromImage } from './storeApi';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
+import { VENDOR_INVENTORY } from '../data/vendorInventory';
 
 const BANNER_SLIDES = [
   { id: '1', image: require('../../assets/photo1.png') },
@@ -67,7 +68,6 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [category, setCategory] = useState('All');
   const [categories, setCategories] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [types, setTypes] = useState([]);
   const [searchProducts, setSearchProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [lensState, setLensState] = useState('idle');
@@ -80,58 +80,56 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const [loadingTypes, setLoadingTypes] = useState(false);
-
-  const loadTypes = useCallback(async () => {
-    setLoadingTypes(true);
-    try {
-      const data = await getStoreTypes(category === 'All' ? '' : category);
-      setTypes(data.types || []);
-    } catch (error) {
-      console.error('Failed to load types', error);
-    } finally {
-      setLoadingTypes(false);
-    }
-  }, [category]);
+  const loadingTypes = false;
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadTypes();
-  }, [loadTypes]);
-
-  useEffect(() => {
-    let mounted = true;
-    const fallback = [
-      'Fastening & Joining',
-      'Electrical & Lighting',
-      'Tools & Hardware',
-      'Abrasives',
-      'Flow Control',
-      'Heating & Cooling',
-      'Fabricating',
-      'Lubricating',
-      'Material Handling',
-    ];
-    getStoreCategories()
-      .then((data) => {
-        if (!mounted) return;
-        const list = Array.isArray(data?.categories) ? data.categories : [];
-        setCategories(list.length ? list : fallback);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setCategories(fallback);
-      });
-    return () => {
-      mounted = false;
-    };
+    const list = VENDOR_INVENTORY.map((entry) => entry.title).filter(Boolean);
+    const unique = Array.from(new Set(list));
+    setCategories(unique);
   }, []);
 
+  const inventoryTypes = useMemo(() => {
+    const baseUrl = process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL || 'https://fixkart-main.vercel.app';
+    const normalizePath = (path) => {
+      if (!path) return '';
+      const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
+      const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+      return encodeURI(normalized);
+    };
+    const selectedCategories =
+      category && category !== 'All'
+        ? VENDOR_INVENTORY.filter((entry) => entry.title === category)
+        : VENDOR_INVENTORY;
+    const result = [];
+    selectedCategories.forEach((entry) => {
+      (entry.items || []).forEach((item, index) => {
+        if (!item?.name) return;
+        result.push({
+          id: `${entry.slug || entry.title}-${item.name}-${index}`,
+          label: item.name,
+          image: item.imagePath ? `${baseUrl}${normalizePath(item.imagePath)}` : '',
+          category: entry.title,
+        });
+      });
+    });
+    const deduped = new Map();
+    result.forEach((item) => {
+      const key = `${item.category}::${item.label}`.toLowerCase();
+      if (!deduped.has(key)) deduped.set(key, item);
+    });
+    return Array.from(deduped.values());
+  }, [category]);
+
   const filteredTypes = useMemo(() => {
-    if (!debouncedQuery) return types;
+    if (!debouncedQuery) return inventoryTypes;
     const needle = debouncedQuery.toLowerCase();
-    return types.filter((item) => item.label?.toLowerCase().includes(needle));
-  }, [types, debouncedQuery]);
+    return inventoryTypes.filter((item) => {
+      const label = (item.label || '').toLowerCase();
+      const cat = (item.category || '').toLowerCase();
+      return label.includes(needle) || cat.includes(needle);
+    });
+  }, [inventoryTypes, debouncedQuery]);
 
   useEffect(() => {
     let mounted = true;
@@ -235,7 +233,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
 
       <FlatList
         data={filteredTypes}
-        keyExtractor={(item) => item.label}
+        keyExtractor={(item) => item.id || `${item.category}-${item.label}`}
         numColumns={2}
         columnWrapperStyle={styles.typeRow}
         contentContainerStyle={styles.typesGrid}
@@ -245,7 +243,8 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
             onRefresh={async () => {
               setRefreshing(true);
               try {
-                await loadTypes();
+                setQuery('');
+                setDebouncedQuery('');
               } finally {
                 setRefreshing(false);
               }
@@ -276,7 +275,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
               <View>
                 <Text style={styles.sectionTitle}>{category === 'All' ? 'Browse Types' : category}</Text>
                 <Text style={styles.sectionSubtitle}>
-                  {loadingTypes ? 'Loading types…' : `${filteredTypes.length} types`}
+                  {loadingTypes ? 'Loading types…' : `${filteredTypes.length} total types`}
                 </Text>
               </View>
               <TouchableOpacity style={styles.filterButton} onPress={() => setDrawerOpen(true)}>
@@ -325,19 +324,25 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.typeCard}
-            onPress={() => onOpenProduct({ type: item.label, isType: true })}
+            onPress={() => onOpenProduct({ type: item.label, typeCategory: item.category, isType: true })}
           >
-            <View style={styles.typeImage}>
-              {item.image ? <Image source={{ uri: item.image }} style={styles.typeImage} /> : null}
+            <View style={styles.typeImageWrap}>
+              {item.image ? (
+                <Image
+                  source={{ uri: item.image }}
+                  style={styles.typeImage}
+                  resizeMode="contain"
+                />
+              ) : null}
               <View style={styles.typeOverlay} />
               <View style={styles.typeBadge}>
-                <Text style={styles.typeBadgeText}>{item.count}</Text>
+                <Text style={styles.typeBadgeText}>TYPE</Text>
               </View>
             </View>
             <Text style={styles.typeLabel} numberOfLines={2}>
               {item.label}
             </Text>
-            <Text style={styles.typeMeta}>{item.count} listings</Text>
+            <Text style={styles.typeMeta}>{item.category}</Text>
           </TouchableOpacity>
         )}
       />
@@ -512,7 +517,19 @@ const styles = StyleSheet.create({
     borderColor: customerColors.border,
     marginBottom: customerSpacing.sm,
   },
-  typeImage: { width: '100%', height: 90, borderRadius: 12, backgroundColor: customerColors.surface },
+  typeImageWrap: {
+    width: '100%',
+    height: 90,
+    borderRadius: 12,
+    backgroundColor: customerColors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  typeImage: {
+    width: '92%',
+    height: '92%',
+  },
   typeOverlay: {
     position: 'absolute',
     inset: 0,

@@ -85,6 +85,7 @@ export default function CustomerPortal({ onOpenLogin }) {
       return (
         <CustomerTypeListingsScreen
           typeLabel={detailProduct.type}
+          typeCategory={detailProduct.typeCategory || ''}
           onBack={() => setDetailProduct(null)}
           onOpenProduct={(product) => setDetailProduct(product)}
           onOpenLogin={onOpenLogin}

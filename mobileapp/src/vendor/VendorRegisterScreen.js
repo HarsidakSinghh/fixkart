@@ -8,7 +8,12 @@ import { useAuth } from '../context/AuthContext';
 import { useSignIn, useSignUp, useAuth as useClerkAuth, useOAuth, useUser } from '@clerk/clerk-expo';
 import { makeRedirectUri } from 'expo-auth-session';
 
-const DOC_TYPES = ['GST', 'PAN', 'Address Proof'];
+const DOCUMENT_SLOTS = [
+  { key: 'gst', label: 'GST Certificate', types: ['application/pdf', 'image/*'] },
+  { key: 'pan', label: 'PAN Card', types: ['application/pdf', 'image/*'] },
+  { key: 'idProof', label: 'ID Proof', types: ['application/pdf', 'image/*'] },
+  { key: 'addressProof', label: 'Address / Location Proof', types: ['application/pdf', 'image/*'] },
+];
 
 export default function VendorRegisterScreen({ onClose }) {
   const { isAuthenticated, saveSession } = useAuth();
@@ -20,11 +25,12 @@ export default function VendorRegisterScreen({ onClose }) {
   const redirectUrl = makeRedirectUri({ scheme: 'fixkart', path: 'redirect' });
   const [categories, setCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [docType, setDocType] = useState(DOC_TYPES[0]);
-  const [docData, setDocData] = useState('');
-  const [docName, setDocName] = useState('');
-  const [docMime, setDocMime] = useState('');
-  const [photoData, setPhotoData] = useState('');
+  const [documents, setDocuments] = useState({
+    gst: { data: '', name: '', mime: '' },
+    pan: { data: '', name: '', mime: '' },
+    idProof: { data: '', name: '', mime: '' },
+    addressProof: { data: '', name: '', mime: '' },
+  });
   const [stage, setStage] = useState('login');
   const [otp, setOtp] = useState('');
   const [pendingSignIn, setPendingSignIn] = useState(null);
@@ -72,10 +78,10 @@ export default function VendorRegisterScreen({ onClose }) {
     );
   };
 
-  const pickDocument = async () => {
+  const pickDocument = async (slotKey, types = ['application/pdf', 'image/*']) => {
     const result = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
-      type: ['application/pdf', 'image/*'],
+      type: types,
     });
 
     if (result.canceled) return;
@@ -84,22 +90,36 @@ export default function VendorRegisterScreen({ onClose }) {
     if (!asset?.uri) return;
 
     const mime = asset.mimeType || 'application/octet-stream';
-    setDocName(asset.name || 'Document');
-    setDocMime(mime);
     const dataUrl = await uriToBase64(asset.uri, mime);
-    setDocData(dataUrl);
+    setDocuments((prev) => ({
+      ...prev,
+      [slotKey]: {
+        data: dataUrl,
+        name: asset.name || 'Document',
+        mime,
+      },
+    }));
   };
 
-  const pickPhoto = async () => {
+  const pickAddressPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.7,
+      quality: 0.8,
       base64: true,
+      mediaTypes: ['images'],
     });
 
     if (result.canceled) return;
     const asset = result.assets?.[0];
     if (!asset?.base64) return;
-    setPhotoData(`data:image/jpeg;base64,${asset.base64}`);
+    const mime = asset.mimeType || 'image/jpeg';
+    setDocuments((prev) => ({
+      ...prev,
+      addressProof: {
+        data: `data:${mime};base64,${asset.base64}`,
+        name: asset.fileName || 'Address Photo',
+        mime,
+      },
+    }));
   };
 
   const sendOtp = useCallback(async () => {
@@ -291,6 +311,11 @@ export default function VendorRegisterScreen({ onClose }) {
       Alert.alert('Error', 'Please fill required fields.');
       return;
     }
+    const missingDocs = DOCUMENT_SLOTS.filter((slot) => !documents?.[slot.key]?.data).map((slot) => slot.label);
+    if (missingDocs.length) {
+      Alert.alert('Missing documents', `Please upload all required documents: ${missingDocs.join(', ')}`);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -298,9 +323,7 @@ export default function VendorRegisterScreen({ onClose }) {
         ...form,
         contactEmail: email,
         categories: selectedCategories,
-        docType,
-        docData,
-        locationPhoto: photoData,
+        documents,
         gpsLat: form.gpsLat ? Number(form.gpsLat) : null,
         gpsLng: form.gpsLng ? Number(form.gpsLng) : null,
       };
@@ -379,37 +402,42 @@ export default function VendorRegisterScreen({ onClose }) {
         {renderInput('Account Number', 'accountNumber')}
         {renderInput('IFSC Code', 'ifscCode')}
 
-        <Text style={styles.sectionTitle}>Document Upload</Text>
-        <View style={styles.categoryWrap}>
-          {DOC_TYPES.map((type) => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.categoryChip, docType === type && styles.categoryChipActive]}
-              onPress={() => setDocType(type)}
-            >
-              <Text style={[styles.categoryText, docType === type && styles.categoryTextActive]}>{type}</Text>
-            </TouchableOpacity>
-          ))}
+        <Text style={styles.sectionTitle}>Document Uploads (All Required)</Text>
+        <View style={styles.docsList}>
+          {DOCUMENT_SLOTS.map((slot) => {
+            const uploaded = documents?.[slot.key];
+            const isImage = !!uploaded?.mime && uploaded.mime.startsWith('image/');
+            return (
+              <View key={slot.key} style={styles.docCard}>
+                <Text style={styles.docCardTitle}>{slot.label}</Text>
+                <TouchableOpacity
+                  style={styles.uploadBtn}
+                  onPress={() =>
+                    slot.key === 'addressProof'
+                      ? pickAddressPhoto()
+                      : pickDocument(slot.key, slot.types)
+                  }
+                >
+                  <Text style={styles.uploadText}>
+                    {uploaded?.name ? `Replace: ${uploaded.name}` : `Upload ${slot.label}`}
+                  </Text>
+                </TouchableOpacity>
+                {uploaded?.data && isImage ? (
+                  <Image source={{ uri: uploaded.data }} style={styles.preview} />
+                ) : null}
+                {uploaded?.data && !isImage ? (
+                  <View style={styles.docMeta}>
+                    <Text style={styles.docMetaText}>{slot.label} ready</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
-        <TouchableOpacity style={styles.uploadBtn} onPress={pickDocument}>
-          <Text style={styles.uploadText}>{docName ? `Uploaded: ${docName}` : 'Upload Document (PDF/Image)'}</Text>
-        </TouchableOpacity>
-        {docData && docMime.startsWith('image/') ? (
-          <Image source={{ uri: docData }} style={styles.preview} />
-        ) : null}
-        {docData && !docMime.startsWith('image/') ? (
-          <View style={styles.docMeta}>
-            <Text style={styles.docMetaText}>Document ready • {docType}</Text>
-          </View>
-        ) : null}
 
-        <Text style={styles.sectionTitle}>GPS & Building Photo (Optional)</Text>
+        <Text style={styles.sectionTitle}>GPS (Optional)</Text>
         {renderInput('Latitude', 'gpsLat')}
         {renderInput('Longitude', 'gpsLng')}
-        <TouchableOpacity style={styles.uploadBtn} onPress={pickPhoto}>
-          <Text style={styles.uploadText}>Upload Building Photo</Text>
-        </TouchableOpacity>
-        {photoData ? <Image source={{ uri: photoData }} style={styles.preview} /> : null}
 
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
           <Text style={styles.submitText}>{submitting ? 'Submitting…' : 'Submit for Approval'}</Text>
@@ -551,6 +579,15 @@ const styles = StyleSheet.create({
   categoryChipActive: { backgroundColor: vendorColors.primary, borderColor: vendorColors.primary },
   categoryText: { fontSize: 11, color: vendorColors.muted, fontWeight: '600' },
   categoryTextActive: { color: '#FFFFFF' },
+  docsList: { marginTop: vendorSpacing.sm, gap: vendorSpacing.md },
+  docCard: {
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 12,
+    backgroundColor: vendorColors.card,
+    padding: vendorSpacing.sm,
+  },
+  docCardTitle: { color: vendorColors.text, fontWeight: '700', fontSize: 12 },
   uploadBtn: {
     marginTop: vendorSpacing.md,
     borderWidth: 1,

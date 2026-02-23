@@ -34,6 +34,7 @@ export async function POST(req: Request) {
     ifscCode,
     docType,
     docData,
+    documents,
     gpsLat,
     gpsLng,
     locationPhoto,
@@ -57,12 +58,28 @@ export async function POST(req: Request) {
     gstCertificateUrl: null,
     panCardUrl: null,
     idProofUrl: null,
+    aadharCardUrl: null,
   };
+  let locationPhotoUrl: string | null = locationPhoto || null;
 
+  // New multi-document payload from mobile app.
+  if (documents && typeof documents === "object") {
+    const docs: any = documents;
+    docFields.gstCertificateUrl = docs?.gst?.data || null;
+    docFields.panCardUrl = docs?.pan?.data || null;
+    docFields.idProofUrl = docs?.idProof?.data || null;
+    docFields.aadharCardUrl = docs?.idProof?.data || null;
+    locationPhotoUrl = docs?.addressProof?.data || locationPhotoUrl;
+  }
+
+  // Backward-compatible single-document payload.
   if (docData && docType) {
-    if (docType === "GST") docFields.gstCertificateUrl = docData;
-    else if (docType === "PAN") docFields.panCardUrl = docData;
-    else docFields.idProofUrl = docData;
+    if (docType === "GST" && !docFields.gstCertificateUrl) docFields.gstCertificateUrl = docData;
+    else if (docType === "PAN" && !docFields.panCardUrl) docFields.panCardUrl = docData;
+    else if (!docFields.idProofUrl) {
+      docFields.idProofUrl = docData;
+      docFields.aadharCardUrl = docData;
+    }
   }
 
   let gstVerificationStatus = "NOT_PROVIDED";
@@ -127,7 +144,7 @@ export async function POST(req: Request) {
       accountHolder: accountHolder || null,
       accountNumber: accountNumber || null,
       ifscCode: ifscCode || null,
-      locationPhotoUrl: locationPhoto || null,
+      locationPhotoUrl,
       gpsLat: typeof gpsLat === "number" ? gpsLat : null,
       gpsLng: typeof gpsLng === "number" ? gpsLng : null,
       ...docFields,
@@ -162,7 +179,7 @@ export async function POST(req: Request) {
       accountHolder: accountHolder || null,
       accountNumber: accountNumber || null,
       ifscCode: ifscCode || null,
-      locationPhotoUrl: locationPhoto || null,
+      locationPhotoUrl,
       gpsLat: typeof gpsLat === "number" ? gpsLat : null,
       gpsLng: typeof gpsLng === "number" ? gpsLng : null,
       ...docFields,

@@ -5,7 +5,13 @@ import { getTypeListings, getReviewSummaries } from './storeApi';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
-export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenProduct, onOpenLogin }) {
+export default function CustomerTypeListingsScreen({
+  typeLabel,
+  typeCategory = '',
+  onBack,
+  onOpenProduct,
+  onOpenLogin,
+}) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const { addItem } = useCart();
@@ -14,7 +20,7 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getTypeListings(typeLabel);
+      const data = await getTypeListings(typeLabel, typeCategory);
       const listings = data.listings || [];
       const summaries = await getReviewSummaries(listings.map((item) => item.id));
       setItems(
@@ -29,7 +35,7 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
     } finally {
       setLoading(false);
     }
-  }, [typeLabel]);
+  }, [typeLabel, typeCategory]);
 
   useEffect(() => {
     load();
@@ -60,7 +66,9 @@ export default function CustomerTypeListingsScreen({ typeLabel, onBack, onOpenPr
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{typeLabel} Inventory</Text>
-        <Text style={styles.subtitle}>Select from vendor listings</Text>
+        <Text style={styles.subtitle}>
+          {typeCategory ? `${typeCategory} • Select from vendor listings` : 'Select from vendor listings'}
+        </Text>
       </View>
 
       {loading ? (
