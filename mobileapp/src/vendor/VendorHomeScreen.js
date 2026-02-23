@@ -712,7 +712,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
             <Text style={styles.modalSubtitle}>
               {`Type "${pendingBulkType || 'new product'}" was not found. Choose category for generated listings.`}
             </Text>
-            <View style={styles.categoryPickerGrid}>
+            <ScrollView style={styles.categoryPickerScroll} contentContainerStyle={styles.categoryPickerGrid} showsVerticalScrollIndicator={false}>
               {categories
                 .filter((cat) => cat && cat !== 'All')
                 .map((cat) => (
@@ -720,10 +720,12 @@ export default function VendorHomeScreen({ canAdd, status }) {
                     <Text style={styles.categoryChoiceText}>{cat}</Text>
                   </TouchableOpacity>
                 ))}
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setBulkCategoryPickerOpen(false)}>
+                <Text style={styles.cancelText}>Close</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setBulkCategoryPickerOpen(false)}>
-              <Text style={styles.cancelText}>Close</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1199,17 +1201,22 @@ const styles = StyleSheet.create({
   categoryPickerCard: {
     width: '100%',
     maxWidth: 420,
+    maxHeight: '82%',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: vendorColors.border,
     backgroundColor: vendorColors.card,
     padding: vendorSpacing.lg,
   },
+  categoryPickerScroll: {
+    marginTop: 6,
+    maxHeight: 420,
+  },
   categoryPickerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 8,
+    marginTop: 2,
     marginBottom: 12,
   },
   categoryChoice: {

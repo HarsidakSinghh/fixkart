@@ -138,9 +138,16 @@ function parseDiaLengthRateTable(text: string) {
 
   const headerLine = lines[headerIndex];
   const lengthTokens = numericTokens(headerLine);
-  const lengths = (lengthTokens || [])
+  let lengths = (lengthTokens || [])
     .map((t) => Number(t))
     .filter((n) => Number.isFinite(n) && n >= 8 && n <= 200);
+  // OCR sometimes drops early small columns (e.g., 4,5,6 in machine screw tables),
+  // which causes a left-shift in generated sizes.
+  const machineScrewHint = /machine\s*screw/i.test(text);
+  const hasSmall = lengths.some((n) => n <= 6);
+  if (machineScrewHint && !hasSmall && lengths.length >= 10) {
+    lengths = [4, 5, 6, ...lengths];
+  }
   if (!lengths.length) return out;
 
   for (let i = headerIndex + 1; i < lines.length; i += 1) {
