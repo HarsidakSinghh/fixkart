@@ -78,25 +78,38 @@ function parseDiaLengthRateTable(text: string) {
     .filter(Boolean);
   const out: Array<{ size: string; price: number }> = [];
 
-  const headerIndex = lines.findIndex((line) => /\bDIA\b/i.test(line));
+  const numericTokens = (line: string) =>
+    (line.match(/\d+(?:\/\d+)?(?:\.\d+)?/g) || []).map((token) => token.trim());
+
+  const looksLikeLengthHeader = (line: string) => {
+    const tokens = numericTokens(line).map((t) => Number(t)).filter((n) => Number.isFinite(n));
+    if (tokens.length < 8) return false;
+    // Header lengths are usually in 10..100 range and ascending.
+    const small = tokens.filter((n) => n >= 8 && n <= 120);
+    if (small.length < 8) return false;
+    let asc = 0;
+    for (let i = 1; i < small.length; i += 1) {
+      if (small[i] >= small[i - 1]) asc += 1;
+    }
+    return asc >= Math.max(6, small.length - 2);
+  };
+
+  let headerIndex = lines.findIndex((line) => /\bDIA\b/i.test(line));
+  if (headerIndex < 0) {
+    headerIndex = lines.findIndex((line) => looksLikeLengthHeader(line));
+  }
   if (headerIndex < 0) return out;
 
   const headerLine = lines[headerIndex];
-  const lengthTokens = headerLine
-    .replace(/\bDIA\b/i, "")
-    .match(/\d+(?:\.\d+)?/g);
+  const lengthTokens = numericTokens(headerLine);
   const lengths = (lengthTokens || [])
     .map((t) => Number(t))
-    .filter((n) => Number.isFinite(n) && n > 0);
+    .filter((n) => Number.isFinite(n) && n >= 8 && n <= 200);
   if (!lengths.length) return out;
 
   for (let i = headerIndex + 1; i < lines.length; i += 1) {
     const line = lines[i];
-    const parts = line
-      .replace(/\s+/g, " ")
-      .split(" ")
-      .map((p) => p.trim())
-      .filter(Boolean);
+    const parts = numericTokens(line);
     if (parts.length < 2) continue;
 
     const diaToken = parts[0].replace(/"/g, "");
@@ -110,7 +123,7 @@ function parseDiaLengthRateTable(text: string) {
       .filter((n) => Number.isFinite(n) && n > 0);
     if (!prices.length) continue;
 
-    const rightAlign = diaNumeric >= 10 && prices.length < lengths.length;
+    const rightAlign = diaNumeric >= 8 && prices.length < lengths.length;
     const startIndex = rightAlign ? Math.max(0, lengths.length - prices.length) : 0;
     for (let j = 0; j < prices.length && startIndex + j < lengths.length; j += 1) {
       const length = lengths[startIndex + j];
