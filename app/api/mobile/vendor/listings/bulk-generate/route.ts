@@ -446,7 +446,9 @@ export async function POST(req: Request) {
     const profile = inferProductProfile(fileName, text);
     const image = profile.image;
     const lineSeed = parseDiaLengthRateTable(text);
-    const seed = overlaySeed.length >= lineSeed.length ? overlaySeed : lineSeed;
+    // Line parser is more stable for clean matrix tables (DIA x LENGTH).
+    // Use overlay parser only as fallback when line parser cannot parse enough rows.
+    const seed = lineSeed.length >= 8 ? lineSeed : overlaySeed;
 
     const uniqueMap = new Map<string, { size: string; price: number }>();
     for (const row of seed) {
