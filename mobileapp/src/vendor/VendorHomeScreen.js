@@ -190,13 +190,19 @@ export default function VendorHomeScreen({ canAdd, status }) {
     const blob = await response.blob();
     const buffer = await blob.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-    let binary = '';
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode(...chunk);
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let base64 = '';
+    for (let i = 0; i < bytes.length; i += 3) {
+      const a = bytes[i];
+      const b = i + 1 < bytes.length ? bytes[i + 1] : NaN;
+      const c = i + 2 < bytes.length ? bytes[i + 2] : NaN;
+      const triple = (a << 16) | ((Number.isNaN(b) ? 0 : b) << 8) | (Number.isNaN(c) ? 0 : c);
+
+      base64 += chars[(triple >> 18) & 63];
+      base64 += chars[(triple >> 12) & 63];
+      base64 += Number.isNaN(b) ? '=' : chars[(triple >> 6) & 63];
+      base64 += Number.isNaN(c) ? '=' : chars[triple & 63];
     }
-    const base64 = btoa(binary);
     return `data:${mimeType};base64,${base64}`;
   }, []);
 
@@ -214,6 +220,10 @@ export default function VendorHomeScreen({ canAdd, status }) {
       if (picked.canceled) return;
       const asset = picked.assets?.[0];
       if (!asset?.uri) return;
+      if (asset.size && asset.size > 3 * 1024 * 1024) {
+        Alert.alert('File too large', 'Please upload a file smaller than 3MB for bulk generation.');
+        return;
+      }
 
       setBulkGenerating(true);
       setBulkProgress(0.08);
@@ -247,7 +257,15 @@ export default function VendorHomeScreen({ canAdd, status }) {
           setBulkPreviewOpen(true);
         }
       } catch (error) {
-        Alert.alert('Generation failed', 'Could not generate listings from this file.');
+        const message = String(error?.message || '');
+        let display = 'Could not generate listings from this file.';
+        try {
+          const parsed = JSON.parse(message);
+          display = parsed?.error || display;
+        } catch (_) {
+          if (message) display = message;
+        }
+        Alert.alert('Generation failed', display);
       } finally {
         clearInterval(progressTicker);
         setTimeout(() => {

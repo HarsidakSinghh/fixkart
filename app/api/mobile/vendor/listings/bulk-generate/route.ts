@@ -164,6 +164,12 @@ export async function POST(req: Request) {
     if (!fileDataUrl.startsWith("data:")) {
       return NextResponse.json({ error: "Invalid file payload" }, { status: 400 });
     }
+    if (fileDataUrl.length > 4_000_000) {
+      return NextResponse.json(
+        { error: "File is too large for processing. Upload a smaller image/pdf." },
+        { status: 413 }
+      );
+    }
 
     const vendor = await prisma.vendorProfile.findUnique({
       where: { userId: guard.userId },
@@ -171,7 +177,13 @@ export async function POST(req: Request) {
     });
     const brand = vendor?.companyName || vendor?.fullName || "Fixkart Vendor";
 
-    const text = await extractTextWithOcrSpace(fileDataUrl);
+    let text = "";
+    try {
+      text = await extractTextWithOcrSpace(fileDataUrl);
+    } catch (ocrError) {
+      // Keep flow alive for preview screen; UI can still edit/remove before submit.
+      text = fileName;
+    }
     const typeName = inferTypeFromName(fileName, text);
     const image = getAutoImageByType(typeName);
 
