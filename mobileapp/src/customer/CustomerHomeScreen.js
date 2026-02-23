@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 90,
     borderRadius: 12,
-    backgroundColor: customerColors.surface,
+    backgroundColor: customerColors.card,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -529,11 +529,13 @@ const styles = StyleSheet.create({
   typeImage: {
     width: '92%',
     height: '92%',
+    backgroundColor: customerColors.card,
+    borderRadius: 8,
   },
   typeOverlay: {
     position: 'absolute',
     inset: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    backgroundColor: 'rgba(15, 23, 42, 0.03)',
     borderRadius: 12,
   },
   typeBadge: {

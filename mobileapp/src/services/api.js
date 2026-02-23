@@ -274,6 +274,14 @@ export async function updateVendorStatus(id, status) {
   });
 }
 
+export async function bulkVendorAction(action, vendorIds = []) {
+  if (USE_MOCK) return { success: true, action, affectedVendors: vendorIds.length, removedListings: 0 };
+  return authenticatedFetch(`/api/mobile/vendors/bulk`, {
+    method: "POST",
+    body: JSON.stringify({ action, vendorIds }),
+  });
+}
+
 export async function reverifyVendorGst(id) {
   if (USE_MOCK) return { success: true };
   return authenticatedFetch(`/api/mobile/vendors/${id}/gst-verify`, {
