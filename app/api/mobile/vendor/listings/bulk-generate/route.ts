@@ -23,22 +23,6 @@ const DEFAULT_IMAGE =
   "https://res.cloudinary.com/demo/image/upload/v1/samples/metallic-structural-detail";
 const DEFAULT_CARTON_PIECES = 100;
 const DEFAULT_STOCK = 100;
-const LENGTH_COLUMNS = [10, 12, 16, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100];
-
-const HEX_BOLT_TABLE: Record<string, Array<number | null>> = {
-  "3": [354, 352, 360, 376, 419, 783, 853, 921, 1003, 1007, null, null, null, null, null, null, null, null],
-  "4": [311, 326, 339, 369, 425, 523, 606, 875, 969, 988, null, null, null, null, null, null, null, null],
-  "5": [369, 393, 416, 462, 520, 606, 736, 894, 1007, 1044, 1278, 1413, 1576, 1618, 1803, 1850, null, null],
-  "6": [540, 574, 619, 687, 791, 909, 1001, 1117, 1225, 1363, 1481, 1530, 1692, 1807, 1951, 2015, 2299, 2543],
-  "8": [null, null, 1235, 1361, 1530, 1688, 1871, 2053, 2280, 2482, 2621, 2821, 3044, 3250, 3389, 3498, 4068, 4237],
-  "10": [null, null, 2376, 2577, 2835, 3100, 3341, 3582, 3930, 4258, 4510, 4786, 5130, 5431, 5904, 6035, 6653, 7215],
-  "12": [null, null, null, 3938, 4164, 4522, 5002, 5413, 5777, 6131, 6634, 7102, 7630, 7914, 8360, 8915, 9702, 10451],
-  "14": [null, null, null, null, 6508, 6876, 7325, 7694, 8449, 8554, 9070, 9454, 10343, 10435, 11456, 11595, 12940, 13516],
-  "16": [null, null, null, null, 8538, 9239, 9787, 10439, 11305, 11514, 12262, 13147, 14335, 14966, 15520, 16598, 18010, 19339],
-  "18": [null, null, null, null, null, null, null, 15174, 16668, 16994, 17166, 18883, 20153, 21208, 22073, 23297, 25223, 27061],
-  "20": [null, null, null, null, null, null, null, 18652, 20652, 21066, 20649, 23056, 24303, 25693, 26799, 28070, 30347, 32544],
-  "24": [null, null, null, null, null, null, null, 29302, 30624, 31231, 32857, 33255, 36314, 37688, 39353, 41105, 44852, 48050],
-};
 
 function uid(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -102,8 +86,13 @@ function parseDiaLengthRateTable(text: string) {
     .filter(Boolean);
   const out: Array<{ size: string; price: number }> = [];
 
+  const normalizeOcrLine = (line: string) =>
+    String(line || "")
+      .replace(/[Oo]/g, "0")
+      .replace(/[lI]/g, "1");
+
   const numericTokens = (line: string) =>
-    (line.match(/\d+(?:\/\d+)?(?:\.\d+)?/g) || []).map((token) => token.trim());
+    (normalizeOcrLine(line).match(/\d+(?:\/\d+)?(?:\.\d+)?/g) || []).map((token) => token.trim());
 
   const looksLikeLengthHeader = (line: string) => {
     const tokens = numericTokens(line).map((t) => Number(t)).filter((n) => Number.isFinite(n));
@@ -217,47 +206,67 @@ function inferProductProfile(fileName = "", text = "") {
   };
 }
 
-function buildSeedFromHexBoltTemplate() {
-  const seed: Array<{ size: string; price: number }> = [];
-  for (const dia of Object.keys(HEX_BOLT_TABLE)) {
-    const row = HEX_BOLT_TABLE[dia] || [];
-    for (let idx = 0; idx < LENGTH_COLUMNS.length; idx += 1) {
-      const price = row[idx];
-      if (!price || !Number.isFinite(price)) continue;
-      seed.push({ size: `${dia}*${LENGTH_COLUMNS[idx]}`, price: Number(price) });
-    }
-  }
-  return seed;
-}
-
 async function extractTextWithOcrSpace(fileDataUrl: string) {
   const apiKey = process.env.OCR_SPACE_API_KEY || "helloworld";
-  const body = new URLSearchParams();
-  body.set("base64Image", fileDataUrl);
-  body.set("language", "eng");
-  body.set("isOverlayRequired", "false");
-  body.set("OCREngine", "2");
-  body.set("scale", "true");
+  const variants: Array<Record<string, string>> = [
+    { OCREngine: "2", isTable: "true", scale: "true" },
+    { OCREngine: "2", isTable: "false", scale: "true" },
+    { OCREngine: "1", isTable: "true", scale: "true" },
+  ];
 
-  const res = await fetch("https://api.ocr.space/parse/image", {
-    method: "POST",
-    headers: {
-      apikey: apiKey,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-  });
+  let bestText = "";
+  let lastError = "";
 
-  if (!res.ok) {
-    const message = await res.text();
-    throw new Error(message || `OCR failed: ${res.status}`);
+  for (const variant of variants) {
+    const body = new URLSearchParams();
+    body.set("base64Image", fileDataUrl);
+    body.set("language", "eng");
+    body.set("isOverlayRequired", "false");
+    body.set("OCREngine", variant.OCREngine);
+    body.set("isTable", variant.isTable);
+    body.set("scale", variant.scale);
+
+    const res = await fetch("https://api.ocr.space/parse/image", {
+      method: "POST",
+      headers: {
+        apikey: apiKey,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: body.toString(),
+    });
+
+    if (!res.ok) {
+      lastError = `OCR failed: ${res.status}`;
+      continue;
+    }
+
+    const payload = (await res.json()) as {
+      IsErroredOnProcessing?: boolean;
+      ErrorMessage?: string[] | string;
+      ParsedResults?: Array<{ ParsedText?: string }>;
+    };
+
+    if (payload?.IsErroredOnProcessing) {
+      const err = Array.isArray(payload?.ErrorMessage)
+        ? payload.ErrorMessage.join(", ")
+        : String(payload?.ErrorMessage || "");
+      lastError = err || "OCR processing error";
+      continue;
+    }
+
+    const parsedText = Array.isArray(payload?.ParsedResults)
+      ? payload.ParsedResults.map((entry) => String(entry?.ParsedText || "")).join("\n")
+      : "";
+    const trimmed = parsedText.trim();
+    if (trimmed.length > bestText.length) {
+      bestText = trimmed;
+    }
   }
 
-  const payload = (await res.json()) as { ParsedResults?: Array<{ ParsedText?: string }> };
-  const parsedText = Array.isArray(payload?.ParsedResults)
-    ? payload.ParsedResults.map((entry) => String(entry?.ParsedText || "")).join("\n")
-    : "";
-  return parsedText.trim();
+  if (!bestText) {
+    throw new Error(lastError || "OCR returned empty text");
+  }
+  return bestText;
 }
 
 export async function POST(req: Request) {
@@ -296,10 +305,7 @@ export async function POST(req: Request) {
     }
     const profile = inferProductProfile(fileName, text);
     const image = profile.image;
-    let seed = parseDiaLengthRateTable(text);
-    if (!seed.length && profile.productBaseName.toLowerCase().includes("hex bolt")) {
-      seed = buildSeedFromHexBoltTemplate();
-    }
+    const seed = parseDiaLengthRateTable(text);
 
     const uniqueMap = new Map<string, { size: string; price: number }>();
     for (const row of seed) {
