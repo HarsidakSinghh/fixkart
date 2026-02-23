@@ -188,22 +188,16 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const uriToDataUrl = useCallback(async (uri, mimeType = 'application/octet-stream') => {
     const response = await fetch(uri);
     const blob = await response.blob();
-    const buffer = await blob.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    let base64 = '';
-    for (let i = 0; i < bytes.length; i += 3) {
-      const a = bytes[i];
-      const b = i + 1 < bytes.length ? bytes[i + 1] : NaN;
-      const c = i + 2 < bytes.length ? bytes[i + 2] : NaN;
-      const triple = (a << 16) | ((Number.isNaN(b) ? 0 : b) << 8) | (Number.isNaN(c) ? 0 : c);
-
-      base64 += chars[(triple >> 18) & 63];
-      base64 += chars[(triple >> 12) & 63];
-      base64 += Number.isNaN(b) ? '=' : chars[(triple >> 6) & 63];
-      base64 += Number.isNaN(c) ? '=' : chars[triple & 63];
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Unable to read file'));
+      reader.readAsDataURL(blob);
+    });
+    if (!String(dataUrl).startsWith('data:')) {
+      throw new Error('Invalid file format');
     }
-    return `data:${mimeType};base64,${base64}`;
+    return String(dataUrl).replace(/^data:[^;]+/, `data:${mimeType}`);
   }, []);
 
   const pickBulkUploadFile = useCallback(async () => {
