@@ -137,6 +137,20 @@ export async function submitVendorProduct(payload) {
   });
 }
 
+export async function generateBulkVendorListings(payload) {
+  return authFetch('/api/mobile/vendor/listings/bulk-generate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function submitBulkVendorListings(listings = []) {
+  return authFetch('/api/mobile/vendor/listings/bulk-submit', {
+    method: 'POST',
+    body: JSON.stringify({ listings }),
+  });
+}
+
 export async function uploadVendorListingImage(imageBase64, filename) {
   return authFetch('/api/mobile/vendor/uploads', {
     method: 'POST',

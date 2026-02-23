@@ -10,10 +10,17 @@ import {
   ActivityIndicator,
   Image,
   ScrollView,
+  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { vendorColors, vendorSpacing } from './VendorTheme';
-import { submitVendorProduct, uploadVendorListingImage } from './vendorApi';
+import {
+  submitVendorProduct,
+  uploadVendorListingImage,
+  generateBulkVendorListings,
+  submitBulkVendorListings,
+} from './vendorApi';
 import { VENDOR_INVENTORY } from '../data/vendorInventory';
 
 export default function VendorHomeScreen({ canAdd, status }) {
@@ -47,6 +54,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     hsnCode: '',
     commissionPercent: '',
     stock: '',
+    cartonPieces: '',
     returnsPolicy: '',
     warrantyPolicy: '',
   });
@@ -56,6 +64,12 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [customImageUrls, setCustomImageUrls] = useState([]);
   const [customImagePreviews, setCustomImagePreviews] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkPreviewOpen, setBulkPreviewOpen] = useState(false);
+  const [bulkDrafts, setBulkDrafts] = useState([]);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [editingDraft, setEditingDraft] = useState(null);
 
   const loadCategories = useCallback(() => {
     const titles = VENDOR_INVENTORY.map((cat) => cat.title);
@@ -93,7 +107,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
       discountedPrice: '',
       tieredPricing: '',
       hsnCode: '',
+      commissionPercent: '',
       stock: '',
+      cartonPieces: '',
       returnsPolicy: '',
       warrantyPolicy: '',
     });
@@ -169,14 +185,139 @@ export default function VendorHomeScreen({ canAdd, status }) {
     setSearch('');
   };
 
+  const uriToDataUrl = useCallback(async (uri, mimeType = 'application/octet-stream') => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    const base64 = btoa(binary);
+    return `data:${mimeType};base64,${base64}`;
+  }, []);
+
+  const pickBulkUploadFile = useCallback(async () => {
+    if (!canAdd) {
+      Alert.alert('Unavailable', 'You can upload listings after admin approval.');
+      return;
+    }
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled) return;
+      const asset = picked.assets?.[0];
+      if (!asset?.uri) return;
+
+      setBulkGenerating(true);
+      setBulkProgress(0.08);
+      const progressTicker = setInterval(() => {
+        setBulkProgress((prev) => (prev >= 0.9 ? 0.9 : prev + 0.06));
+      }, 350);
+
+      try {
+        const mime = asset.mimeType || (asset.name?.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+        const dataUrl = await uriToDataUrl(asset.uri, mime);
+        setBulkProgress(0.45);
+        const response = await generateBulkVendorListings({
+          fileDataUrl: dataUrl,
+          fileName: asset.name || `bulk-${Date.now()}`,
+          mimeType: mime,
+        });
+        const drafts = Array.isArray(response?.drafts) ? response.drafts : [];
+        setBulkDrafts(
+          drafts.map((item, idx) => ({
+            ...item,
+            tempId: item.tempId || `${Date.now()}-${idx}`,
+            price: String(item.price ?? ''),
+            stock: String(item.stock ?? '100'),
+            cartonPieces: String(item.cartonPieces ?? '100'),
+          }))
+        );
+        setBulkProgress(1);
+        if (!drafts.length) {
+          Alert.alert('No listings found', 'Could not detect listings from this file. Try a clearer file or edit manually.');
+        } else {
+          setBulkPreviewOpen(true);
+        }
+      } catch (error) {
+        Alert.alert('Generation failed', 'Could not generate listings from this file.');
+      } finally {
+        clearInterval(progressTicker);
+        setTimeout(() => {
+          setBulkGenerating(false);
+          setBulkProgress(0);
+        }, 300);
+      }
+    } catch (error) {
+      Alert.alert('Upload failed', 'Unable to read selected file.');
+    }
+  }, [canAdd, uriToDataUrl]);
+
+  const removeDraft = useCallback((tempId) => {
+    setBulkDrafts((prev) => prev.filter((item) => item.tempId !== tempId));
+  }, []);
+
+  const rejectAllDrafts = useCallback(() => {
+    Alert.alert('Reject all', 'Remove all generated listings?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reject all',
+        style: 'destructive',
+        onPress: () => {
+          setBulkDrafts([]);
+          setBulkPreviewOpen(false);
+        },
+      },
+    ]);
+  }, []);
+
+  const submitAllDrafts = useCallback(async () => {
+    if (!bulkDrafts.length) {
+      Alert.alert('No listings', 'Nothing to submit.');
+      return;
+    }
+    setBulkSubmitting(true);
+    try {
+      const payload = bulkDrafts.map((item) => ({
+        ...item,
+        price: Number(item.price || 0),
+        stock: Number(item.stock || 0),
+        cartonPieces: Number(item.cartonPieces || 0),
+      }));
+      const response = await submitBulkVendorListings(payload);
+      Alert.alert(
+        'Submitted',
+        `${response?.createdCount || 0} listings submitted for approval${response?.failedCount ? `, ${response.failedCount} failed` : ''}.`
+      );
+      setBulkPreviewOpen(false);
+      setBulkDrafts([]);
+    } catch (error) {
+      Alert.alert('Submit failed', 'Could not submit generated listings.');
+    } finally {
+      setBulkSubmitting(false);
+    }
+  }, [bulkDrafts]);
+
   const handleSubmit = async () => {
     const commissionValue = Number(form.commissionPercent);
+    const cartonPiecesValue = form.cartonPieces ? Number(form.cartonPieces) : null;
     if (!form.name || !form.category || !form.price || !form.commissionPercent) {
       setMessage('Name, category, and price are required.');
       return;
     }
     if (Number.isNaN(commissionValue) || commissionValue < 5) {
       setMessage('Commission must be at least 5%.');
+      return;
+    }
+    if (cartonPiecesValue !== null && (!Number.isFinite(cartonPiecesValue) || cartonPiecesValue <= 0)) {
+      setMessage('Carton (pieces) must be a positive number.');
       return;
     }
     setSubmitting(true);
@@ -200,6 +341,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
           size: form.size,
           certifications: form.certifications,
           commissionPercent: commissionValue,
+          cartonPieces: cartonPiecesValue,
         },
         price: Number(form.price),
         mrp: form.mrp,
@@ -211,8 +353,20 @@ export default function VendorHomeScreen({ canAdd, status }) {
         warrantyPolicy: form.warrantyPolicy,
       });
       setMessage('Submitted for approval.');
+      Alert.alert('Submitted', 'Submitted for approval', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setModalOpen(false);
+            setSelectedProduct(null);
+            setSearch('');
+            setActiveType('');
+          },
+        },
+      ]);
     } catch (error) {
       setMessage('Failed to submit product.');
+      Alert.alert('Failed', 'Failed to submit product.');
     } finally {
       setSubmitting(false);
     }
@@ -379,6 +533,13 @@ export default function VendorHomeScreen({ canAdd, status }) {
                 </TouchableOpacity>
               ) : null}
             </View>
+            <TouchableOpacity
+              style={[styles.bulkUploadBtn, !canAdd ? styles.bulkUploadBtnDisabled : null]}
+              onPress={pickBulkUploadFile}
+              disabled={!canAdd}
+            >
+              <Text style={styles.bulkUploadText}>Bulk Upload (PDF/Image)</Text>
+            </TouchableOpacity>
 
           </View>
         }
@@ -422,6 +583,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
               {renderInput('Base Price', 'price')}
               {renderInput('Platform Commission (%)', 'commissionPercent')}
               {renderInput('Stock / Availability', 'stock')}
+              {renderInput('Carton (pieces)', 'cartonPieces')}
 
               <TouchableOpacity
                 style={styles.advancedToggle}
@@ -464,6 +626,100 @@ export default function VendorHomeScreen({ canAdd, status }) {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={bulkPreviewOpen} transparent animationType="slide" onRequestClose={() => setBulkPreviewOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.bulkModalCard}>
+            <Text style={styles.modalTitle}>Generated Listings Preview</Text>
+            <Text style={styles.modalSubtitle}>{bulkDrafts.length} listings ready</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
+              {bulkDrafts.map((item) => (
+                <View key={item.tempId} style={styles.previewCard}>
+                  <Image source={{ uri: item.image }} style={styles.previewImage} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.previewTitle} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.previewMeta}>Size: {item.size || '-'}</Text>
+                    <Text style={styles.previewMeta}>Price: ₹{item.price || 0}</Text>
+                    <Text style={styles.previewMeta}>Pieces/Carton: {item.cartonPieces || '-'}</Text>
+                  </View>
+                  <View style={styles.previewActions}>
+                    <TouchableOpacity style={styles.previewEditBtn} onPress={() => setEditingDraft(item)}>
+                      <Text style={styles.previewEditText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.previewRemoveBtn} onPress={() => removeDraft(item.tempId)}>
+                      <Text style={styles.previewRemoveText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.bulkActionRow}>
+              <TouchableOpacity style={styles.rejectAllBtn} onPress={rejectAllDrafts}>
+                <Text style={styles.rejectAllText}>Reject All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtn, bulkSubmitting ? { opacity: 0.7 } : null]}
+                onPress={submitAllDrafts}
+                disabled={bulkSubmitting}
+              >
+                <Text style={styles.submitText}>{bulkSubmitting ? 'Submitting…' : 'Submit All'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!editingDraft} transparent animationType="slide" onRequestClose={() => setEditingDraft(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Generated Listing</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {renderDraftInput('Name', 'name')}
+              {renderDraftInput('Category', 'category')}
+              {renderDraftInput('Subcategory', 'subCategory')}
+              {renderDraftInput('Size', 'size')}
+              {renderDraftInput('Price', 'price', 'numeric')}
+              {renderDraftInput('Stock', 'stock', 'numeric')}
+              {renderDraftInput('Carton (pieces)', 'cartonPieces', 'numeric')}
+              {renderDraftInput('Brand', 'brand')}
+              {renderDraftInput('Description', 'description', 'default', true)}
+              {renderDraftInput('Image URL', 'image')}
+            </ScrollView>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingDraft(null)}>
+                <Text style={styles.cancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={() => {
+                  if (!editingDraft?.tempId) return;
+                  setBulkDrafts((prev) =>
+                    prev.map((item) => (item.tempId === editingDraft.tempId ? editingDraft : item))
+                  );
+                  setEditingDraft(null);
+                }}
+              >
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={bulkGenerating} transparent animationType="fade">
+        <View style={styles.processingBackdrop}>
+          <View style={styles.processingCard}>
+            <ActivityIndicator color={vendorColors.primary} size="large" />
+            <Text style={styles.processingTitle}>Generating listings...</Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.max(6, Math.round(bulkProgress * 100))}%` }]} />
+            </View>
+            <Text style={styles.processingSub}>{Math.round(bulkProgress * 100)}%</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 
@@ -476,6 +732,22 @@ export default function VendorHomeScreen({ canAdd, status }) {
           value={form[key]}
           onChangeText={(value) => setForm((prev) => ({ ...prev, [key]: value }))}
           editable={!disabled}
+          multiline={multiline}
+          placeholderTextColor={vendorColors.muted}
+        />
+      </View>
+    );
+  }
+
+  function renderDraftInput(label, key, keyboardType = 'default', multiline = false) {
+    return (
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        <TextInput
+          style={[styles.input, multiline && styles.inputMultiline]}
+          value={editingDraft?.[key] == null ? '' : String(editingDraft[key])}
+          onChangeText={(value) => setEditingDraft((prev) => ({ ...(prev || {}), [key]: value }))}
+          keyboardType={keyboardType}
           multiline={multiline}
           placeholderTextColor={vendorColors.muted}
         />
@@ -560,6 +832,18 @@ const styles = StyleSheet.create({
     borderColor: vendorColors.border,
   },
   clearText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
+  bulkUploadBtn: {
+    marginHorizontal: vendorSpacing.lg,
+    marginTop: vendorSpacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: vendorColors.primary,
+    backgroundColor: 'rgba(26, 102, 73, 0.08)',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  bulkUploadBtnDisabled: { opacity: 0.5 },
+  bulkUploadText: { color: vendorColors.primary, fontWeight: '800', fontSize: 12 },
   activeTypeRow: {
     marginHorizontal: vendorSpacing.lg,
     marginTop: vendorSpacing.sm,
@@ -669,6 +953,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: vendorColors.border,
   },
+  bulkModalCard: {
+    width: '100%',
+    minHeight: '68%',
+    maxHeight: '92%',
+    backgroundColor: vendorColors.card,
+    borderRadius: 18,
+    padding: vendorSpacing.lg,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+  },
   advancedToggle: {
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
@@ -682,6 +976,63 @@ const styles = StyleSheet.create({
   advancedText: { color: vendorColors.primary, fontWeight: '700', fontSize: 12 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: vendorColors.text },
   modalSubtitle: { color: vendorColors.muted, marginTop: 4, marginBottom: vendorSpacing.md },
+  previewCard: {
+    flexDirection: 'row',
+    gap: vendorSpacing.sm,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 12,
+    backgroundColor: vendorColors.surface,
+    padding: vendorSpacing.sm,
+    marginBottom: vendorSpacing.sm,
+  },
+  previewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: vendorColors.card,
+  },
+  previewTitle: { color: vendorColors.text, fontWeight: '700', fontSize: 12 },
+  previewMeta: { color: vendorColors.muted, marginTop: 2, fontSize: 11 },
+  previewActions: { justifyContent: 'space-between' },
+  previewEditBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: vendorColors.primary,
+    backgroundColor: 'rgba(26, 102, 73, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  previewEditText: { color: vendorColors.primary, fontWeight: '700', fontSize: 11 },
+  previewRemoveBtn: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E05252',
+    backgroundColor: 'rgba(224, 82, 82, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  previewRemoveText: { color: '#E05252', fontWeight: '700', fontSize: 11 },
+  bulkActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: vendorSpacing.sm,
+    marginTop: vendorSpacing.sm,
+  },
+  rejectAllBtn: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E05252',
+    backgroundColor: 'rgba(224, 82, 82, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  rejectAllText: { color: '#E05252', fontWeight: '800', fontSize: 12 },
   imagePickerRow: {
     marginBottom: vendorSpacing.md,
   },
@@ -756,4 +1107,36 @@ const styles = StyleSheet.create({
     backgroundColor: vendorColors.primary,
   },
   submitText: { color: '#FFFFFF', fontWeight: '700' },
+  processingBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: vendorSpacing.lg,
+  },
+  processingCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    backgroundColor: vendorColors.card,
+    padding: vendorSpacing.lg,
+    alignItems: 'center',
+  },
+  processingTitle: { marginTop: 10, color: vendorColors.text, fontWeight: '800', fontSize: 16 },
+  processingSub: { marginTop: 8, color: vendorColors.muted, fontWeight: '700' },
+  progressTrack: {
+    width: '100%',
+    marginTop: 12,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: vendorColors.surface,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: vendorColors.primary,
+  },
 });

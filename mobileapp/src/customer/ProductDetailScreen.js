@@ -89,6 +89,9 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
     .filter((uri, index, arr) => arr.indexOf(uri) === index);
   const avgRating = Number(reviewSummary.averageRating || 0);
   const reviewCount = Number(reviewSummary.reviewCount || 0);
+  const brandValue = view.brand || view.specs?.brand || '-';
+  const modelValue = view.model || view.specs?.model || '-';
+  const cartonPieces = Number(view.specs?.cartonPieces || 0);
 
   const submitReview = async () => {
     if (!isAuthenticated) {
@@ -148,6 +151,16 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
         <View style={styles.priceRow}>
           <Text style={styles.price}>₹{Math.round(view.price || 0)}</Text>
           <Text style={styles.stock}>{view.quantity > 0 ? 'In stock' : 'Out of stock'}</Text>
+        </View>
+        <View style={styles.specRow}>
+          <Text style={styles.specText}>Brand: {brandValue}</Text>
+          <Text style={styles.specText}>Model: {modelValue}</Text>
+        </View>
+        <View style={styles.infoChipRow}>
+          <View style={styles.infoChip}>
+            <Text style={styles.infoChipLabel}>Pieces / Carton</Text>
+            <Text style={styles.infoChipValue}>{cartonPieces > 0 ? cartonPieces : '—'}</Text>
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>Description</Text>
@@ -259,6 +272,19 @@ const styles = StyleSheet.create({
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
   price: { fontSize: 22, fontWeight: '800', color: customerColors.primary },
   stock: { color: customerColors.success, fontWeight: '700', fontSize: 12 },
+  specRow: { marginTop: 8, gap: 4 },
+  specText: { color: customerColors.muted, fontSize: 12, fontWeight: '600' },
+  infoChipRow: { marginTop: 10, flexDirection: 'row' },
+  infoChip: {
+    borderWidth: 1,
+    borderColor: customerColors.border,
+    backgroundColor: customerColors.card,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  infoChipLabel: { color: customerColors.muted, fontSize: 10, fontWeight: '700' },
+  infoChipValue: { marginTop: 2, color: customerColors.text, fontSize: 14, fontWeight: '800' },
   addButton: {
     backgroundColor: customerColors.primary,
     paddingVertical: 12,

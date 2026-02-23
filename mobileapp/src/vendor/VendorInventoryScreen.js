@@ -182,6 +182,7 @@ export default function VendorInventoryScreen() {
                     description: item.description || '',
                     brand: item.brand || '',
                     model: item.specs?.model || '',
+                    cartonPieces: item.specs?.cartonPieces ? String(item.specs.cartonPieces) : '',
                     color: item.specs?.color || '',
                     material: item.specs?.material || '',
                     size: item.specs?.size || '',
@@ -267,6 +268,7 @@ export default function VendorInventoryScreen() {
               {renderInput('Description', 'description', true)}
               {renderInput('Brand', 'brand')}
               {renderInput('Model', 'model')}
+              {renderInput('Carton (pieces)', 'cartonPieces', false, 'numeric')}
               {renderInput('Color', 'color')}
               {renderInput('Material', 'material')}
               {renderInput('Size', 'size')}
@@ -288,6 +290,16 @@ export default function VendorInventoryScreen() {
                 style={styles.saveBtn}
                 onPress={async () => {
                   if (!detailItem?.id) return;
+                  const cartonPiecesValue = detailForm.cartonPieces
+                    ? Number(detailForm.cartonPieces)
+                    : null;
+                  if (
+                    cartonPiecesValue !== null &&
+                    (!Number.isFinite(cartonPiecesValue) || cartonPiecesValue <= 0)
+                  ) {
+                    Alert.alert('Invalid value', 'Carton (pieces) must be a positive number.');
+                    return;
+                  }
                   const payload = {
                     title: detailForm.title,
                     description: detailForm.description,
@@ -305,6 +317,9 @@ export default function VendorInventoryScreen() {
                     returnsPolicy: detailForm.returnsPolicy,
                     warrantyPolicy: detailForm.warrantyPolicy,
                     features: detailForm.features,
+                    specs: {
+                      cartonPieces: cartonPiecesValue,
+                    },
                   };
                   const res = await updateVendorListing(detailItem.id, payload);
                   setListings((prev) =>
