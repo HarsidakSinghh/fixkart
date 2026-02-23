@@ -14,10 +14,11 @@ type DraftListing = {
   brand: string;
   description: string;
   image: string;
+  commissionPercent: number;
 };
 
 const DEFAULT_CATEGORY = "Fastening & Joining";
-const DEFAULT_SUBCATEGORY = "Wedge anchor";
+const DEFAULT_SUBCATEGORY = "Bolts";
 const DEFAULT_IMAGE =
   "https://res.cloudinary.com/demo/image/upload/v1/samples/metallic-structural-detail";
 const DEFAULT_CARTON_PIECES = 100;
@@ -37,17 +38,11 @@ function buildDescription(name: string, size: string, brand: string, cartonPiece
   return `${name} size ${size} by ${brand}. Packed as ${cartonPieces} pieces per carton. Built for durable industrial fastening and joining use cases.`;
 }
 
-function inferTypeFromName(fileName = "", text = "") {
-  const hay = `${fileName} ${text}`.toLowerCase();
-  if (hay.includes("stud")) return "Studs";
-  if (hay.includes("u-bolt") || hay.includes("u bolt")) return "U-Bolts";
-  if (hay.includes("threaded")) return "Threaded Rods";
-  if (hay.includes("anchor")) return "Wedge anchor";
-  return DEFAULT_SUBCATEGORY;
-}
-
 function getAutoImageByType(typeName: string) {
   const key = String(typeName || "").toLowerCase();
+  if (key.includes("bolt")) {
+    return "https://fixkart-main.vercel.app/fastening/bolts.webp";
+  }
   if (key.includes("stud")) {
     return "https://fixkart-main.vercel.app/fastening/studs.jpg";
   }
@@ -63,61 +58,126 @@ function getAutoImageByType(typeName: string) {
   return DEFAULT_IMAGE;
 }
 
-function parseSizePricePairs(text: string) {
-  const pairs: Array<{ size: string; price: number }> = [];
-  const regexes = [
-    /(\d+(?:\.\d+)?)\s*[*xX]\s*(\d+(?:\.\d+)?)\s*(?:=|:|-|is)\s*([0-9]+(?:\.[0-9]+)?)/g,
-    /(\d+(?:\.\d+)?)\s*[*xX]\s*(\d+(?:\.\d+)?)\s+([0-9]+(?:\.[0-9]+)?)/g,
-  ];
-
-  for (const regex of regexes) {
-    let match: RegExpExecArray | null = regex.exec(text);
-    while (match) {
-      const a = normalizeNumber(match[1]);
-      const b = normalizeNumber(match[2]);
-      const price = normalizeNumber(match[3]);
-      if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(price) && price > 0) {
-        pairs.push({ size: `${a}*${b}`, price });
-      }
-      match = regex.exec(text);
-    }
+function parseDiaValue(diaText: string) {
+  const raw = String(diaText || "").trim();
+  if (!raw) return NaN;
+  if (raw.includes("/")) {
+    const [a, b] = raw.split("/");
+    const n = Number(a);
+    const d = Number(b);
+    if (Number.isFinite(n) && Number.isFinite(d) && d !== 0) return n / d;
+    return NaN;
   }
-
-  return pairs;
+  return Number(raw);
 }
 
-function parseMatrixFallback(text: string) {
-  const rows = text
+function parseDiaLengthRateTable(text: string) {
+  const lines = String(text || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+  const out: Array<{ size: string; price: number }> = [];
 
-  const derived: Array<{ size: string; price: number }> = [];
-  const defaultLengths = [16, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 110, 120];
+  const headerIndex = lines.findIndex((line) => /\bDIA\b/i.test(line));
+  if (headerIndex < 0) return out;
 
-  for (const row of rows) {
-    const tokens = row
+  const headerLine = lines[headerIndex];
+  const lengthTokens = headerLine
+    .replace(/\bDIA\b/i, "")
+    .match(/\d+(?:\.\d+)?/g);
+  const lengths = (lengthTokens || [])
+    .map((t) => Number(t))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (!lengths.length) return out;
+
+  for (let i = headerIndex + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    const parts = line
       .replace(/\s+/g, " ")
       .split(" ")
-      .map((t) => t.trim())
+      .map((p) => p.trim())
       .filter(Boolean);
-    if (tokens.length < 3) continue;
+    if (parts.length < 2) continue;
 
-    const first = tokens[0].replace(/"/g, "");
-    if (!/^\d+(?:\/\d+)?(?:\.\d+)?$/.test(first)) continue;
+    const diaToken = parts[0].replace(/"/g, "");
+    if (!/^\d+(?:\/\d+)?(?:\.\d+)?$/.test(diaToken)) continue;
+    const diaNumeric = parseDiaValue(diaToken);
+    if (!Number.isFinite(diaNumeric)) continue;
 
-    const base = first;
-    const prices = tokens
+    const prices = parts
       .slice(1)
-      .map((t) => normalizeNumber(t))
+      .map((p) => normalizeNumber(p))
       .filter((n) => Number.isFinite(n) && n > 0);
+    if (!prices.length) continue;
 
-    for (let i = 0; i < prices.length && i < defaultLengths.length; i += 1) {
-      derived.push({ size: `${base}*${defaultLengths[i]}`, price: prices[i] });
+    const rightAlign = diaNumeric >= 10 && prices.length < lengths.length;
+    const startIndex = rightAlign ? Math.max(0, lengths.length - prices.length) : 0;
+    for (let j = 0; j < prices.length && startIndex + j < lengths.length; j += 1) {
+      const length = lengths[startIndex + j];
+      const price = prices[j];
+      out.push({ size: `${diaToken}*${length}`, price });
     }
   }
+  return out;
+}
 
-  return derived;
+function inferProductProfile(fileName = "", text = "") {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const topLine = lines.find(
+    (line) => /[A-Za-z]/.test(line) && !/\bDIA\b/i.test(line) && !/\bRATE\b/i.test(line)
+  ) || "";
+  const hay = `${topLine} ${fileName} ${text}`.toLowerCase();
+
+  if (hay.includes("hex bolt")) {
+    return {
+      productBaseName: "Hex bolts",
+      category: "Fastening & Joining",
+      subCategory: "Bolts",
+      image: "https://fixkart-main.vercel.app/fastening/bolts.webp",
+    };
+  }
+  if (hay.includes("u-bolt") || hay.includes("u bolt")) {
+    return {
+      productBaseName: "U-Bolts",
+      category: "Fastening & Joining",
+      subCategory: "U-Bolts",
+      image: "https://fixkart-main.vercel.app/fastening/u-bolts.jpg",
+    };
+  }
+  if (hay.includes("stud")) {
+    return {
+      productBaseName: "Studs",
+      category: "Fastening & Joining",
+      subCategory: "Studs",
+      image: "https://fixkart-main.vercel.app/fastening/studs.jpg",
+    };
+  }
+  if (hay.includes("threaded")) {
+    return {
+      productBaseName: "Threaded rods",
+      category: "Fastening & Joining",
+      subCategory: "Threaded Rods",
+      image: "https://fixkart-main.vercel.app/fastening/threaded-rods.jpg",
+    };
+  }
+  if (hay.includes("anchor")) {
+    return {
+      productBaseName: "Wedge anchor",
+      category: "Fastening & Joining",
+      subCategory: "Wedge anchor",
+      image: "https://fixkart-main.vercel.app/fastening/anchor.webp",
+    };
+  }
+
+  return {
+    productBaseName: DEFAULT_SUBCATEGORY,
+    category: DEFAULT_CATEGORY,
+    subCategory: DEFAULT_SUBCATEGORY,
+    image: getAutoImageByType(DEFAULT_SUBCATEGORY),
+  };
 }
 
 async function extractTextWithOcrSpace(fileDataUrl: string) {
@@ -180,16 +240,13 @@ export async function POST(req: Request) {
     let text = "";
     try {
       text = await extractTextWithOcrSpace(fileDataUrl);
-    } catch (ocrError) {
+    } catch {
       // Keep flow alive for preview screen; UI can still edit/remove before submit.
       text = fileName;
     }
-    const typeName = inferTypeFromName(fileName, text);
-    const image = getAutoImageByType(typeName);
-
-    const fromPairs = parseSizePricePairs(text);
-    const fromMatrix = fromPairs.length ? [] : parseMatrixFallback(text);
-    const seed = fromPairs.length ? fromPairs : fromMatrix;
+    const profile = inferProductProfile(fileName, text);
+    const image = profile.image;
+    const seed = parseDiaLengthRateTable(text);
 
     const uniqueMap = new Map<string, { size: string; price: number }>();
     for (const row of seed) {
@@ -200,12 +257,12 @@ export async function POST(req: Request) {
     const drafts: DraftListing[] = Array.from(uniqueMap.values())
       .slice(0, 300)
       .map((row) => {
-        const name = `${typeName} ${row.size}`;
+        const name = `${profile.productBaseName} ${row.size}`;
         return {
           tempId: uid("draft"),
           name,
-          category: DEFAULT_CATEGORY,
-          subCategory: typeName,
+          category: profile.category,
+          subCategory: profile.subCategory,
           size: row.size,
           price: Number(row.price),
           cartonPieces: DEFAULT_CARTON_PIECES,
@@ -213,6 +270,7 @@ export async function POST(req: Request) {
           brand,
           description: buildDescription(name, row.size, brand, DEFAULT_CARTON_PIECES),
           image,
+          commissionPercent: 5,
         };
       });
 

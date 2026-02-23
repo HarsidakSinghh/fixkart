@@ -82,6 +82,7 @@ export async function POST(req: Request) {
             specs: {
               cartonPieces: Number.isFinite(cartonPieces) && cartonPieces > 0 ? Math.floor(cartonPieces) : null,
               size: size || null,
+              commissionPercent: 5,
             },
             status: "PENDING",
             isPublished: false,
