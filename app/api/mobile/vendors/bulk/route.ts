@@ -34,8 +34,12 @@ export async function POST(req: Request) {
 
   if (action === "SUSPEND") {
     const [listingResult, vendorResult] = await prisma.$transaction([
-      prisma.product.deleteMany({
+      prisma.product.updateMany({
         where: { vendorId: { in: vendorUserIds } },
+        data: {
+          isPublished: false,
+          status: "PENDING",
+        },
       }),
       prisma.vendorProfile.updateMany({
         where: { id: { in: resolvedVendorIds } },
@@ -47,48 +51,50 @@ export async function POST(req: Request) {
       success: true,
       action,
       affectedVendors: vendorResult.count,
-      removedListings: listingResult.count,
+      removedListings: listingResult.count, // hidden from app
     });
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const removedListings = await tx.product.deleteMany({
+    const removedListings = await tx.product.updateMany({
       where: { vendorId: { in: vendorUserIds } },
+      data: {
+        isPublished: false,
+        status: "REJECTED",
+      },
     });
 
-    // Remove vendor-linked records first, then vendor profile.
-    await tx.refundChat.deleteMany({
-      where: { refundRequest: { vendorId: { in: vendorUserIds } } },
-    });
-    await tx.refundRequest.deleteMany({
-      where: { vendorId: { in: vendorUserIds } },
-    });
-    await tx.complaint.deleteMany({
-      where: { vendorId: { in: vendorUserIds } },
-    });
-    await tx.purchaseOrder.deleteMany({
-      where: { vendorId: { in: vendorUserIds } },
-    });
-    await tx.vendorInvoice.deleteMany({
-      where: { vendorId: { in: vendorUserIds } },
-    });
-    await tx.orderItem.deleteMany({
-      where: { vendorId: { in: vendorUserIds } },
-    });
-    await tx.salesman.deleteMany({
-      where: { vendorId: { in: vendorUserIds } },
-    });
-    await tx.pushToken.deleteMany({
-      where: { userId: { in: vendorUserIds }, role: "vendor" },
-    });
-
-    const vendorResult = await tx.vendorProfile.deleteMany({
+    // "Delete" in business terms: wipe profile info and disable account
+    // while preserving relational integrity for historic orders.
+    const vendorResult = await tx.vendorProfile.updateMany({
       where: { id: { in: resolvedVendorIds } },
+      data: {
+        status: "PENDING",
+        fullName: "Deleted Vendor",
+        companyName: null,
+        phone: "0000000000",
+        email: "",
+        address: "",
+        city: "",
+        state: "",
+        postalCode: "",
+        category: null,
+        gstNumber: null,
+        gstCertificateUrl: null,
+        panCardUrl: null,
+        idProofUrl: null,
+        aadharCardUrl: null,
+        locationPhotoUrl: null,
+        bankName: null,
+        accountHolder: null,
+        accountNumber: null,
+        ifscCode: null,
+      },
     });
 
     return {
       affectedVendors: vendorResult.count,
-      removedListings: removedListings.count,
+      removedListings: removedListings.count, // hidden from app
     };
   });
 
