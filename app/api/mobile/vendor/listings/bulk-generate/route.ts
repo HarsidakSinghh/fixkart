@@ -105,6 +105,24 @@ function parseNumberToken(raw: string) {
   return Number(t);
 }
 
+function normalizeMachineScrewLengths(lengths: number[], machineScrewHint: boolean) {
+  const uniqueSorted = Array.from(
+    new Set(
+      lengths
+        .map((n) => Number(n))
+        .filter((n) => Number.isFinite(n) && n >= 2 && n <= 200)
+        .sort((a, b) => a - b)
+    )
+  );
+  if (!machineScrewHint || !uniqueSorted.length) return uniqueSorted;
+
+  const first = uniqueSorted[0];
+  if (first >= 8) return [4, 5, 6, ...uniqueSorted];
+  if (first === 6) return [4, 5, ...uniqueSorted];
+  if (first === 5) return [4, ...uniqueSorted];
+  return uniqueSorted;
+}
+
 function parseDiaLengthRateTable(text: string) {
   const lines = String(text || "")
     .split(/\r?\n/)
@@ -138,16 +156,11 @@ function parseDiaLengthRateTable(text: string) {
 
   const headerLine = lines[headerIndex];
   const lengthTokens = numericTokens(headerLine);
+  const machineScrewHint = /machine\s*screw/i.test(text);
   let lengths = (lengthTokens || [])
     .map((t) => Number(t))
-    .filter((n) => Number.isFinite(n) && n >= 8 && n <= 200);
-  // OCR sometimes drops early small columns (e.g., 4,5,6 in machine screw tables),
-  // which causes a left-shift in generated sizes.
-  const machineScrewHint = /machine\s*screw/i.test(text);
-  const hasSmall = lengths.some((n) => n <= 6);
-  if (machineScrewHint && !hasSmall && lengths.length >= 10) {
-    lengths = [4, 5, 6, ...lengths];
-  }
+    .filter((n) => Number.isFinite(n) && n >= 2 && n <= 200);
+  lengths = normalizeMachineScrewLengths(lengths, machineScrewHint);
   if (!lengths.length) return out;
 
   for (let i = headerIndex + 1; i < lines.length; i += 1) {
@@ -222,7 +235,22 @@ function parseTableFromOverlay(words: OcrWord[]) {
     .sort((a, b) => a.x - b.x);
   if (headerNums.length < 6) return [];
 
-  const colHeaders = headerNums.map((h) => ({ x: h.x, len: Number(h.n) }));
+  let colHeaders = headerNums.map((h) => ({ x: h.x, len: Number(h.n) }));
+  const machineScrewHint = /machine\s*screw/i.test(points.map((p) => p.text).join(" "));
+  const normalizedLens = normalizeMachineScrewLengths(
+    colHeaders.map((h) => h.len),
+    machineScrewHint
+  );
+  if (normalizedLens.length !== colHeaders.length) {
+    const firstX = colHeaders[0]?.x ?? 0;
+    const secondX = colHeaders[1]?.x ?? firstX + 35;
+    const step = Math.max(14, secondX - firstX);
+    const xByLen = new Map(colHeaders.map((h) => [h.len, h.x]));
+    colHeaders = normalizedLens.map((len, idx) => ({
+      len,
+      x: xByLen.get(len) ?? firstX + idx * step,
+    }));
+  }
   const minHeaderX = colHeaders[0].x;
   const rowCandidates = points.filter((w) => w.y > headerBandY + headerBandHeight);
   const clusteredRows = clusterRowsByY(rowCandidates.map((w) => ({ x: w.x, y: w.y, text: w.text })));
