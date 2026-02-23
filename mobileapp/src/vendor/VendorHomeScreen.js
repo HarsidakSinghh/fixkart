@@ -72,6 +72,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [editingDraft, setEditingDraft] = useState(null);
   const [bulkCategoryPickerOpen, setBulkCategoryPickerOpen] = useState(false);
   const [pendingBulkType, setPendingBulkType] = useState('');
+  const [bulkGrade, setBulkGrade] = useState('');
+  const [bulkCustomType, setBulkCustomType] = useState('');
 
   const loadCategories = useCallback(() => {
     const titles = VENDOR_INVENTORY.map((cat) => cat.title);
@@ -244,6 +246,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
             price: String(item.price ?? ''),
             stock: String(item.stock ?? '100'),
             cartonPieces: String(item.cartonPieces ?? '100'),
+            customType: String(item.customType || item.type || '').trim(),
           }))
         );
         setBulkProgress(1);
@@ -279,11 +282,22 @@ export default function VendorHomeScreen({ canAdd, status }) {
 
   const applyBulkCategory = useCallback((categoryName) => {
     const normalizedType = pendingBulkType || 'New Product Type';
+    const normalizedGrade = String(bulkGrade || '').trim();
+    const normalizedCustomType = String(bulkCustomType || '').trim();
+    const applyGradeInDescription = (description) => {
+      if (!normalizedGrade) return description || '';
+      const base = String(description || '').trim();
+      if (/\bgrade\s*:/i.test(base)) return base;
+      return `${base}${base ? ' ' : ''}Grade: ${normalizedGrade}`.trim();
+    };
     setBulkDrafts((prev) =>
       prev.map((item) => ({
         ...item,
         category: categoryName,
         subCategory: item.subCategory || normalizedType,
+        grade: item.grade || normalizedGrade,
+        customType: item.customType || normalizedCustomType,
+        description: applyGradeInDescription(item.description),
         name:
           item.name && item.name.toLowerCase().includes((normalizedType || '').toLowerCase())
             ? item.name
@@ -291,8 +305,10 @@ export default function VendorHomeScreen({ canAdd, status }) {
       }))
     );
     setBulkCategoryPickerOpen(false);
+    setBulkGrade('');
+    setBulkCustomType('');
     setBulkPreviewOpen(true);
-  }, [pendingBulkType]);
+  }, [bulkCustomType, bulkGrade, pendingBulkType]);
 
   const removeDraft = useCallback((tempId) => {
     setBulkDrafts((prev) => prev.filter((item) => item.tempId !== tempId));
@@ -319,12 +335,22 @@ export default function VendorHomeScreen({ canAdd, status }) {
     }
     setBulkSubmitting(true);
     try {
-      const payload = bulkDrafts.map((item) => ({
-        ...item,
-        price: Number(item.price || 0),
-        stock: Number(item.stock || 0),
-        cartonPieces: Number(item.cartonPieces || 0),
-      }));
+      const payload = bulkDrafts.map((item) => {
+        const grade = String(item.grade || '').trim();
+        const baseDescription = String(item.description || '').trim();
+        const mergedDescription =
+          grade && !/\bgrade\s*:/i.test(baseDescription)
+            ? `${baseDescription}${baseDescription ? ' ' : ''}Grade: ${grade}`.trim()
+            : baseDescription;
+        return {
+          ...item,
+          price: Number(item.price || 0),
+          stock: Number(item.stock || 0),
+          cartonPieces: Number(item.cartonPieces || 0),
+          description: mergedDescription,
+          customType: String(item.customType || '').trim(),
+        };
+      });
       const response = await submitBulkVendorListings(payload);
       Alert.alert(
         'Submitted',
@@ -676,6 +702,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
                     <Text style={styles.previewMeta}>Size: {item.size || '-'}</Text>
                     <Text style={styles.previewMeta}>Price: ₹{item.price || 0}</Text>
                     <Text style={styles.previewMeta}>Pieces/Carton: {item.cartonPieces || '-'}</Text>
+                    <Text style={styles.previewMeta}>Grade: {item.grade || '-'}</Text>
+                    <Text style={styles.previewMeta}>Type: {item.customType || '-'}</Text>
                   </View>
                   <View style={styles.previewActions}>
                     <TouchableOpacity style={styles.previewEditBtn} onPress={() => setEditingDraft(item)}>
@@ -712,6 +740,26 @@ export default function VendorHomeScreen({ canAdd, status }) {
             <Text style={styles.modalSubtitle}>
               {`Type "${pendingBulkType || 'new product'}" was not found. Choose category for generated listings.`}
             </Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Grade (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={bulkGrade}
+                onChangeText={setBulkGrade}
+                placeholder="e.g. A2-70 / 8.8"
+                placeholderTextColor={vendorColors.muted}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Type (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={bulkCustomType}
+                onChangeText={setBulkCustomType}
+                placeholder="Shown on product page only"
+                placeholderTextColor={vendorColors.muted}
+              />
+            </View>
             <ScrollView style={styles.categoryPickerScroll} contentContainerStyle={styles.categoryPickerGrid} showsVerticalScrollIndicator={false}>
               {categories
                 .filter((cat) => cat && cat !== 'All')
@@ -742,6 +790,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
               {renderDraftInput('Price', 'price', 'numeric')}
               {renderDraftInput('Stock', 'stock', 'numeric')}
               {renderDraftInput('Carton (pieces)', 'cartonPieces', 'numeric')}
+              {renderDraftInput('Grade (optional)', 'grade')}
+              {renderDraftInput('Type (optional)', 'customType')}
               {renderDraftInput('Brand', 'brand')}
               {renderDraftInput('Description', 'description', 'default', true)}
               {renderDraftInput('Image URL', 'image')}

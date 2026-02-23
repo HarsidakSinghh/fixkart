@@ -26,6 +26,8 @@ export default function ApprovalsScreen({ routeParams }) {
   const [selectedVendorId, setSelectedVendorId] = useState(null);
   const [commissionInput, setCommissionInput] = useState("");
   const [savingCommission, setSavingCommission] = useState(false);
+  const [selectedInventoryVendorKeys, setSelectedInventoryVendorKeys] = useState([]);
+  const [bulkApprovingVendors, setBulkApprovingVendors] = useState(false);
 
   const fetchVendors = useCallback(async () => {
     const data = await getVendors("PENDING");
@@ -67,6 +69,68 @@ export default function ApprovalsScreen({ routeParams }) {
     }
     inventoryList.setItems((prev) => prev.filter((p) => p.id !== productId));
   };
+
+  const getInventoryVendorKey = useCallback((item) => {
+    const id = String(item?.vendorId || "").trim();
+    if (id) return `id:${id}`;
+    const name = String(item?.vendorName || item?.vendor || "").trim().toLowerCase();
+    return name ? `name:${name}` : "";
+  }, []);
+
+  const inventoryVendors = useMemo(() => {
+    const byKey = new Map();
+    inventoryList.items.forEach((item) => {
+      const key = getInventoryVendorKey(item);
+      if (!key) return;
+      const label = item.vendorName || item.vendor || "Unknown Vendor";
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        byKey.set(key, { key, label, count: 1 });
+      }
+    });
+    return Array.from(byKey.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }, [getInventoryVendorKey, inventoryList.items]);
+
+  useEffect(() => {
+    setSelectedInventoryVendorKeys((prev) => prev.filter((key) => inventoryVendors.some((v) => v.key === key)));
+  }, [inventoryVendors]);
+
+  const approveSelectedVendors = useCallback(async () => {
+    if (!selectedInventoryVendorKeys.length) {
+      Alert.alert("Select vendor", "Choose one or more vendors first.");
+      return;
+    }
+    const targets = inventoryList.items.filter((item) => selectedInventoryVendorKeys.includes(getInventoryVendorKey(item)));
+    if (!targets.length) {
+      Alert.alert("No listings", "No pending listings found for selected vendors.");
+      return;
+    }
+    setBulkApprovingVendors(true);
+    try {
+      const results = await Promise.allSettled(targets.map((item) => approveProduct(item.id)));
+      const approvedIds = new Set();
+      let failedCount = 0;
+      results.forEach((res, idx) => {
+        if (res.status === "fulfilled") {
+          approvedIds.add(targets[idx].id);
+        } else {
+          failedCount += 1;
+        }
+      });
+      inventoryList.setItems((prev) => prev.filter((item) => !approvedIds.has(item.id)));
+      setSelectedInventoryVendorKeys([]);
+      Alert.alert(
+        "Bulk approve complete",
+        `${approvedIds.size} listing(s) approved${failedCount ? `, ${failedCount} failed` : ""}.`
+      );
+    } catch {
+      Alert.alert("Failed", "Could not bulk approve selected vendor listings.");
+    } finally {
+      setBulkApprovingVendors(false);
+    }
+  }, [getInventoryVendorKey, inventoryList.items, selectedInventoryVendorKeys]);
 
   const saveCommission = async () => {
     if (!selectedInventory?.id) return;
@@ -137,6 +201,56 @@ export default function ApprovalsScreen({ routeParams }) {
             : "Inventory Requests"
         }
       />
+
+      {activeTab === "inventory" && inventoryVendors.length ? (
+        <View style={styles.bulkVendorPanel}>
+          <Text style={styles.bulkVendorTitle}>Bulk Approve by Vendor</Text>
+          <Text style={styles.bulkVendorMeta}>
+            {selectedInventoryVendorKeys.length
+              ? `${selectedInventoryVendorKeys.length} vendor(s) selected`
+              : "Select vendor(s), then approve all their pending listings."}
+          </Text>
+          <View style={styles.bulkVendorChips}>
+            {inventoryVendors.map((entry) => {
+              const selected = selectedInventoryVendorKeys.includes(entry.key);
+              return (
+                <TouchableOpacity
+                  key={entry.key}
+                  style={[styles.bulkVendorChip, selected && styles.bulkVendorChipActive]}
+                  onPress={() =>
+                    setSelectedInventoryVendorKeys((prev) =>
+                      prev.includes(entry.key)
+                        ? prev.filter((k) => k !== entry.key)
+                        : [...prev, entry.key]
+                    )
+                  }
+                >
+                  <Text style={[styles.bulkVendorChipText, selected && styles.bulkVendorChipTextActive]}>
+                    {entry.label} ({entry.count})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={styles.bulkVendorActions}>
+            <TouchableOpacity
+              style={styles.bulkVendorClearBtn}
+              onPress={() => setSelectedInventoryVendorKeys([])}
+            >
+              <Text style={styles.bulkVendorClearText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bulkVendorApproveBtn, bulkApprovingVendors && { opacity: 0.7 }]}
+              onPress={approveSelectedVendors}
+              disabled={bulkApprovingVendors}
+            >
+              <Text style={styles.bulkVendorApproveText}>
+                {bulkApprovingVendors ? "Approving..." : "Approve Selected Vendors"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
 
       {activeError && activeItems.length === 0 ? (
         <ErrorState message={activeError} onRetry={activeRefresh} />
@@ -402,4 +516,57 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   commissionBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  bulkVendorPanel: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    backgroundColor: colors.card,
+  },
+  bulkVendorTitle: { color: colors.text, fontWeight: "800", fontSize: 13 },
+  bulkVendorMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  bulkVendorChips: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  bulkVendorChip: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: colors.panelAlt,
+  },
+  bulkVendorChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.card,
+  },
+  bulkVendorChipText: { color: colors.muted, fontSize: 11, fontWeight: "700" },
+  bulkVendorChipTextActive: { color: colors.primary },
+  bulkVendorActions: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignItems: "center",
+  },
+  bulkVendorClearBtn: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: colors.panelAlt,
+  },
+  bulkVendorClearText: { color: colors.muted, fontWeight: "700", fontSize: 12 },
+  bulkVendorApproveBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  bulkVendorApproveText: { color: "#fff", fontWeight: "700", fontSize: 12 },
 });

@@ -54,6 +54,7 @@ export async function POST(req: Request) {
       const description = String(row?.description || "").trim() || null;
       const cartonPieces = Number(row?.cartonPieces || 0);
       const size = String(row?.size || "").trim();
+      const customType = String(row?.customType || row?.type || "").trim();
 
       if (!name || !image || !Number.isFinite(price) || price <= 0) {
         failed.push({ index: i, reason: "Missing required fields" });
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
             specs: {
               cartonPieces: Number.isFinite(cartonPieces) && cartonPieces > 0 ? Math.floor(cartonPieces) : null,
               size: size || null,
+              customType: customType || null,
               commissionPercent: 5,
             },
             status: "PENDING",

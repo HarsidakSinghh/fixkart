@@ -105,6 +105,27 @@ function parseNumberToken(raw: string) {
   return Number(t);
 }
 
+function normalizeSizeToken(raw: string) {
+  const cleaned = String(raw || "")
+    .replace(/["']/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+  if (!cleaned) return "";
+
+  // OCR often reads mixed fractions as 1.1/4 or 1-1/4.
+  const mixed = cleaned.match(/^(\d+)[.\-](\d+)\/(\d+)$/);
+  if (mixed) {
+    return `${mixed[1]}-${mixed[2]}/${mixed[3]}`;
+  }
+  if (/^\d+\/\d+$/.test(cleaned)) return cleaned;
+  if (/^\d+(?:\.\d+)?$/.test(cleaned)) return cleaned;
+  return "";
+}
+
+function hasFractionalSizes(text: string) {
+  return /\d+\s*\/\s*\d+/.test(String(text || ""));
+}
+
 function normalizeMachineScrewLengths(lengths: number[], machineScrewHint: boolean) {
   const uniqueSorted = Array.from(
     new Set(
@@ -161,7 +182,11 @@ function parseDiaLengthRateTable(text: string) {
     .map((t) => Number(t))
     .filter((n) => Number.isFinite(n) && n >= 2 && n <= 200);
   lengths = normalizeMachineScrewLengths(lengths, machineScrewHint);
-  if (!lengths.length) return out;
+  let lengthLabels = lengths.map((n) => String(n));
+  if (!lengthLabels.length) {
+    lengthLabels = (lengthTokens || []).map(normalizeSizeToken).filter(Boolean);
+  }
+  if (!lengthLabels.length) return out;
 
   for (let i = headerIndex + 1; i < lines.length; i += 1) {
     const line = lines[i];
@@ -179,10 +204,10 @@ function parseDiaLengthRateTable(text: string) {
       .filter((n) => Number.isFinite(n) && n > 0);
     if (!prices.length) continue;
 
-    const rightAlign = diaNumeric >= 8 && prices.length < lengths.length;
-    const startIndex = rightAlign ? Math.max(0, lengths.length - prices.length) : 0;
-    for (let j = 0; j < prices.length && startIndex + j < lengths.length; j += 1) {
-      const length = lengths[startIndex + j];
+    const rightAlign = diaNumeric >= 8 && prices.length < lengthLabels.length;
+    const startIndex = rightAlign ? Math.max(0, lengthLabels.length - prices.length) : 0;
+    for (let j = 0; j < prices.length && startIndex + j < lengthLabels.length; j += 1) {
+      const length = lengthLabels[startIndex + j];
       const price = prices[j];
       out.push({ size: `${diaToken}*${length}`, price });
     }
@@ -235,10 +260,10 @@ function parseTableFromOverlay(words: OcrWord[]) {
     .sort((a, b) => a.x - b.x);
   if (headerNums.length < 6) return [];
 
-  let colHeaders = headerNums.map((h) => ({ x: h.x, len: Number(h.n) }));
+  let colHeaders = headerNums.map((h) => ({ x: h.x, len: String(Number(h.n)) }));
   const machineScrewHint = /machine\s*screw/i.test(points.map((p) => p.text).join(" "));
   const normalizedLens = normalizeMachineScrewLengths(
-    colHeaders.map((h) => h.len),
+    colHeaders.map((h) => Number(h.len)),
     machineScrewHint
   );
   if (normalizedLens.length !== colHeaders.length) {
@@ -247,9 +272,19 @@ function parseTableFromOverlay(words: OcrWord[]) {
     const step = Math.max(14, secondX - firstX);
     const xByLen = new Map(colHeaders.map((h) => [h.len, h.x]));
     colHeaders = normalizedLens.map((len, idx) => ({
-      len,
-      x: xByLen.get(len) ?? firstX + idx * step,
+      len: String(len),
+      x: xByLen.get(String(len)) ?? firstX + idx * step,
     }));
+  }
+  if (hasFractionalSizes(points.map((p) => p.text).join(" "))) {
+    const fractionalHeader = points
+      .filter((w) => Math.abs(w.y - headerBandY) <= headerBandHeight)
+      .map((w) => ({ x: w.x, s: normalizeSizeToken(w.text) }))
+      .filter((w) => Boolean(w.s))
+      .sort((a, b) => a.x - b.x);
+    if (fractionalHeader.length >= 4) {
+      colHeaders = fractionalHeader.map((h) => ({ x: h.x, len: h.s }));
+    }
   }
   const minHeaderX = colHeaders[0].x;
   const rowCandidates = points.filter((w) => w.y > headerBandY + headerBandHeight);
@@ -259,8 +294,8 @@ function parseTableFromOverlay(words: OcrWord[]) {
   for (const row of clusteredRows) {
     const diaCell = row.find((c) => c.x < minHeaderX - 10 && Number.isFinite(parseNumberToken(c.text)));
     if (!diaCell) continue;
-    const diaTokenRaw = normalizeOcrToken(diaCell.text).replace(/"/g, "");
-    if (!/^\d+(?:\/\d+)?(?:\.\d+)?$/.test(diaTokenRaw)) continue;
+    const diaTokenRaw = normalizeSizeToken(diaCell.text) || normalizeOcrToken(diaCell.text).replace(/"/g, "");
+    if (!diaTokenRaw) continue;
 
     for (const cell of row) {
       if (cell === diaCell) continue;
@@ -483,7 +518,10 @@ export async function POST(req: Request) {
     const lineSeed = parseDiaLengthRateTable(text);
     // Line parser is more stable for clean matrix tables (DIA x LENGTH).
     // Use overlay parser only as fallback when line parser cannot parse enough rows.
-    const seed = lineSeed.length >= 8 ? lineSeed : overlaySeed;
+    const fractionalTable = hasFractionalSizes(text);
+    const seed = fractionalTable
+      ? (overlaySeed.length >= 4 ? overlaySeed : lineSeed)
+      : (lineSeed.length >= 8 ? lineSeed : overlaySeed);
 
     const uniqueMap = new Map<string, { size: string; price: number }>();
     for (const row of seed) {

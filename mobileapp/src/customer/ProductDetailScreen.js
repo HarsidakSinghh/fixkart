@@ -91,6 +91,7 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
   const reviewCount = Number(reviewSummary.reviewCount || 0);
   const brandValue = view.brand || view.specs?.brand || '-';
   const modelValue = view.model || view.specs?.model || '-';
+  const typeValue = view.specs?.customType || view.specs?.type || '-';
   const cartonPieces = Number(view.specs?.cartonPieces || 0);
 
   const submitReview = async () => {
@@ -155,6 +156,7 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
         <View style={styles.specRow}>
           <Text style={styles.specText}>Brand: {brandValue}</Text>
           <Text style={styles.specText}>Model: {modelValue}</Text>
+          <Text style={styles.specText}>Type: {typeValue}</Text>
         </View>
         <View style={styles.infoChipRow}>
           <View style={styles.infoChip}>
