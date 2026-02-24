@@ -225,16 +225,21 @@ export default function VendorHomeScreen({ canAdd, status }) {
         return;
       }
 
+      const bumpProgress = (target) => {
+        const safe = Math.max(0, Math.min(1, Number(target) || 0));
+        setBulkProgress((prev) => (safe > prev ? safe : prev));
+      };
+
       setBulkGenerating(true);
       setBulkProgress(0.08);
       const progressTicker = setInterval(() => {
-        setBulkProgress((prev) => (prev >= 0.9 ? 0.9 : prev + 0.06));
+        setBulkProgress((prev) => (prev >= 0.9 ? prev : prev + 0.06));
       }, 350);
 
       try {
         const mime = asset.mimeType || (asset.name?.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
         const dataUrl = await uriToDataUrl(asset.uri, mime);
-        setBulkProgress(0.45);
+        bumpProgress(0.45);
         const response = await generateBulkVendorListings({
           fileDataUrl: dataUrl,
           fileName: asset.name || `bulk-${Date.now()}`,
@@ -252,7 +257,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
             customType: String(item.customType || item.type || '').trim(),
           }))
         );
-        setBulkProgress(1);
+        bumpProgress(1);
         if (!drafts.length) {
           Alert.alert('No listings found', 'Could not detect listings from this file. Try a clearer file or edit manually.');
         } else if (response?.requiresCategorySelection) {

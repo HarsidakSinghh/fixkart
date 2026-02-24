@@ -101,18 +101,17 @@ export async function POST(req: Request) {
       });
     }
 
-    const createdIds = await prisma.$transaction(async (tx) => {
-      const ids: string[] = [];
-      for (const data of prepared) {
-        const created = await tx.product.create({ data });
-        ids.push(created.id);
+    const createdRows = await prisma.$transaction(
+      prepared.map((data) => prisma.product.create({ data })),
+      {
+        maxWait: 10_000,
+        timeout: 120_000,
       }
-      return ids;
-    });
+    );
 
     return NextResponse.json({
       success: true,
-      createdCount: createdIds.length,
+      createdCount: createdRows.length,
       failedCount: 0,
       failed: [],
     });
@@ -128,6 +127,12 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Duplicate listing key detected. Please retry submit once." },
         { status: 400 }
+      );
+    }
+    if (prismaCode === "P2028") {
+      return NextResponse.json(
+        { error: "Bulk submit timed out. Please retry with fewer listings (e.g. 100 at a time)." },
+        { status: 503 }
       );
     }
     return NextResponse.json({ error: message }, { status: 500 });
