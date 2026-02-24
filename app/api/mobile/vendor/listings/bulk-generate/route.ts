@@ -33,9 +33,9 @@ const DEFAULT_IMAGE =
   "https://res.cloudinary.com/demo/image/upload/v1/samples/metallic-structural-detail";
 const DEFAULT_CARTON_PIECES = 100;
 const DEFAULT_STOCK = 100;
-const GEMINI_TIMEOUT_MS = 50000;
-const OCR_TIMEOUT_MS = 45000;
-const OCR_OVERLAY_TIMEOUT_MS = 20000;
+const GEMINI_TIMEOUT_MS = 45000;
+const OCR_TIMEOUT_MS = 7000;
+const OCR_OVERLAY_TIMEOUT_MS = 5000;
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number) {
   const controller = new AbortController();
@@ -731,6 +731,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const fileDataUrl = String(body?.fileDataUrl || "").trim();
     const fileName = String(body?.fileName || "").trim();
+    const mimeMatch = fileDataUrl.match(/^data:([^;]+);base64,/i);
+    const fileMime = String(mimeMatch?.[1] || "").toLowerCase();
+    const isPdf = fileMime.includes("pdf");
 
     if (!fileDataUrl.startsWith("data:")) {
       return NextResponse.json({ error: "Invalid file payload" }, { status: 400 });
@@ -784,10 +787,13 @@ export async function POST(req: Request) {
         fileName,
         parsedPages,
         extractedRows: gemini.seeds.length,
+        isPdf,
       });
     } catch (error) {
       console.warn("[bulk-generate] gemini failed, switching to OCR fallback", {
         fileName,
+        isPdf,
+        fileDataUrlLength: fileDataUrl.length,
         error: error instanceof Error ? error.message : String(error),
       });
       // fallback to OCR parser below
