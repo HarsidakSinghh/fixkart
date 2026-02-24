@@ -151,6 +151,13 @@ export async function submitBulkVendorListings(listings = []) {
   });
 }
 
+export async function generateSingleListingDetailsAI(payload) {
+  return authFetch('/api/mobile/vendor/listings/generate-details', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
 export async function uploadVendorListingImage(imageBase64, filename) {
   return authFetch('/api/mobile/vendor/uploads', {
     method: 'POST',

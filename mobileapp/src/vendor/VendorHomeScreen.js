@@ -20,6 +20,7 @@ import {
   uploadVendorListingImage,
   generateBulkVendorListings,
   submitBulkVendorListings,
+  generateSingleListingDetailsAI,
 } from './vendorApi';
 import { VENDOR_INVENTORY } from '../data/vendorInventory';
 
@@ -64,6 +65,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [customImageUrls, setCustomImageUrls] = useState([]);
   const [customImagePreviews, setCustomImagePreviews] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [aiGeneratingDetails, setAiGeneratingDetails] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [bulkPreviewOpen, setBulkPreviewOpen] = useState(false);
@@ -122,6 +124,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     setShowAdvanced(false);
     setCustomImageUrls([]);
     setCustomImagePreviews([]);
+    setAiGeneratingDetails(false);
     setModalOpen(true);
   };
 
@@ -444,6 +447,59 @@ export default function VendorHomeScreen({ canAdd, status }) {
     }
   };
 
+  const handleGenerateDetailsWithAi = useCallback(async () => {
+    const sourceImages = customImageUrls.length
+      ? customImageUrls
+      : selectedProduct?.image
+        ? [selectedProduct.image]
+        : [];
+
+    if (!sourceImages.length) {
+      setMessage('Upload product/box images first.');
+      return;
+    }
+
+    setAiGeneratingDetails(true);
+    setMessage('');
+    try {
+      const response = await generateSingleListingDetailsAI({
+        name: form.name,
+        category: form.category,
+        subCategory: form.subCategory,
+        imageUrls: sourceImages.slice(0, 3),
+      });
+      const details = response?.details || {};
+      setForm((prev) => ({
+        ...prev,
+        brand: String(details.brand || prev.brand || '').trim(),
+        model: String(details.model || prev.model || '').trim(),
+        description: String(details.description || prev.description || '').trim(),
+        features: String(details.features || prev.features || '').trim(),
+        weight: String(details.weight || prev.weight || '').trim(),
+        color: String(details.color || prev.color || '').trim(),
+        material: String(details.material || prev.material || '').trim(),
+        size: String(details.size || prev.size || '').trim(),
+        certifications: String(details.certifications || prev.certifications || '').trim(),
+        returnsPolicy: String(details.returnsPolicy || prev.returnsPolicy || '').trim(),
+        warrantyPolicy: String(details.warrantyPolicy || prev.warrantyPolicy || '').trim(),
+      }));
+      setShowAdvanced(true);
+      setMessage('AI generated details added. Review and edit if needed.');
+    } catch (error) {
+      const raw = String(error?.message || '').trim();
+      let display = 'Could not generate details.';
+      try {
+        const parsed = JSON.parse(raw);
+        display = parsed?.error || display;
+      } catch (_) {
+        if (raw) display = raw;
+      }
+      setMessage(display);
+    } finally {
+      setAiGeneratingDetails(false);
+    }
+  }, [customImageUrls, form.category, form.name, form.subCategory, selectedProduct?.image]);
+
   const renderCatalogItem = ({ item }) => (
     <View style={styles.productCard}>
       <Image source={{ uri: item.image }} style={styles.productImage} />
@@ -505,6 +561,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
     if (base.length % 2 === 0) return base;
     return [...base, { id: '__spacer__', spacer: true }];
   }, [filteredTypes]);
+  const hasAnySourceImage = customImageUrls.length > 0 || Boolean(selectedProduct?.image);
 
   return (
     <View style={styles.container}>
@@ -645,6 +702,18 @@ export default function VendorHomeScreen({ canAdd, status }) {
                 </ScrollView>
                 <TouchableOpacity style={styles.uploadImageBtn} onPress={handlePickCustomImage} disabled={uploadingImage}>
                   <Text style={styles.uploadImageBtnText}>{uploadingImage ? 'Uploading…' : 'Upload images'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.aiGenerateBtn,
+                    (aiGeneratingDetails || uploadingImage || !hasAnySourceImage) && styles.aiGenerateBtnDisabled,
+                  ]}
+                  onPress={handleGenerateDetailsWithAi}
+                  disabled={aiGeneratingDetails || uploadingImage || !hasAnySourceImage}
+                >
+                  <Text style={styles.aiGenerateBtnText}>
+                    {aiGeneratingDetails ? 'Generating…' : 'Generate listing using AI'}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -1229,6 +1298,22 @@ const styles = StyleSheet.create({
     color: vendorColors.primary,
     fontSize: 12,
     fontWeight: '700',
+  },
+  aiGenerateBtn: {
+    marginTop: vendorSpacing.sm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: vendorColors.primary,
+  },
+  aiGenerateBtnDisabled: {
+    opacity: 0.55,
+  },
+  aiGenerateBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   inputGroup: { marginBottom: vendorSpacing.md },
   inputLabel: { color: vendorColors.muted, fontSize: 12, marginBottom: 6 },
