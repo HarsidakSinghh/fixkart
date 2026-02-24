@@ -230,7 +230,7 @@ Rules:
             role: "user",
             parts: [
               { text: prompt },
-              { inline_data: { mime_type: mimeType, data } },
+              { inlineData: { mimeType, data } },
             ],
           },
         ],
@@ -243,15 +243,59 @@ Rules:
   );
 
   if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.error("[bulk-generate][gemini] non-200", {
+      status: res.status,
+      fileName,
+      body: String(errText || "").slice(0, 1200),
+    });
     throw new Error(`Gemini failed: ${res.status}`);
   }
 
   const payload = (await res.json()) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
-  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  const parsed = JSON.parse(stripCodeFenceJson(text || "{}")) as GeminiExtraction;
-  const pages = Array.isArray(parsed?.pages) ? parsed.pages : [];
+  const modelText = (payload?.candidates || [])
+    .flatMap((c) => c?.content?.parts || [])
+    .map((p) => String(p?.text || ""))
+    .join("\n")
+    .trim();
+  let parsed: GeminiExtraction & {
+    rows?: GeminiRow[];
+    product_name?: string;
+    grade?: string;
+    type?: string;
+    header_text?: string;
+  };
+  try {
+    parsed = JSON.parse(stripCodeFenceJson(modelText || "{}")) as GeminiExtraction & {
+      rows?: GeminiRow[];
+      product_name?: string;
+      grade?: string;
+      type?: string;
+      header_text?: string;
+    };
+  } catch (error) {
+    console.error("[bulk-generate][gemini] invalid json", {
+      fileName,
+      responsePreview: String(modelText || "").slice(0, 1200),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+  let pages = Array.isArray(parsed?.pages) ? parsed.pages : [];
+  if (!pages.length && Array.isArray(parsed?.rows)) {
+    pages = [
+      {
+        page_number: 1,
+        header_text: parsed?.header_text || "",
+        product_name: parsed?.product_name || "",
+        grade: parsed?.grade || "",
+        type: parsed?.type || "",
+        rows: parsed.rows,
+      },
+    ];
+  }
 
   const seeds: ParsedGeminiSeed[] = [];
   for (const page of pages) {
@@ -720,7 +764,16 @@ export async function POST(req: Request) {
           customType: row.customType || "",
         });
       }
-    } catch {
+      console.log("[bulk-generate] gemini success", {
+        fileName,
+        parsedPages,
+        extractedRows: gemini.seeds.length,
+      });
+    } catch (error) {
+      console.warn("[bulk-generate] gemini failed, switching to OCR fallback", {
+        fileName,
+        error: error instanceof Error ? error.message : String(error),
+      });
       // fallback to OCR parser below
     }
 
@@ -754,7 +807,11 @@ export async function POST(req: Request) {
             ) || [];
           overlaySeed = parseTableFromOverlay(words);
         }
-      } catch {
+      } catch (error) {
+        console.error("[bulk-generate][ocr] extraction failed", {
+          fileName,
+          error: error instanceof Error ? error.message : String(error),
+        });
         text = fileName;
       }
 
@@ -862,6 +919,13 @@ export async function POST(req: Request) {
     const needsCategorySelection = Array.from(uniqueMap.values()).some((row) => !row.knownType || !row.category);
     const firstUnknown = Array.from(uniqueMap.values()).find((row) => !row.knownType || !row.category);
 
+    console.log("[bulk-generate] completed", {
+      fileName,
+      parsedPages,
+      drafts: drafts.length,
+      categorySelectionRequired: needsCategorySelection,
+    });
+
     return NextResponse.json({
       success: true,
       parsedTextLength: text.length,
@@ -872,6 +936,11 @@ export async function POST(req: Request) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to generate listings from file";
+    console.error("[bulk-generate] fatal error", {
+      fileName: "unknown",
+      error: message,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       { error: message },
       { status: 500 }
