@@ -68,6 +68,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [bulkProgress, setBulkProgress] = useState(0);
   const [bulkPreviewOpen, setBulkPreviewOpen] = useState(false);
   const [bulkDrafts, setBulkDrafts] = useState([]);
+  const [bulkParsedPages, setBulkParsedPages] = useState(0);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null);
   const [bulkCategoryPickerOpen, setBulkCategoryPickerOpen] = useState(false);
@@ -210,6 +211,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
       return;
     }
     try {
+      setBulkParsedPages(0);
       const picked = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
         copyToCacheDirectory: true,
@@ -238,6 +240,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
           fileName: asset.name || `bulk-${Date.now()}`,
           mimeType: mime,
         });
+        setBulkParsedPages(Number(response?.parsedPages || 0));
         const drafts = Array.isArray(response?.drafts) ? response.drafts : [];
         setBulkDrafts(
           drafts.map((item, idx) => ({
@@ -322,6 +325,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
         style: 'destructive',
         onPress: () => {
           setBulkDrafts([]);
+          setBulkParsedPages(0);
           setBulkPreviewOpen(false);
         },
       },
@@ -360,6 +364,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
       );
       setBulkPreviewOpen(false);
       setBulkDrafts([]);
+      setBulkParsedPages(0);
     } catch (error) {
       Alert.alert('Submit failed', 'Could not submit generated listings.');
     } finally {
@@ -693,7 +698,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
         <View style={styles.modalOverlay}>
           <View style={styles.bulkModalCard}>
             <Text style={styles.modalTitle}>Generated Listings Preview</Text>
-            <Text style={styles.modalSubtitle}>{bulkDrafts.length} listings ready</Text>
+            <Text style={styles.modalSubtitle}>
+              {bulkDrafts.length} listings ready{bulkParsedPages ? ` • ${bulkParsedPages} page(s) parsed` : ''}
+            </Text>
             <View style={styles.bulkMetaInputRow}>
               <View style={[styles.inputGroup, styles.bulkMetaInput]}>
                 <Text style={styles.inputLabel}>Grade (optional)</Text>

@@ -15,6 +15,8 @@ type DraftListing = {
   description: string;
   image: string;
   commissionPercent: number;
+  grade?: string;
+  customType?: string;
 };
 type OcrWord = {
   WordText?: string;
@@ -40,8 +42,23 @@ function normalizeNumber(input: string) {
   return Number.isFinite(value) ? value : NaN;
 }
 
-function buildDescription(name: string, size: string, brand: string, cartonPieces: number) {
-  return `${name} size ${size} by ${brand}. Packed as ${cartonPieces} pieces per carton. Built for durable industrial fastening and joining use cases.`;
+function buildDescription(
+  name: string,
+  size: string,
+  brand: string,
+  cartonPieces: number,
+  grade = "",
+  customType = ""
+) {
+  const meta = [
+    grade ? `Grade: ${grade}.` : "",
+    customType ? `Type: ${customType}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `${name} size ${size} by ${brand}. Packed as ${cartonPieces} pieces per carton. ${meta} Built for durable industrial fastening and joining use cases.`
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatProductName(base: string, size: string) {
@@ -80,6 +97,188 @@ function getAutoImageByType(typeName: string) {
     return "https://fixkart-main.vercel.app/fastening/anchor.webp";
   }
   return DEFAULT_IMAGE;
+}
+
+type GeminiRow = {
+  first_size?: string | number;
+  second_size?: string | number;
+  price?: string | number;
+};
+
+type GeminiPage = {
+  page_number?: number;
+  header_text?: string;
+  product_name?: string;
+  grade?: string;
+  type?: string;
+  rows?: GeminiRow[];
+};
+
+type GeminiExtraction = {
+  pages?: GeminiPage[];
+};
+
+type ParsedGeminiSeed = {
+  productName: string;
+  size: string;
+  price: number;
+  grade: string;
+  customType: string;
+};
+
+function normalizeGeminiText(raw: unknown) {
+  return String(raw || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseGeminiPrice(raw: unknown) {
+  const v = Number(String(raw ?? "").replace(/[^\d.]/g, ""));
+  return Number.isFinite(v) && v > 0 ? v : NaN;
+}
+
+function parseGeminiSizePart(raw: unknown) {
+  return normalizeSizeToken(String(raw || "").replace(/[xX*]/g, "").trim()) || normalizeGeminiText(raw);
+}
+
+function inferGradeFromHeader(header: string) {
+  const h = String(header || "");
+  const m1 = h.match(/\bAISI\s*([0-9]{3,4})\b/i);
+  if (m1?.[1]) return m1[1];
+  const m2 = h.match(/\b([0-9]{3,4})\s*GRADE\b/i);
+  if (m2?.[1]) return m2[1];
+  return "";
+}
+
+function inferTypeFromHeader(header: string) {
+  const h = String(header || "");
+  const paren = h.match(/\(([^)]+)\)/);
+  if (paren?.[1]) return normalizeGeminiText(paren[1]);
+  return "";
+}
+
+function inferProductNameFromHeader(header: string) {
+  const h = String(header || "").toLowerCase();
+  if (h.includes("hex bolt")) return "Hex bolts";
+  if (h.includes("machine screw")) return "Machine screw";
+  if (h.includes("u-bolt") || h.includes("u bolt")) return "U-Bolts";
+  if (h.includes("stud")) return "Studs";
+  if (h.includes("threaded")) return "Threaded rods";
+  if (h.includes("anchor")) return "Wedge anchor";
+  return "New Product Type";
+}
+
+function stripCodeFenceJson(raw: string) {
+  const text = String(raw || "").trim();
+  if (!text.startsWith("```")) return text;
+  return text.replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+}
+
+async function extractListingsWithGemini(fileDataUrl: string, fileName: string) {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+  if (!apiKey) {
+    throw new Error("Missing GEMINI_API_KEY");
+  }
+
+  const match = fileDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match?.[1] || !match?.[2]) {
+    throw new Error("Invalid data url for Gemini");
+  }
+  const mimeType = match[1];
+  const data = match[2];
+
+  const prompt = `
+You are extracting industrial product listings from a PDF/image table document.
+Return ONLY strict JSON.
+
+Output schema:
+{
+  "pages": [
+    {
+      "page_number": 1,
+      "header_text": "raw heading above table",
+      "product_name": "hex bolts",
+      "grade": "304",
+      "type": "matric threads",
+      "rows": [
+        { "first_size": "3", "second_size": "100", "price": 354 }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Parse page by page.
+- Product name is usually in table heading.
+- Grade can be in heading, e.g. "AS PER AISI 304" => grade "304", "202 GRADE" => grade "202".
+- Type can be qualifier in heading, often in parentheses.
+- For matrix table, first_size is left DIA row value and second_size is top column value.
+- Create one row for each non-empty price cell.
+- Keep sizes as strings exactly (support fractions like 1/8, 1-1/4).
+- Ignore blank cells.
+- File name: ${fileName || "document"}.
+`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data } },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0,
+          responseMimeType: "application/json",
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Gemini failed: ${res.status}`);
+  }
+
+  const payload = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const parsed = JSON.parse(stripCodeFenceJson(text || "{}")) as GeminiExtraction;
+  const pages = Array.isArray(parsed?.pages) ? parsed.pages : [];
+
+  const seeds: ParsedGeminiSeed[] = [];
+  for (const page of pages) {
+    const header = normalizeGeminiText(page?.header_text);
+    const productName = normalizeGeminiText(page?.product_name) || inferProductNameFromHeader(header);
+    const grade = normalizeGeminiText(page?.grade) || inferGradeFromHeader(header);
+    const customType = normalizeGeminiText(page?.type) || inferTypeFromHeader(header);
+    const rows = Array.isArray(page?.rows) ? page.rows : [];
+    for (const row of rows) {
+      const first = parseGeminiSizePart(row?.first_size);
+      const second = parseGeminiSizePart(row?.second_size);
+      const price = parseGeminiPrice(row?.price);
+      if (!first || !second || !Number.isFinite(price) || price <= 0) continue;
+      seeds.push({
+        productName,
+        size: `${first}*${second}`,
+        price,
+        grade,
+        customType,
+      });
+    }
+  }
+
+  return {
+    seeds,
+    parsedPages: pages.length,
+  };
 }
 
 function parseDiaValue(diaText: string) {
@@ -490,52 +689,113 @@ export async function POST(req: Request) {
     const brand = vendor?.companyName || vendor?.fullName || "Fixkart Vendor";
 
     let text = "";
-    let overlaySeed: Array<{ size: string; price: number }> = [];
+    let parsedPages = 0;
+    const preparedSeeds: Array<{
+      productBaseName: string;
+      category: string;
+      subCategory: string;
+      image: string;
+      knownType: boolean;
+      size: string;
+      price: number;
+      grade: string;
+      customType: string;
+    }> = [];
+
+    // Primary path: Gemini document parsing with page-wise JSON extraction.
     try {
-      text = await extractTextWithOcrSpace(fileDataUrl);
-      // extra OCR pass with overlay coordinates for robust table mapping.
-      const overlayBody = new URLSearchParams();
-      overlayBody.set("base64Image", fileDataUrl);
-      overlayBody.set("language", "eng");
-      overlayBody.set("isOverlayRequired", "true");
-      overlayBody.set("OCREngine", "2");
-      overlayBody.set("isTable", "true");
-      overlayBody.set("scale", "true");
-      const overlayRes = await fetch("https://api.ocr.space/parse/image", {
-        method: "POST",
-        headers: {
-          apikey: process.env.OCR_SPACE_API_KEY || "helloworld",
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: overlayBody.toString(),
-      });
-      if (overlayRes.ok) {
-        const overlayPayload = (await overlayRes.json()) as {
-          ParsedResults?: Array<{ TextOverlay?: { Lines?: Array<{ Words?: OcrWord[] }> } }>;
-        };
-        const words =
-          overlayPayload?.ParsedResults?.flatMap((r) =>
-            (r?.TextOverlay?.Lines || []).flatMap((ln) => ln?.Words || [])
-          ) || [];
-        overlaySeed = parseTableFromOverlay(words);
+      const gemini = await extractListingsWithGemini(fileDataUrl, fileName);
+      parsedPages = gemini.parsedPages;
+      for (const row of gemini.seeds) {
+        const profile = inferProductProfile(fileName, row.productName || fileName);
+        preparedSeeds.push({
+          productBaseName: profile.productBaseName || row.productName || "New Product Type",
+          category: profile.category || "",
+          subCategory: profile.subCategory || row.productName || profile.productBaseName || "",
+          image: profile.image || getAutoImageByType(row.productName || profile.productBaseName),
+          knownType: !!profile.knownType,
+          size: row.size,
+          price: Number(row.price),
+          grade: row.grade || "",
+          customType: row.customType || "",
+        });
       }
     } catch {
-      // Keep flow alive for preview screen; UI can still edit/remove before submit.
-      text = fileName;
+      // fallback to OCR parser below
     }
-    const profile = inferProductProfile(fileName, text);
-    const image = profile.image;
-    const lineSeed = parseDiaLengthRateTable(text);
-    // Line parser is more stable for clean matrix tables (DIA x LENGTH).
-    // Use overlay parser only as fallback when line parser cannot parse enough rows.
-    const fractionalTable = hasFractionalSizes(text);
-    const seed = fractionalTable
-      ? (overlaySeed.length >= 4 ? overlaySeed : lineSeed)
-      : (lineSeed.length >= 8 ? lineSeed : overlaySeed);
 
-    const uniqueMap = new Map<string, { size: string; price: number }>();
-    for (const row of seed) {
-      const key = `${row.size}|${row.price}`;
+    // Fallback path: OCR + deterministic parser.
+    if (!preparedSeeds.length) {
+      let overlaySeed: Array<{ size: string; price: number }> = [];
+      try {
+        text = await extractTextWithOcrSpace(fileDataUrl);
+        const overlayBody = new URLSearchParams();
+        overlayBody.set("base64Image", fileDataUrl);
+        overlayBody.set("language", "eng");
+        overlayBody.set("isOverlayRequired", "true");
+        overlayBody.set("OCREngine", "2");
+        overlayBody.set("isTable", "true");
+        overlayBody.set("scale", "true");
+        const overlayRes = await fetch("https://api.ocr.space/parse/image", {
+          method: "POST",
+          headers: {
+            apikey: process.env.OCR_SPACE_API_KEY || "helloworld",
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: overlayBody.toString(),
+        });
+        if (overlayRes.ok) {
+          const overlayPayload = (await overlayRes.json()) as {
+            ParsedResults?: Array<{ TextOverlay?: { Lines?: Array<{ Words?: OcrWord[] }> } }>;
+          };
+          const words =
+            overlayPayload?.ParsedResults?.flatMap((r) =>
+              (r?.TextOverlay?.Lines || []).flatMap((ln) => ln?.Words || [])
+            ) || [];
+          overlaySeed = parseTableFromOverlay(words);
+        }
+      } catch {
+        text = fileName;
+      }
+
+      const profile = inferProductProfile(fileName, text);
+      const lineSeed = parseDiaLengthRateTable(text);
+      const fractionalTable = hasFractionalSizes(text);
+      const seed = fractionalTable
+        ? (overlaySeed.length >= 4 ? overlaySeed : lineSeed)
+        : (lineSeed.length >= 8 ? lineSeed : overlaySeed);
+
+      for (const row of seed) {
+        preparedSeeds.push({
+          productBaseName: profile.productBaseName,
+          category: profile.category || "",
+          subCategory: profile.subCategory || profile.productBaseName,
+          image: profile.image,
+          knownType: !!profile.knownType,
+          size: row.size,
+          price: Number(row.price),
+          grade: "",
+          customType: "",
+        });
+      }
+    }
+
+    const uniqueMap = new Map<
+      string,
+      {
+        productBaseName: string;
+        category: string;
+        subCategory: string;
+        image: string;
+        knownType: boolean;
+        size: string;
+        price: number;
+        grade: string;
+        customType: string;
+      }
+    >();
+    for (const row of preparedSeeds) {
+      const key = `${row.productBaseName}|${row.size}|${row.price}`;
       if (!uniqueMap.has(key)) uniqueMap.set(key, row);
     }
 
@@ -566,20 +826,29 @@ export async function POST(req: Request) {
     const drafts: DraftListing[] = Array.from(uniqueMap.values())
       .slice(0, 300)
       .map((row) => {
-        const name = formatProductName(profile.productBaseName, row.size);
+        const name = formatProductName(row.productBaseName, row.size);
         return {
           tempId: uid("draft"),
           name,
-          category: profile.category || "",
-          subCategory: profile.subCategory || profile.productBaseName,
+          category: row.category || "",
+          subCategory: row.subCategory || row.productBaseName,
           size: row.size,
           price: Number(row.price),
           cartonPieces: DEFAULT_CARTON_PIECES,
           stock: DEFAULT_STOCK,
           brand,
-          description: buildDescription(name, row.size, brand, DEFAULT_CARTON_PIECES),
-          image,
+          description: buildDescription(
+            name,
+            row.size,
+            brand,
+            DEFAULT_CARTON_PIECES,
+            row.grade,
+            row.customType
+          ),
+          image: row.image,
           commissionPercent: 5,
+          grade: row.grade || "",
+          customType: row.customType || "",
         };
       })
       .filter((draft) => {
@@ -590,12 +859,16 @@ export async function POST(req: Request) {
         return !existingSignatures.has(signature);
       });
 
+    const needsCategorySelection = Array.from(uniqueMap.values()).some((row) => !row.knownType || !row.category);
+    const firstUnknown = Array.from(uniqueMap.values()).find((row) => !row.knownType || !row.category);
+
     return NextResponse.json({
       success: true,
       parsedTextLength: text.length,
+      parsedPages,
       drafts,
-      requiresCategorySelection: !profile.knownType,
-      suggestedType: profile.subCategory || profile.productBaseName,
+      requiresCategorySelection: needsCategorySelection,
+      suggestedType: firstUnknown?.subCategory || firstUnknown?.productBaseName || "",
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to generate listings from file";
