@@ -102,10 +102,17 @@ export async function POST(req: Request) {
     }
 
     const createdRows = await prisma.$transaction(
-      prepared.map((data) => prisma.product.create({ data })),
+      async (tx) => {
+        const rows = [];
+        for (const data of prepared) {
+          const created = await tx.product.create({ data });
+          rows.push(created);
+        }
+        return rows;
+      },
       {
-        maxWait: 10_000,
-        timeout: 120_000,
+        maxWait: 20_000,
+        timeout: 240_000,
       }
     );
 
