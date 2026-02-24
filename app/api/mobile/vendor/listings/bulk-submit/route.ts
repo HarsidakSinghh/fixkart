@@ -10,6 +10,19 @@ function slugify(text: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+function buildSafeSku(inputSku: string, fallbackBase: string, index: number) {
+  const source = String(inputSku || "").trim() || String(fallbackBase || "").trim() || "SKU";
+  const normalized = source
+    .toUpperCase()
+    .replace(/[^A-Z0-9\-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  const suffix = `${Date.now().toString(36)}-${Math.floor(Math.random() * 100000).toString(36)}-${index.toString(36)}`;
+  const maxBaseLength = Math.max(1, 120 - suffix.length - 1);
+  const base = (normalized || "SKU").slice(0, maxBaseLength);
+  return `${base}-${suffix}`;
+}
+
 export async function POST(req: Request) {
   const guard = await requireVendor(req);
   if (!guard.ok) {
@@ -55,10 +68,11 @@ export async function POST(req: Request) {
 
       const slugBase = slugify(name) || `item-${i + 1}`;
       const slug = `${slugBase}-${guard.userId.slice(-6)}-${Date.now()}-${i}`;
-      const sku = String(row?.sku || `${slugBase}-${guard.userId.slice(-4)}-${Date.now()}-${i}`)
-        .toUpperCase()
-        .replace(/[^A-Z0-9\-]/g, "-")
-        .slice(0, 120);
+      const sku = buildSafeSku(
+        String(row?.sku || ""),
+        `${slugBase}-${guard.userId.slice(-4)}`,
+        i
+      );
 
       prepared.push({
         vendorId: guard.userId,
@@ -104,9 +118,18 @@ export async function POST(req: Request) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to submit listings";
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+    const prismaCode = (error as { code?: string } | null)?.code;
+    console.error("[bulk-submit] failed", {
+      code: prismaCode,
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    if (prismaCode === "P2002") {
+      return NextResponse.json(
+        { error: "Duplicate listing key detected. Please retry submit once." },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
