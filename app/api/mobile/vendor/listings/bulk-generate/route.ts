@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/vendor-guard";
 
+export const maxDuration = 300;
+
 type DraftListing = {
   tempId: string;
   name: string;
@@ -31,6 +33,19 @@ const DEFAULT_IMAGE =
   "https://res.cloudinary.com/demo/image/upload/v1/samples/metallic-structural-detail";
 const DEFAULT_CARTON_PIECES = 100;
 const DEFAULT_STOCK = 100;
+const GEMINI_TIMEOUT_MS = 50000;
+const OCR_TIMEOUT_MS = 45000;
+const OCR_OVERLAY_TIMEOUT_MS = 20000;
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function uid(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -219,7 +234,7 @@ Rules:
 - File name: ${fileName || "document"}.
 `;
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
@@ -239,7 +254,8 @@ Rules:
           responseMimeType: "application/json",
         },
       }),
-    }
+    },
+    GEMINI_TIMEOUT_MS
   );
 
   if (!res.ok) {
@@ -662,14 +678,14 @@ async function extractTextWithOcrSpace(fileDataUrl: string) {
     body.set("isTable", variant.isTable);
     body.set("scale", variant.scale);
 
-    const res = await fetch("https://api.ocr.space/parse/image", {
+    const res = await fetchWithTimeout("https://api.ocr.space/parse/image", {
       method: "POST",
       headers: {
         apikey: apiKey,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: body.toString(),
-    });
+    }, OCR_TIMEOUT_MS);
 
     if (!res.ok) {
       lastError = `OCR failed: ${res.status}`;
@@ -789,14 +805,14 @@ export async function POST(req: Request) {
         overlayBody.set("OCREngine", "2");
         overlayBody.set("isTable", "true");
         overlayBody.set("scale", "true");
-        const overlayRes = await fetch("https://api.ocr.space/parse/image", {
+        const overlayRes = await fetchWithTimeout("https://api.ocr.space/parse/image", {
           method: "POST",
           headers: {
             apikey: process.env.OCR_SPACE_API_KEY || "helloworld",
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: overlayBody.toString(),
-        });
+        }, OCR_OVERLAY_TIMEOUT_MS);
         if (overlayRes.ok) {
           const overlayPayload = (await overlayRes.json()) as {
             ParsedResults?: Array<{ TextOverlay?: { Lines?: Array<{ Words?: OcrWord[] }> } }>;
