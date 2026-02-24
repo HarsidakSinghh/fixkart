@@ -118,6 +118,18 @@ export async function PATCH(
   }
 
   if (requiresReview) {
+    const currentSpecs =
+      product.specs && typeof product.specs === "object" && !Array.isArray(product.specs)
+        ? (product.specs as Record<string, any>)
+        : {};
+
+    nextData.specs = {
+      ...currentSpecs,
+      ...(nextData.specs && typeof nextData.specs === "object" ? nextData.specs : {}),
+      adminNeedsReview: false,
+      adminReviewNote: "",
+      adminReviewAt: null,
+    };
     nextData.status = "PENDING";
     nextData.isPublished = false;
   }

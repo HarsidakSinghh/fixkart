@@ -28,11 +28,14 @@ export default function ApprovalsScreen({ routeParams }) {
   const [savingCommission, setSavingCommission] = useState(false);
   const [selectedInventoryVendorKeys, setSelectedInventoryVendorKeys] = useState([]);
   const [bulkApprovingVendors, setBulkApprovingVendors] = useState(false);
+  const [bulkVendorOpen, setBulkVendorOpen] = useState(false);
+  const [reviewComment, setReviewComment] = useState("");
 
   const fetchVendors = useCallback(async () => {
     const data = await getVendors("PENDING");
     return data.vendors;
   }, []);
+
   const fetchInventory = useCallback(async () => {
     const data = await getInventoryApprovals();
     return data.products;
@@ -61,11 +64,13 @@ export default function ApprovalsScreen({ routeParams }) {
     vendorsList.setItems((prev) => prev.filter((v) => v.id !== vendorId));
   };
 
-  const handleInventoryAction = async (productId, action) => {
+  const handleInventoryAction = async (productId, action, comment = "") => {
     if (action === "APPROVE") {
       await approveProduct(productId);
+    } else if (action === "SEND_REVIEW") {
+      await rejectProduct(productId, { action: "SEND_REVIEW", comment });
     } else {
-      await rejectProduct(productId);
+      await rejectProduct(productId, { action: "REJECT", comment });
     }
     inventoryList.setItems((prev) => prev.filter((p) => p.id !== productId));
   };
@@ -154,20 +159,9 @@ export default function ApprovalsScreen({ routeParams }) {
     }
   };
 
-  const activeItems =
-    activeTab === "vendors"
-      ? vendorsList.items
-      : inventoryList.items;
-
-  const activeError =
-    activeTab === "vendors"
-      ? vendorsList.error
-      : inventoryList.error;
-
-  const activeRefresh =
-    activeTab === "vendors"
-      ? vendorsList.refresh
-      : inventoryList.refresh;
+  const activeItems = activeTab === "vendors" ? vendorsList.items : inventoryList.items;
+  const activeError = activeTab === "vendors" ? vendorsList.error : inventoryList.error;
+  const activeRefresh = activeTab === "vendors" ? vendorsList.refresh : inventoryList.refresh;
 
   if (selectedVendorId) {
     return <VendorProfileAdminScreen vendorId={selectedVendorId} onBack={() => setSelectedVendorId(null)} />;
@@ -194,61 +188,59 @@ export default function ApprovalsScreen({ routeParams }) {
         })}
       </View>
 
-      <SectionHeader
-        title={
-          activeTab === "vendors"
-            ? "Vendor Requests"
-            : "Inventory Requests"
-        }
-      />
+      <SectionHeader title={activeTab === "vendors" ? "Vendor Requests" : "Inventory Requests"} />
 
       {activeTab === "inventory" && inventoryVendors.length ? (
         <View style={styles.bulkVendorPanel}>
-          <Text style={styles.bulkVendorTitle}>Bulk Approve by Vendor</Text>
-          <Text style={styles.bulkVendorMeta}>
-            {selectedInventoryVendorKeys.length
-              ? `${selectedInventoryVendorKeys.length} vendor(s) selected`
-              : "Select vendor(s), then approve all their pending listings."}
-          </Text>
-          <View style={styles.bulkVendorChips}>
-            {inventoryVendors.map((entry) => {
-              const selected = selectedInventoryVendorKeys.includes(entry.key);
-              return (
+          <TouchableOpacity style={styles.bulkVendorHeader} onPress={() => setBulkVendorOpen((prev) => !prev)}>
+            <Text style={styles.bulkVendorTitle}>Bulk Approve by Vendor</Text>
+            <Text style={styles.bulkVendorToggle}>{bulkVendorOpen ? "Hide" : "Show"}</Text>
+          </TouchableOpacity>
+          {bulkVendorOpen ? (
+            <>
+              <Text style={styles.bulkVendorMeta}>
+                {selectedInventoryVendorKeys.length
+                  ? `${selectedInventoryVendorKeys.length} vendor(s) selected`
+                  : "Select vendor(s), then approve all their pending listings."}
+              </Text>
+              <View style={styles.bulkVendorChips}>
+                {inventoryVendors.map((entry) => {
+                  const selected = selectedInventoryVendorKeys.includes(entry.key);
+                  return (
+                    <TouchableOpacity
+                      key={entry.key}
+                      style={[styles.bulkVendorChip, selected && styles.bulkVendorChipActive]}
+                      onPress={() =>
+                        setSelectedInventoryVendorKeys((prev) =>
+                          prev.includes(entry.key)
+                            ? prev.filter((k) => k !== entry.key)
+                            : [...prev, entry.key]
+                        )
+                      }
+                    >
+                      <Text style={[styles.bulkVendorChipText, selected && styles.bulkVendorChipTextActive]}>
+                        {entry.label} ({entry.count})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.bulkVendorActions}>
+                <TouchableOpacity style={styles.bulkVendorClearBtn} onPress={() => setSelectedInventoryVendorKeys([])}>
+                  <Text style={styles.bulkVendorClearText}>Clear</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
-                  key={entry.key}
-                  style={[styles.bulkVendorChip, selected && styles.bulkVendorChipActive]}
-                  onPress={() =>
-                    setSelectedInventoryVendorKeys((prev) =>
-                      prev.includes(entry.key)
-                        ? prev.filter((k) => k !== entry.key)
-                        : [...prev, entry.key]
-                    )
-                  }
+                  style={[styles.bulkVendorApproveBtn, bulkApprovingVendors && { opacity: 0.7 }]}
+                  onPress={approveSelectedVendors}
+                  disabled={bulkApprovingVendors}
                 >
-                  <Text style={[styles.bulkVendorChipText, selected && styles.bulkVendorChipTextActive]}>
-                    {entry.label} ({entry.count})
+                  <Text style={styles.bulkVendorApproveText}>
+                    {bulkApprovingVendors ? "Approving..." : "Approve Selected Vendors"}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-          <View style={styles.bulkVendorActions}>
-            <TouchableOpacity
-              style={styles.bulkVendorClearBtn}
-              onPress={() => setSelectedInventoryVendorKeys([])}
-            >
-              <Text style={styles.bulkVendorClearText}>Clear</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.bulkVendorApproveBtn, bulkApprovingVendors && { opacity: 0.7 }]}
-              onPress={approveSelectedVendors}
-              disabled={bulkApprovingVendors}
-            >
-              <Text style={styles.bulkVendorApproveText}>
-                {bulkApprovingVendors ? "Approving..." : "Approve Selected Vendors"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              </View>
+            </>
+          ) : null}
         </View>
       ) : null}
 
@@ -277,6 +269,7 @@ export default function ApprovalsScreen({ routeParams }) {
                   onSecondary={() => {
                     setSelectedInventory(item);
                     setCommissionInput(String(Number(item.commissionPercent || 0)));
+                    setReviewComment("");
                   }}
                 />
               }
@@ -343,6 +336,19 @@ export default function ApprovalsScreen({ routeParams }) {
                 <Text style={styles.metaText}>Price: ₹{Math.round(selectedInventory.price || 0)}</Text>
                 <Text style={styles.metaText}>Commission: {Number(selectedInventory.commissionPercent || 0)}%</Text>
                 <Text style={styles.metaText}>Description: {selectedInventory.description || "No description"}</Text>
+
+                <View style={styles.commentWrap}>
+                  <Text style={styles.commissionLabel}>Comment for reject/review</Text>
+                  <TextInput
+                    value={reviewComment}
+                    onChangeText={setReviewComment}
+                    placeholder="Write note for vendor"
+                    placeholderTextColor={colors.muted}
+                    style={[styles.commissionInput, styles.commentInput]}
+                    multiline
+                  />
+                </View>
+
                 <View style={styles.commissionWrap}>
                   <Text style={styles.commissionLabel}>Change Commission %</Text>
                   <TextInput
@@ -358,17 +364,29 @@ export default function ApprovalsScreen({ routeParams }) {
                     onPress={saveCommission}
                     disabled={savingCommission}
                   >
-                    <Text style={styles.commissionBtnText}>
-                      {savingCommission ? "Saving..." : "Save Commission"}
-                    </Text>
+                    <Text style={styles.commissionBtnText}>{savingCommission ? "Saving..." : "Save Commission"}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity
+                  style={styles.reviewBtn}
+                  onPress={async () => {
+                    const note = reviewComment.trim();
+                    if (!note) {
+                      Alert.alert("Comment required", "Add a comment before sending listing for review.");
+                      return;
+                    }
+                    await handleInventoryAction(selectedInventory.id, "SEND_REVIEW", note);
+                    setSelectedInventory(null);
+                  }}
+                >
+                  <Text style={styles.reviewText}>Send for Review</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={styles.rejectBtn}
                   onPress={async () => {
-                    await handleInventoryAction(selectedInventory.id, "REJECT");
+                    await handleInventoryAction(selectedInventory.id, "REJECT", reviewComment);
                     setSelectedInventory(null);
                   }}
                 >
@@ -472,6 +490,16 @@ const styles = StyleSheet.create({
   vendorLinkText: { color: colors.primary, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
   vendorLinkDisabled: { color: colors.muted, textDecorationLine: "none", fontWeight: "500" },
   modalActions: { marginTop: spacing.sm, flexDirection: "row", gap: spacing.sm },
+  reviewBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 11,
+    backgroundColor: "rgba(24, 77, 178, 0.08)",
+  },
+  reviewText: { color: colors.primary, fontWeight: "700" },
   rejectBtn: {
     flex: 1,
     borderWidth: 1,
@@ -490,6 +518,15 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   approveText: { color: "#FFFFFF", fontWeight: "700" },
+  commentWrap: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    padding: spacing.sm,
+    backgroundColor: colors.card,
+  },
+  commentInput: { minHeight: 68, textAlignVertical: "top" },
   commissionWrap: {
     marginTop: 10,
     borderWidth: 1,
@@ -524,7 +561,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.card,
   },
+  bulkVendorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   bulkVendorTitle: { color: colors.text, fontWeight: "800", fontSize: 13 },
+  bulkVendorToggle: { color: colors.primary, fontSize: 12, fontWeight: "800" },
   bulkVendorMeta: { color: colors.muted, fontSize: 12, marginTop: 4 },
   bulkVendorChips: {
     marginTop: spacing.sm,

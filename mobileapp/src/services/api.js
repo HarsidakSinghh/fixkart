@@ -380,12 +380,15 @@ export async function approveProduct(id) {
   });
 }
 
-export async function rejectProduct(id) {
+export async function rejectProduct(id, options = {}) {
   if (USE_MOCK) return { success: true };
+
+  const action = options?.action || "REJECT";
+  const comment = String(options?.comment || "").trim();
 
   return authenticatedFetch(`/api/mobile/products/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ action: "REJECT" }),
+    body: JSON.stringify({ action, comment }),
   });
 }
 

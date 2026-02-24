@@ -23,6 +23,12 @@ export default function VendorInventoryScreen() {
   const [detailForm, setDetailForm] = useState({});
   const [deletingId, setDeletingId] = useState(null);
 
+  const hasAdminReviewFlag = useCallback((item) => {
+    const specs = item?.specs;
+    if (!specs || typeof specs !== 'object' || Array.isArray(specs)) return false;
+    return Boolean(specs.adminNeedsReview);
+  }, []);
+
   const loadListings = useCallback(async () => {
     setLoading(true);
     try {
@@ -46,8 +52,8 @@ export default function VendorInventoryScreen() {
         (p) => p.status === 'APPROVED' && p.isPublished && Number(p.quantity ?? 0) > 0
       );
     }
-    if (statusFilter === 'PENDING') filtered = filtered.filter((p) => p.status === 'PENDING');
-    if (statusFilter === 'ACTION') filtered = filtered.filter((p) => p.status === 'REJECTED');
+    if (statusFilter === 'PENDING') filtered = filtered.filter((p) => p.status === 'PENDING' && !hasAdminReviewFlag(p));
+    if (statusFilter === 'ACTION') filtered = filtered.filter((p) => p.status === 'REJECTED' || hasAdminReviewFlag(p));
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       filtered = filtered.filter((p) => {
@@ -57,15 +63,42 @@ export default function VendorInventoryScreen() {
       });
     }
     return filtered;
-  }, [listings, statusFilter, search]);
+  }, [hasAdminReviewFlag, listings, statusFilter, search]);
+
+  const statusCounts = useMemo(() => {
+    let live = 0;
+    let pending = 0;
+    let action = 0;
+    listings.forEach((p) => {
+      const isLive = p.status === 'APPROVED' && p.isPublished && Number(p.quantity ?? 0) > 0;
+      const isAction = p.status === 'REJECTED' || hasAdminReviewFlag(p);
+      if (isLive) live += 1;
+      if (p.status === 'PENDING' && !hasAdminReviewFlag(p)) pending += 1;
+      if (isAction) action += 1;
+    });
+    return {
+      ALL: listings.length,
+      LIVE: live,
+      PENDING: pending,
+      ACTION: action,
+    };
+  }, [hasAdminReviewFlag, listings]);
 
   const renderListing = ({ item }) => (
     <View style={styles.listingCard}>
       <View style={[styles.statusStripe, { backgroundColor: statusStripe(item) }]} />
       <Image source={{ uri: item.image }} style={styles.listingImage} />
-      <View style={styles.listingBody}>
-        <Text style={styles.productName}>{item.title || item.name}</Text>
-        <Text style={styles.productSku} numberOfLines={1}>SKU: {item.sku || 'N/A'}</Text>
+        <View style={styles.listingBody}>
+          <Text style={styles.productName}>{item.title || item.name}</Text>
+          {hasAdminReviewFlag(item) ? (
+            <View style={styles.reviewNoteWrap}>
+              <Text style={styles.reviewNoteTitle}>Admin marked for review</Text>
+              <Text style={styles.reviewNoteText} numberOfLines={3}>
+                {String(item?.specs?.adminReviewNote || '').trim() || 'Please review and update this listing.'}
+              </Text>
+            </View>
+          ) : null}
+          <Text style={styles.productSku} numberOfLines={1}>SKU: {item.sku || 'N/A'}</Text>
         {typeof item.quantity === 'number' && item.quantity > 0 && item.quantity < 5 ? (
           <View style={styles.lowStockPill}>
             <Text style={styles.lowStockText}>Only {item.quantity} left</Text>
@@ -238,7 +271,7 @@ export default function VendorInventoryScreen() {
                   onPress={() => setStatusFilter(item.key)}
                 >
                   <Text style={[styles.categoryText, statusFilter === item.key && styles.categoryTextActive]}>
-                    {item.label}
+                    {item.label} ({statusCounts[item.key] ?? 0})
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -339,6 +372,7 @@ export default function VendorInventoryScreen() {
 
   function statusLabel(item) {
     const qty = Number(item?.quantity ?? 0);
+    if (hasAdminReviewFlag(item)) return 'NEEDS ACTION';
     if (item.status === 'APPROVED' && item.isPublished) {
       if (qty <= 0) return 'SOLD OUT';
       if (qty < 5) return 'LOW STOCK';
@@ -351,6 +385,7 @@ export default function VendorInventoryScreen() {
 
   function statusTone(item) {
     const qty = Number(item?.quantity ?? 0);
+    if (hasAdminReviewFlag(item)) return 'danger';
     if (item.status === 'APPROVED' && item.isPublished) {
       if (qty <= 0) return 'danger';
       if (qty < 5) return 'warning';
@@ -363,6 +398,7 @@ export default function VendorInventoryScreen() {
 
   function statusStripe(item) {
     const qty = Number(item?.quantity ?? 0);
+    if (hasAdminReviewFlag(item)) return '#E05252';
     if (item.status === 'APPROVED' && item.isPublished) {
       if (qty <= 0) return '#E05252';
       if (qty < 5) return '#F0B429';
@@ -496,6 +532,17 @@ const styles = StyleSheet.create({
     borderColor: '#8C5B2D',
   },
   lowStockText: { color: '#F5C391', fontSize: 10, fontWeight: '700' },
+  reviewNoteWrap: {
+    marginTop: 2,
+    borderWidth: 1,
+    borderColor: '#E9B3B3',
+    backgroundColor: '#FFF4F4',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  reviewNoteTitle: { color: '#B52E2E', fontSize: 10, fontWeight: '800' },
+  reviewNoteText: { color: '#8A2C2C', fontSize: 10, marginTop: 2 },
   metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   metricCard: {
     paddingHorizontal: 10,
