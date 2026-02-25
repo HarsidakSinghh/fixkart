@@ -76,7 +76,7 @@ async function fallbackCallImagga(file: File): Promise<FallbackCandidate[]> {
         name: toBasicName(String(e?.tag?.en || "").trim()),
         confidence: Number(e?.confidence || 0),
         source: "imagga",
-      })).filter((c) => c.name)
+      })).filter((c: FallbackCandidate) => c.name)
     : [];
 }
 
