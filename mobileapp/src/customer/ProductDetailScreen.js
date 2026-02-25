@@ -93,6 +93,8 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
   const modelValue = view.model || view.specs?.model || '-';
   const typeValue = view.specs?.customType || view.specs?.type || '-';
   const cartonPieces = Number(view.specs?.cartonPieces || 0);
+  const featureList = parseFeatures(view.features || view.specs?.features || '');
+  const detailItems = buildDetailItems(view);
 
   const submitReview = async () => {
     if (!isAuthenticated) {
@@ -154,21 +156,49 @@ export default function ProductDetailScreen({ product, onBack, onLogin }) {
           <Text style={styles.stock}>{view.quantity > 0 ? 'In stock' : 'Out of stock'}</Text>
         </View>
         <View style={styles.specRow}>
-          <Text style={styles.specText}>Brand: {brandValue}</Text>
-          <Text style={styles.specText}>Model: {modelValue}</Text>
-          <Text style={styles.specText}>Type: {typeValue}</Text>
+          {brandValue !== '-' ? <Text style={styles.specText}>Brand: {brandValue}</Text> : null}
+          {modelValue !== '-' ? <Text style={styles.specText}>Model: {modelValue}</Text> : null}
+          {typeValue !== '-' ? <Text style={styles.specText}>Type: {typeValue}</Text> : null}
         </View>
-        <View style={styles.infoChipRow}>
-          <View style={styles.infoChip}>
-            <Text style={styles.infoChipLabel}>Pieces / Carton</Text>
-            <Text style={styles.infoChipValue}>{cartonPieces > 0 ? cartonPieces : '—'}</Text>
+        {cartonPieces > 0 ? (
+          <View style={styles.infoChipRow}>
+            <View style={styles.infoChip}>
+              <Text style={styles.infoChipLabel}>Pieces / Carton</Text>
+              <Text style={styles.infoChipValue}>{cartonPieces}</Text>
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Description</Text>
         <Text style={styles.description}>
           {loading ? 'Loading description…' : view.description || view.features || 'No description available yet.'}
         </Text>
+
+        {featureList.length ? (
+          <>
+            <Text style={styles.sectionTitle}>Features</Text>
+            <View style={styles.featureWrap}>
+              {featureList.map((feature, idx) => (
+                <View key={`${feature}-${idx}`} style={styles.featurePill}>
+                  <Text style={styles.featureText}>{feature}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+        {detailItems.length ? (
+          <>
+            <Text style={styles.sectionTitle}>Product Details</Text>
+            <View style={styles.detailsCard}>
+              {detailItems.map((item) => (
+                <View key={item.key} style={styles.detailRow}>
+                  <Text style={styles.detailKey}>{item.label}</Text>
+                  <Text style={styles.detailValue}>{item.value}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <View style={styles.reviewSection}>
           <View style={styles.reviewHeader}>
@@ -247,6 +277,36 @@ function renderStars(rating) {
   return output;
 }
 
+function parseFeatures(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return [];
+  return raw
+    .split(/[,\n;|]/)
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function normalizedText(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (text === '-' || text.toLowerCase() === 'nil' || text.toLowerCase() === 'null') return '';
+  return text;
+}
+
+function buildDetailItems(view) {
+  const details = [
+    { key: 'color', label: 'Color', value: normalizedText(view?.specs?.color) },
+    { key: 'weight', label: 'Weight', value: normalizedText(view?.specs?.weight) },
+    { key: 'size', label: 'Size', value: normalizedText(view?.specs?.size) },
+    { key: 'material', label: 'Material', value: normalizedText(view?.specs?.material) },
+    { key: 'certifications', label: 'Certifications', value: normalizedText(view?.specs?.certifications) },
+    { key: 'returnsPolicy', label: 'Return Policy', value: normalizedText(view?.returnsPolicy || view?.specs?.returnsPolicy) },
+    { key: 'warrantyPolicy', label: 'Warranty', value: normalizedText(view?.warrantyPolicy || view?.specs?.warrantyPolicy) },
+  ];
+  return details.filter((item) => item.value);
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: customerColors.bg },
   scrollContent: { paddingBottom: 120 },
@@ -294,15 +354,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addText: { color: '#FFFFFF', fontWeight: '700' },
-  sectionTitle: { marginTop: customerSpacing.xl, fontWeight: '700', color: customerColors.text },
-  description: { marginTop: customerSpacing.sm, color: customerColors.muted, lineHeight: 20 },
-  reviewSection: {
-    marginTop: customerSpacing.lg,
+  sectionTitle: { marginTop: customerSpacing.lg, fontWeight: '800', color: customerColors.text, fontSize: 15 },
+  description: { marginTop: customerSpacing.sm, color: customerColors.muted, lineHeight: 21, fontSize: 13 },
+  featureWrap: {
+    marginTop: customerSpacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  featurePill: {
     borderWidth: 1,
-    borderColor: customerColors.border,
-    borderRadius: 16,
-    backgroundColor: customerColors.card,
-    padding: customerSpacing.md,
+    borderColor: '#DEE7F4',
+    backgroundColor: '#F7FAFF',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  featureText: {
+    color: customerColors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  detailsCard: {
+    marginTop: customerSpacing.sm,
+    borderWidth: 1,
+    borderColor: '#E2EAF6',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: customerSpacing.md,
+    paddingVertical: customerSpacing.sm,
+  },
+  detailRow: {
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFF3FA',
+  },
+  detailKey: {
+    color: customerColors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  detailValue: {
+    marginTop: 3,
+    color: customerColors.text,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  reviewSection: {
+    marginTop: customerSpacing.xl + 4,
+    borderWidth: 1,
+    borderColor: '#E3EAF5',
+    borderRadius: 18,
+    backgroundColor: '#FCFDFF',
+    padding: customerSpacing.lg,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -310,7 +417,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: customerSpacing.sm,
   },
-  reviewSectionTitle: { color: customerColors.text, fontWeight: '800', fontSize: 15 },
+  reviewSectionTitle: { color: customerColors.text, fontWeight: '800', fontSize: 16 },
   ratingBadge: {
     borderWidth: 1,
     borderColor: '#D4E2F5',
@@ -320,14 +427,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   ratingBadgeText: { color: customerColors.primary, fontWeight: '700', fontSize: 11 },
-  ratingSummary: { marginTop: 8, color: '#B45309', fontWeight: '700' },
+  ratingSummary: { marginTop: 10, color: '#B45309', fontWeight: '700' },
   reviewForm: {
-    marginTop: 12,
+    marginTop: 14,
     borderWidth: 1,
-    borderColor: '#E4ECF8',
-    borderRadius: 12,
+    borderColor: '#DFE8F5',
+    borderRadius: 14,
     padding: customerSpacing.md,
-    backgroundColor: '#FAFCFF',
+    backgroundColor: '#FFFFFF',
   },
   reviewLabel: { color: customerColors.text, fontWeight: '700', marginBottom: 8, fontSize: 13 },
   starSelectRow: { flexDirection: 'row', gap: 8 },
@@ -366,19 +473,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   submitReviewText: { color: '#fff', fontWeight: '700' },
-  reviewMeta: { marginTop: 12, color: customerColors.muted, fontSize: 12 },
+  reviewMeta: { marginTop: 14, color: customerColors.muted, fontSize: 12 },
   reviewCard: {
-    marginTop: 12,
+    marginTop: 14,
     borderWidth: 1,
-    borderColor: '#E5ECF8',
-    borderRadius: 14,
+    borderColor: '#E2EAF6',
+    borderRadius: 16,
     padding: customerSpacing.md,
-    backgroundColor: customerColors.card,
+    backgroundColor: '#FFFFFF',
     shadowColor: customerColors.shadow,
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
   reviewName: { color: customerColors.text, fontWeight: '700' },
   reviewStars: { marginTop: 4, color: '#B45309', fontSize: 12, fontWeight: '700' },

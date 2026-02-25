@@ -120,7 +120,7 @@ export async function recognizeProductFromImage(asset) {
     type: asset.mimeType || 'image/jpeg',
   });
 
-  const res = await fetch(`${BASE_URL}/api/mobile/vision/recognize`, {
+  const res = await fetch(`${BASE_URL}/api/mobile/vision/recognize-gemini`, {
     method: 'POST',
     body: formData,
   });

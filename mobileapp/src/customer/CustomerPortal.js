@@ -87,7 +87,13 @@ export default function CustomerPortal({ onOpenLogin }) {
           typeLabel={detailProduct.type}
           typeCategory={detailProduct.typeCategory || ''}
           onBack={() => setDetailProduct(null)}
-          onOpenProduct={(product) => setDetailProduct(product)}
+          onOpenProduct={(product) =>
+            setDetailProduct({
+              ...product,
+              _sourceTypeLabel: detailProduct.type,
+              _sourceTypeCategory: detailProduct.typeCategory || '',
+            })
+          }
           onOpenLogin={onOpenLogin}
         />
       );
@@ -95,7 +101,17 @@ export default function CustomerPortal({ onOpenLogin }) {
     return (
       <ProductDetailScreen
         product={detailProduct}
-        onBack={() => setDetailProduct(null)}
+        onBack={() => {
+          if (detailProduct?._sourceTypeLabel) {
+            setDetailProduct({
+              isType: true,
+              type: detailProduct._sourceTypeLabel,
+              typeCategory: detailProduct._sourceTypeCategory || '',
+            });
+            return;
+          }
+          setDetailProduct(null);
+        }}
         onLogin={onOpenLogin}
       />
     );
