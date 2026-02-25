@@ -66,24 +66,34 @@ export async function POST(req: Request) {
     }
 
     const prompt = `You are an expert at identifying industrial hardware and fasteners from photos.
-Identify the product type shown in this image. Focus on industrial products like: bolts, nuts, screws, washers, fasteners, bearings, valves, pipe fittings, cables, motors, pumps, tools, etc.
+Identify the product type. Return the most BASIC, generic name only – 1–2 words max.
 
-Return ONLY strict JSON with this exact shape:
+Examples of basic names:
+- Chain saw → saw
+- Electric drill → drill
+- Hex bolt → bolt
+- Flat washer → washer
+- Machine screw → screw
+- Hex nut → nut
+- Angle grinder → grinder
+- Pipe fitting → pipe
+
+Return ONLY strict JSON:
 {
-  "productName": "Hex Bolt",
+  "productName": "drill",
   "confidence": 85,
   "candidates": [
-    { "name": "Hex Bolt", "confidence": 85 },
-    { "name": "Machine Screw", "confidence": 10 }
+    { "name": "drill", "confidence": 85 },
+    { "name": "screwdriver", "confidence": 10 }
   ]
 }
 
 Rules:
-- productName: best single product type or name (e.g. "Hex Bolt", "Flat Washer", "Hex Nut").
-- confidence: 0-100, how confident you are.
-- candidates: up to 5 alternatives sorted by confidence.
-- Use standard industrial product names.
-- If unclear or not a product, use productName "" and confidence 0.`;
+- productName: single most basic word (bolt, nut, screw, washer, drill, saw, wrench, pump, valve, etc).
+- Do NOT use prefixes: no "electric", "hex", "flat", "chain", "power" – just the core type.
+- confidence: 0–100.
+- candidates: up to 5 alternatives, all basic names.
+- If unclear, use productName "" and confidence 0.`;
 
     const res = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
