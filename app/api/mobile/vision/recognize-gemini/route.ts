@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const GEMINI_TIMEOUT_MS = 25_000;
+const GEMINI_TIMEOUT_MS = 60_000; // Image read + analyze + response
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number) {
   const controller = new AbortController();
