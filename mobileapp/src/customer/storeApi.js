@@ -109,20 +109,18 @@ export async function recognizeProductFromImage(asset) {
   if (!BASE_URL) {
     throw new Error('Missing API base URL');
   }
-  if (!asset?.uri) {
-    throw new Error('Image is required');
+  const base64 = asset?.base64 ?? asset?.imageBase64;
+  if (!base64) {
+    throw new Error('Image is required (use base64: true in ImagePicker)');
   }
-
-  const formData = new FormData();
-  formData.append('image', {
-    uri: asset.uri,
-    name: asset.fileName || `lens-${Date.now()}.jpg`,
-    type: asset.mimeType || 'image/jpeg',
-  });
 
   const res = await fetch(`${BASE_URL}/api/mobile/vision/recognize-gemini`, {
     method: 'POST',
-    body: formData,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      imageBase64: base64,
+      mimeType: asset.mimeType || 'image/jpeg',
+    }),
   });
 
   if (!res.ok) {

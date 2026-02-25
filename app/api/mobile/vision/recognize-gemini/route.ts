@@ -26,14 +26,34 @@ type GeminiRecognizeResult = {
 
 export async function POST(req: Request) {
   try {
-    const incoming = await req.formData();
-    const image = incoming.get("image");
+    let data: string;
+    let mimeType: string;
 
-    if (!(image instanceof File)) {
-      return NextResponse.json({ error: "Image file is required" }, { status: 400 });
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      const base64 = body?.imageBase64 ?? body?.base64 ?? body?.image;
+      const raw = String(base64 ?? "").trim();
+      if (!raw) {
+        return NextResponse.json({ error: "imageBase64 is required" }, { status: 400 });
+      }
+      data = raw.replace(/^data:[^;]+;base64,/, "");
+      mimeType = body?.mimeType || "image/jpeg";
+    } else {
+      const incoming = await req.formData();
+      const image = incoming.get("image");
+      if (!image || typeof (image as any)?.arrayBuffer !== "function") {
+        return NextResponse.json({ error: "Image file is required" }, { status: 400 });
+      }
+      const buffer = Buffer.from(await (image as Blob).arrayBuffer());
+      if (buffer.length > 10 * 1024 * 1024) {
+        return NextResponse.json({ error: "Image must be less than 10MB" }, { status: 400 });
+      }
+      data = buffer.toString("base64");
+      mimeType = (image as File).type || "image/jpeg";
     }
 
-    if (image.size > 10 * 1024 * 1024) {
+    if (Buffer.byteLength(data, "base64") > 10 * 1024 * 1024) {
       return NextResponse.json({ error: "Image must be less than 10MB" }, { status: 400 });
     }
 
@@ -44,10 +64,6 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-
-    const buffer = Buffer.from(await image.arrayBuffer());
-    const mimeType = image.type || "image/jpeg";
-    const data = buffer.toString("base64");
 
     const prompt = `You are an expert at identifying industrial hardware and fasteners from photos.
 Identify the product type shown in this image. Focus on industrial products like: bolts, nuts, screws, washers, fasteners, bearings, valves, pipe fittings, cables, motors, pumps, tools, etc.
@@ -122,14 +138,21 @@ Rules:
       );
     }
 
-    const productName = String(parsed?.productName || "").trim();
-    const confidence = Number(parsed?.confidence ?? 0);
+    let productName = String(parsed?.productName || "").trim();
     const candidates = Array.isArray(parsed?.candidates)
       ? parsed.candidates.slice(0, 8).map((c) => ({
-          name: String(c?.name || ""),
+          name: String(c?.name || "").trim(),
           confidence: Number(c?.confidence ?? 0),
-        }))
-      : productName ? [{ name: productName, confidence }] : [];
+        })).filter((c) => c.name)
+      : [];
+    let confidence = Number(parsed?.confidence ?? 0);
+    if (!productName && candidates.length) {
+      productName = candidates[0].name;
+      confidence = candidates[0].confidence;
+    }
+    if (productName && !candidates.length) {
+      candidates.push({ name: productName, confidence });
+    }
 
     return NextResponse.json({
       productName,

@@ -189,6 +189,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
       mediaTypes: ['images'],
       quality: 0.7,
       allowsEditing: true,
+      base64: true,
     });
     if (result.canceled || !result.assets?.length) return;
     runImageRecognition(result.assets[0]);
@@ -203,6 +204,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.7,
+      base64: true,
     });
     if (result.canceled || !result.assets?.length) return;
     runImageRecognition(result.assets[0]);
