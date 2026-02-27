@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -61,7 +62,7 @@ export async function GET(req: Request) {
       category: p.category,
       subCategory: p.subCategory,
       price: displayPrice,
-      image: p.image,
+      image: normalizeMobileImageUrl(p.image),
       quantity: p.quantity || 0,
       vendorName: vendorMap.get(p.vendorId) || "Vendor",
       specs,

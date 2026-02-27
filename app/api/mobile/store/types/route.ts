@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -57,11 +58,11 @@ export async function GET(req: Request) {
       p.category ||
       "Others";
     if (!map.has(label)) {
-      map.set(label, { label, image: p.image || null, count: 1 });
+      map.set(label, { label, image: normalizeMobileImageUrl(p.image) || null, count: 1 });
     } else {
       const entry = map.get(label)!;
       entry.count += 1;
-      if (!entry.image && p.image) entry.image = p.image;
+      if (!entry.image && p.image) entry.image = normalizeMobileImageUrl(p.image) || null;
     }
   }
 
