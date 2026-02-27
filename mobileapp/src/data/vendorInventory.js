@@ -101,7 +101,10 @@ export const VENDOR_INVENTORY = [
         quantity: undefined
       },
       {
-        name: "Drywall Screws", imagePath: "/fastening\\screws.jpg",
+        name: "Drywall Screws", imagePath: "/fastening\\philips-roundhead.webp",
+        quantity: undefined
+      },{
+        name: "Machine Screw", imagePath: "/fastening\\screws.jpg",
         quantity: undefined
       },{
         name: "Torx Screws", imagePath: "/fastening\\stainless-steel-torx-screws-stainless-steel-torx-screws-isolated-white-background-215582969.webp",

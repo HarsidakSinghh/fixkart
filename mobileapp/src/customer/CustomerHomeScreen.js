@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Act
 import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
-import { getStoreProducts, recognizeProductFromImage } from './storeApi';
+import { getStoreProducts, getStoreTypes, recognizeProductFromImage } from './storeApi';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
@@ -70,6 +70,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchProducts, setSearchProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [vendorTypes, setVendorTypes] = useState([]);
   const [lensState, setLensState] = useState('idle');
   const [lensResult, setLensResult] = useState(null);
   const { isAuthenticated, clearSession } = useAuth();
@@ -88,6 +89,34 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     const unique = Array.from(new Set(list));
     setCategories(unique);
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadVendorTypes() {
+      try {
+        const data = await getStoreTypes(category === 'All' ? '' : category);
+        if (!mounted) return;
+        const incoming = Array.isArray(data?.types) ? data.types : [];
+        setVendorTypes(
+          incoming
+            .map((item, index) => ({
+              id: `vendor-${item?.label || index}-${index}`,
+              label: String(item?.label || '').trim(),
+              image: String(item?.image || '').trim(),
+              category: String(item?.category || '').trim(),
+              source: 'vendor',
+            }))
+            .filter((item) => item.label)
+        );
+      } catch {
+        if (mounted) setVendorTypes([]);
+      }
+    }
+    loadVendorTypes();
+    return () => {
+      mounted = false;
+    };
+  }, [category]);
 
   const inventoryTypes = useMemo(() => {
     const baseUrl = process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL || 'https://fixkart-main.vercel.app';
@@ -115,11 +144,24 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
     });
     const deduped = new Map();
     result.forEach((item) => {
-      const key = `${item.category}::${item.label}`.toLowerCase();
+      const key = item.label.toLowerCase();
       if (!deduped.has(key)) deduped.set(key, item);
     });
+    vendorTypes.forEach((item) => {
+      const key = item.label.toLowerCase();
+      const existing = deduped.get(key);
+      if (!existing) {
+        deduped.set(key, {
+          ...item,
+          id: item.id || `vendor-${key}`,
+          category: item.category || (category === 'All' ? 'Others' : category),
+        });
+      } else if (!existing.image && item.image) {
+        existing.image = item.image;
+      }
+    });
     return Array.from(deduped.values());
-  }, [category]);
+  }, [category, vendorTypes]);
 
   const filteredTypes = useMemo(() => {
     if (!debouncedQuery) return inventoryTypes;

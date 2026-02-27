@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     return null;
   };
 
-  const map = new Map<string, { label: string; image: string | null; count: number }>();
+  const map = new Map<string, { label: string; image: string | null; count: number; category: string }>();
   for (const p of products) {
     const label =
       p.subSubCategory ||
@@ -57,12 +57,19 @@ export async function GET(req: Request) {
       deriveType(p.name, p.title) ||
       p.category ||
       "Others";
+    const resolvedCategory = String(p.category || p.subCategory || "").trim();
     if (!map.has(label)) {
-      map.set(label, { label, image: normalizeMobileImageUrl(p.image) || null, count: 1 });
+      map.set(label, {
+        label,
+        image: normalizeMobileImageUrl(p.image) || null,
+        count: 1,
+        category: resolvedCategory,
+      });
     } else {
       const entry = map.get(label)!;
       entry.count += 1;
       if (!entry.image && p.image) entry.image = normalizeMobileImageUrl(p.image) || null;
+      if (!entry.category && resolvedCategory) entry.category = resolvedCategory;
     }
   }
 
