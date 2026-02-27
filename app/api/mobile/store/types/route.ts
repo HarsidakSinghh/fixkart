@@ -27,6 +27,7 @@ export async function GET(req: Request) {
       name: true,
       title: true,
       image: true,
+      specs: true,
     },
   });
 
@@ -51,7 +52,13 @@ export async function GET(req: Request) {
 
   const map = new Map<string, { label: string; image: string | null; count: number; category: string }>();
   for (const p of products) {
+    const specs =
+      p?.specs && typeof p.specs === "object" && !Array.isArray(p.specs)
+        ? (p.specs as Record<string, unknown>)
+        : {};
+    const customType = String(specs?.customType || specs?.type || "").trim();
     const label =
+      customType ||
       p.subSubCategory ||
       (p.subCategory && p.subCategory !== p.category ? p.subCategory : null) ||
       deriveType(p.name, p.title) ||

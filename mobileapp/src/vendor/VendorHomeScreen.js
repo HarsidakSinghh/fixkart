@@ -72,6 +72,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [bulkDrafts, setBulkDrafts] = useState([]);
   const [bulkParsedPages, setBulkParsedPages] = useState(0);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkUploadingImages, setBulkUploadingImages] = useState(false);
+  const [bulkSharedImageUrls, setBulkSharedImageUrls] = useState([]);
+  const [bulkSharedImagePreviews, setBulkSharedImagePreviews] = useState([]);
   const [editingDraft, setEditingDraft] = useState(null);
   const [bulkCategoryPickerOpen, setBulkCategoryPickerOpen] = useState(false);
   const [pendingBulkType, setPendingBulkType] = useState('');
@@ -215,6 +218,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
     }
     try {
       setBulkParsedPages(0);
+      setBulkSharedImageUrls([]);
+      setBulkSharedImagePreviews([]);
       const picked = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
         copyToCacheDirectory: true,
@@ -325,6 +330,57 @@ export default function VendorHomeScreen({ canAdd, status }) {
     setBulkDrafts((prev) => prev.filter((item) => item.tempId !== tempId));
   }, []);
 
+  const handlePickBulkSharedImages = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow gallery access to upload listing images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.75,
+      allowsEditing: false,
+      allowsMultipleSelection: true,
+      base64: true,
+      selectionLimit: 8,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const assets = result.assets || [];
+    if (assets.some((asset) => !asset.base64)) {
+      Alert.alert('Upload failed', 'Could not read one or more images. Try another image.');
+      return;
+    }
+
+    setBulkUploadingImages(true);
+    try {
+      const uploads = await Promise.all(
+        assets.map((asset, index) =>
+          uploadVendorListingImage(asset.base64, `bulk-listing-shared-${Date.now()}-${index}`)
+        )
+      );
+      const urls = uploads.map((u) => String(u?.url || '').trim()).filter(Boolean);
+      if (!urls.length) {
+        Alert.alert('Upload failed', 'Could not upload images. Please try again.');
+        return;
+      }
+      const previews = assets.map((asset) => asset.uri).filter(Boolean);
+      setBulkSharedImageUrls(urls);
+      setBulkSharedImagePreviews(previews);
+      setBulkDrafts((prev) =>
+        prev.map((item) => ({
+          ...item,
+          image: urls[0],
+        }))
+      );
+      Alert.alert('Applied', `Uploaded ${urls.length} image(s). Applied to all generated listings.`);
+    } catch (_) {
+      Alert.alert('Upload failed', 'Could not upload images. Please try again.');
+    } finally {
+      setBulkUploadingImages(false);
+    }
+  }, []);
+
   const rejectAllDrafts = useCallback(() => {
     Alert.alert('Reject all', 'Remove all generated listings?', [
       { text: 'Cancel', style: 'cancel' },
@@ -334,6 +390,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
         onPress: () => {
           setBulkDrafts([]);
           setBulkParsedPages(0);
+          setBulkSharedImageUrls([]);
+          setBulkSharedImagePreviews([]);
           setBulkPreviewOpen(false);
         },
       },
@@ -373,6 +431,8 @@ export default function VendorHomeScreen({ canAdd, status }) {
       setBulkPreviewOpen(false);
       setBulkDrafts([]);
       setBulkParsedPages(0);
+      setBulkSharedImageUrls([]);
+      setBulkSharedImagePreviews([]);
     } catch (error) {
       Alert.alert('Submit failed', 'Could not submit generated listings.');
     } finally {
@@ -796,6 +856,27 @@ export default function VendorHomeScreen({ canAdd, status }) {
                   placeholderTextColor={vendorColors.muted}
                 />
               </View>
+            </View>
+            <View style={styles.bulkSharedImageSection}>
+              <Text style={styles.inputLabel}>Bulk listing images (apply to all)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
+                {bulkSharedImagePreviews.length
+                  ? bulkSharedImagePreviews.map((uri, idx) => (
+                      <View key={`${uri}-${idx}`} style={styles.selectedImageWrap}>
+                        <Image source={{ uri }} style={styles.selectedImage} />
+                      </View>
+                    ))
+                  : null}
+              </ScrollView>
+              <TouchableOpacity
+                style={[styles.uploadImageBtn, bulkUploadingImages ? { opacity: 0.7 } : null]}
+                onPress={handlePickBulkSharedImages}
+                disabled={bulkUploadingImages}
+              >
+                <Text style={styles.uploadImageBtnText}>
+                  {bulkUploadingImages ? 'Uploading…' : 'Upload images for all listings'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
