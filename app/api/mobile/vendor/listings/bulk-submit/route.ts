@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/vendor-guard";
 import type { Prisma } from "@prisma/client";
 
+export const maxDuration = 300;
+
 function slugify(text: string) {
   return String(text || "")
     .toLowerCase()
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
     const fallbackBrand = vendor?.companyName || vendor?.fullName || null;
 
     const capped = listings.slice(0, 400);
-    const prepared: Prisma.ProductCreateInput[] = [];
+    const prepared: Prisma.ProductCreateManyInput[] = [];
     for (let i = 0; i < capped.length; i += 1) {
       const row = capped[i] || {};
       const name = String(row?.name || "").trim();
@@ -101,14 +103,15 @@ export async function POST(req: Request) {
       });
     }
 
-    const createdRows = await prisma.$transaction(
+    const created = await prisma.$transaction(
       async (tx) => {
-        const rows = [];
-        for (const data of prepared) {
-          const created = await tx.product.create({ data });
-          rows.push(created);
+        const result = await tx.product.createMany({
+          data: prepared,
+        });
+        if (Number(result?.count || 0) !== prepared.length) {
+          throw new Error("Bulk submit atomicity check failed");
         }
-        return rows;
+        return result;
       },
       {
         maxWait: 20_000,
@@ -118,7 +121,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      createdCount: createdRows.length,
+      createdCount: Number(created?.count || 0),
       failedCount: 0,
       failed: [],
     });

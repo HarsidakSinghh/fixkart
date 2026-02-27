@@ -75,11 +75,15 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const [bulkUploadingImages, setBulkUploadingImages] = useState(false);
   const [bulkSharedImageUrls, setBulkSharedImageUrls] = useState([]);
   const [bulkSharedImagePreviews, setBulkSharedImagePreviews] = useState([]);
+  const [bulkEditAllOpen, setBulkEditAllOpen] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null);
   const [bulkCategoryPickerOpen, setBulkCategoryPickerOpen] = useState(false);
   const [pendingBulkType, setPendingBulkType] = useState('');
   const [bulkGrade, setBulkGrade] = useState('');
   const [bulkCustomType, setBulkCustomType] = useState('');
+  const [bulkAllSubCategory, setBulkAllSubCategory] = useState('');
+  const [bulkAllBrand, setBulkAllBrand] = useState('');
+  const [bulkAllMaterial, setBulkAllMaterial] = useState('');
 
   const loadCategories = useCallback(() => {
     const titles = VENDOR_INVENTORY.map((cat) => cat.title);
@@ -220,6 +224,10 @@ export default function VendorHomeScreen({ canAdd, status }) {
       setBulkParsedPages(0);
       setBulkSharedImageUrls([]);
       setBulkSharedImagePreviews([]);
+      setBulkAllSubCategory('');
+      setBulkAllBrand('');
+      setBulkAllMaterial('');
+      setBulkEditAllOpen(true);
       const picked = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
         copyToCacheDirectory: true,
@@ -381,6 +389,40 @@ export default function VendorHomeScreen({ canAdd, status }) {
     }
   }, []);
 
+  const applyBulkEditAll = useCallback(() => {
+    const nextGrade = String(bulkGrade || '').trim();
+    const nextType = String(bulkCustomType || '').trim();
+    const nextSubCategory = String(bulkAllSubCategory || '').trim();
+    const nextBrand = String(bulkAllBrand || '').trim();
+    const nextMaterial = String(bulkAllMaterial || '').trim();
+    const nextImage = String(bulkSharedImageUrls[0] || '').trim();
+
+    if (!nextGrade && !nextType && !nextSubCategory && !nextBrand && !nextMaterial && !nextImage) {
+      Alert.alert('Nothing to apply', 'Enter at least one value or upload image first.');
+      return;
+    }
+
+    setBulkDrafts((prev) =>
+      prev.map((item) => ({
+        ...item,
+        image: nextImage || item.image,
+        subCategory: nextSubCategory || item.subCategory,
+        grade: nextGrade || item.grade || '',
+        customType: nextType || item.customType || '',
+        brand: nextBrand || item.brand || '',
+        material: nextMaterial || item.material || '',
+      }))
+    );
+    Alert.alert('Applied', 'All generated listings updated.');
+  }, [
+    bulkAllBrand,
+    bulkAllMaterial,
+    bulkAllSubCategory,
+    bulkCustomType,
+    bulkGrade,
+    bulkSharedImageUrls,
+  ]);
+
   const rejectAllDrafts = useCallback(() => {
     Alert.alert('Reject all', 'Remove all generated listings?', [
       { text: 'Cancel', style: 'cancel' },
@@ -392,6 +434,9 @@ export default function VendorHomeScreen({ canAdd, status }) {
           setBulkParsedPages(0);
           setBulkSharedImageUrls([]);
           setBulkSharedImagePreviews([]);
+          setBulkAllSubCategory('');
+          setBulkAllBrand('');
+          setBulkAllMaterial('');
           setBulkPreviewOpen(false);
         },
       },
@@ -421,6 +466,10 @@ export default function VendorHomeScreen({ canAdd, status }) {
           description: mergedDescription,
           grade,
           customType,
+          subCategory: String(item.subCategory || bulkAllSubCategory || '').trim(),
+          brand: String(item.brand || bulkAllBrand || '').trim(),
+          material: String(item.material || bulkAllMaterial || '').trim(),
+          image: String(item.image || bulkSharedImageUrls[0] || '').trim(),
         };
       });
       const response = await submitBulkVendorListings(payload);
@@ -433,12 +482,23 @@ export default function VendorHomeScreen({ canAdd, status }) {
       setBulkParsedPages(0);
       setBulkSharedImageUrls([]);
       setBulkSharedImagePreviews([]);
+      setBulkAllSubCategory('');
+      setBulkAllBrand('');
+      setBulkAllMaterial('');
     } catch (error) {
       Alert.alert('Submit failed', 'Could not submit generated listings.');
     } finally {
       setBulkSubmitting(false);
     }
-  }, [bulkCustomType, bulkDrafts, bulkGrade]);
+  }, [
+    bulkAllBrand,
+    bulkAllMaterial,
+    bulkAllSubCategory,
+    bulkCustomType,
+    bulkDrafts,
+    bulkGrade,
+    bulkSharedImageUrls,
+  ]);
 
   const handleSubmit = async () => {
     const commissionValue = Number(form.commissionPercent);
@@ -835,48 +895,93 @@ export default function VendorHomeScreen({ canAdd, status }) {
             <Text style={styles.modalSubtitle}>
               {bulkDrafts.length} listings ready{bulkParsedPages ? ` • ${bulkParsedPages} page(s) parsed` : ''}
             </Text>
-            <View style={styles.bulkMetaInputRow}>
-              <View style={[styles.inputGroup, styles.bulkMetaInput]}>
-                <Text style={styles.inputLabel}>Grade (optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={bulkGrade}
-                  onChangeText={setBulkGrade}
-                  placeholder="Apply to all listings"
-                  placeholderTextColor={vendorColors.muted}
-                />
-              </View>
-              <View style={[styles.inputGroup, styles.bulkMetaInput]}>
-                <Text style={styles.inputLabel}>Type (optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={bulkCustomType}
-                  onChangeText={setBulkCustomType}
-                  placeholder="Shown on product page"
-                  placeholderTextColor={vendorColors.muted}
-                />
-              </View>
-            </View>
-            <View style={styles.bulkSharedImageSection}>
-              <Text style={styles.inputLabel}>Bulk listing images (apply to all)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
-                {bulkSharedImagePreviews.length
-                  ? bulkSharedImagePreviews.map((uri, idx) => (
-                      <View key={`${uri}-${idx}`} style={styles.selectedImageWrap}>
-                        <Image source={{ uri }} style={styles.selectedImage} />
-                      </View>
-                    ))
-                  : null}
-              </ScrollView>
-              <TouchableOpacity
-                style={[styles.uploadImageBtn, bulkUploadingImages ? { opacity: 0.7 } : null]}
-                onPress={handlePickBulkSharedImages}
-                disabled={bulkUploadingImages}
-              >
-                <Text style={styles.uploadImageBtnText}>
-                  {bulkUploadingImages ? 'Uploading…' : 'Upload images for all listings'}
-                </Text>
+            <View style={styles.bulkEditAllSection}>
+              <TouchableOpacity style={styles.bulkEditAllHeader} onPress={() => setBulkEditAllOpen((prev) => !prev)}>
+                <Text style={styles.bulkEditAllTitle}>Edit all listings</Text>
+                <Text style={styles.bulkEditAllToggle}>{bulkEditAllOpen ? 'Hide' : 'Show'}</Text>
               </TouchableOpacity>
+              {bulkEditAllOpen ? (
+                <>
+                  <View style={styles.bulkMetaInputRow}>
+                    <View style={[styles.inputGroup, styles.bulkMetaInput]}>
+                      <Text style={styles.inputLabel}>Grade</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={bulkGrade}
+                        onChangeText={setBulkGrade}
+                        placeholder="Apply to all listings"
+                        placeholderTextColor={vendorColors.muted}
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, styles.bulkMetaInput]}>
+                      <Text style={styles.inputLabel}>Type</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={bulkCustomType}
+                        onChangeText={setBulkCustomType}
+                        placeholder="Shown on product page"
+                        placeholderTextColor={vendorColors.muted}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.bulkMetaInputRow}>
+                    <View style={[styles.inputGroup, styles.bulkMetaInput]}>
+                      <Text style={styles.inputLabel}>Subcategory</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={bulkAllSubCategory}
+                        onChangeText={setBulkAllSubCategory}
+                        placeholder="Apply to all listings"
+                        placeholderTextColor={vendorColors.muted}
+                      />
+                    </View>
+                    <View style={[styles.inputGroup, styles.bulkMetaInput]}>
+                      <Text style={styles.inputLabel}>Brand</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={bulkAllBrand}
+                        onChangeText={setBulkAllBrand}
+                        placeholder="Apply to all listings"
+                        placeholderTextColor={vendorColors.muted}
+                      />
+                    </View>
+                  </View>
+                  <View style={[styles.inputGroup, styles.bulkMetaInputSingle]}>
+                    <Text style={styles.inputLabel}>Material</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={bulkAllMaterial}
+                      onChangeText={setBulkAllMaterial}
+                      placeholder="Apply to all listings"
+                      placeholderTextColor={vendorColors.muted}
+                    />
+                  </View>
+                  <View style={styles.bulkSharedImageSection}>
+                    <Text style={styles.inputLabel}>Bulk listing images (apply to all)</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewRow}>
+                      {bulkSharedImagePreviews.length
+                        ? bulkSharedImagePreviews.map((uri, idx) => (
+                            <View key={`${uri}-${idx}`} style={styles.selectedImageWrap}>
+                              <Image source={{ uri }} style={styles.selectedImage} />
+                            </View>
+                          ))
+                        : null}
+                    </ScrollView>
+                    <TouchableOpacity
+                      style={[styles.uploadImageBtn, bulkUploadingImages ? { opacity: 0.7 } : null]}
+                      onPress={handlePickBulkSharedImages}
+                      disabled={bulkUploadingImages}
+                    >
+                      <Text style={styles.uploadImageBtnText}>
+                        {bulkUploadingImages ? 'Uploading…' : 'Upload images for all listings'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity style={styles.bulkApplyAllBtn} onPress={applyBulkEditAll}>
+                    <Text style={styles.bulkApplyAllText}>Apply to all listings</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 12 }}>
@@ -1296,6 +1401,48 @@ const styles = StyleSheet.create({
   bulkMetaInput: {
     flex: 1,
     marginBottom: vendorSpacing.sm,
+  },
+  bulkMetaInputSingle: {
+    marginBottom: vendorSpacing.sm,
+  },
+  bulkEditAllSection: {
+    borderWidth: 1,
+    borderColor: vendorColors.border,
+    borderRadius: 12,
+    padding: vendorSpacing.sm,
+    backgroundColor: vendorColors.surface,
+    marginBottom: vendorSpacing.sm,
+  },
+  bulkEditAllHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  bulkEditAllTitle: {
+    color: vendorColors.text,
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  bulkEditAllToggle: {
+    color: vendorColors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  bulkSharedImageSection: {
+    marginBottom: vendorSpacing.sm,
+  },
+  bulkApplyAllBtn: {
+    borderRadius: 10,
+    backgroundColor: vendorColors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  bulkApplyAllText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
   },
   previewActions: { justifyContent: 'space-between' },
   previewEditBtn: {
