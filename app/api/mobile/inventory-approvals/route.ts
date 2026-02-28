@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin-guard";
+import { normalizeMobileImageList, normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request) {
+  const requestOrigin = new URL(req.url).origin;
   const guard = await requireAdmin(req);
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
@@ -42,8 +44,8 @@ export async function GET(req: Request) {
       price: p.price,
       commissionPercent: Number((p.specs as any)?.commissionPercent || 0),
       specs: p.specs || null,
-      image: p.image,
-      gallery: p.gallery || [],
+      image: normalizeMobileImageUrl(p.image, requestOrigin),
+      gallery: normalizeMobileImageList(p.gallery, requestOrigin),
       vendorId: p.vendorId || "N/A",
       createdAt: p.createdAt.toISOString(),
       description: p.description || "No description provided.",

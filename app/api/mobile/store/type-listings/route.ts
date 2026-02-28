@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request) {
+  const requestOrigin = new URL(req.url).origin;
   const { searchParams } = new URL(req.url);
   const subCategory = searchParams.get("subCategory") || "";
   const category = searchParams.get("category") || "";
@@ -62,7 +63,7 @@ export async function GET(req: Request) {
       category: p.category,
       subCategory: p.subCategory,
       price: displayPrice,
-      image: normalizeMobileImageUrl(p.image),
+      image: normalizeMobileImageUrl(p.image, requestOrigin),
       quantity: p.quantity || 0,
       vendorName: vendorMap.get(p.vendorId) || "Vendor",
       specs,

@@ -4,6 +4,7 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
 import { getStoreProducts, getStoreTypes, recognizeProductFromImage } from './storeApi';
+import { API_CONFIG } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
@@ -119,7 +120,11 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   }, [category]);
 
   const inventoryTypes = useMemo(() => {
-    const baseUrl = process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL || 'https://fixkart-main.vercel.app';
+    const baseUrl =
+      process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL ||
+      process.env.EXPO_PUBLIC_API_BASE_URL ||
+      API_CONFIG.baseUrl ||
+      '';
     const normalizePath = (path) => {
       if (!path) return '';
       const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');

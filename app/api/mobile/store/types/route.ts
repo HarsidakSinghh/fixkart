@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request) {
+  const requestOrigin = new URL(req.url).origin;
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category") || "";
 
@@ -68,14 +69,14 @@ export async function GET(req: Request) {
     if (!map.has(label)) {
       map.set(label, {
         label,
-        image: normalizeMobileImageUrl(p.image) || null,
+        image: normalizeMobileImageUrl(p.image, requestOrigin) || null,
         count: 1,
         category: resolvedCategory,
       });
     } else {
       const entry = map.get(label)!;
       entry.count += 1;
-      if (!entry.image && p.image) entry.image = normalizeMobileImageUrl(p.image) || null;
+      if (!entry.image && p.image) entry.image = normalizeMobileImageUrl(p.image, requestOrigin) || null;
       if (!entry.category && resolvedCategory) entry.category = resolvedCategory;
     }
   }

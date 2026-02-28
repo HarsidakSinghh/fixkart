@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/vendor-guard";
+import { normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request) {
+  const requestOrigin = new URL(req.url).origin;
   const guard = await requireVendor(req);
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
@@ -43,6 +45,7 @@ export async function GET(req: Request) {
 
   const withSold = products.map((p) => ({
     ...p,
+    image: normalizeMobileImageUrl(p.image, requestOrigin),
     sold: soldMap.get(p.id) || 0,
   }));
   const visibleProducts = withSold.filter((p) => {

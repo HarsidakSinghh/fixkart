@@ -22,6 +22,7 @@ import {
   submitBulkVendorListings,
   generateSingleListingDetailsAI,
 } from './vendorApi';
+import { API_CONFIG } from '../config';
 import { VENDOR_INVENTORY } from '../data/vendorInventory';
 
 export default function VendorHomeScreen({ canAdd, status }) {
@@ -646,7 +647,11 @@ export default function VendorHomeScreen({ canAdd, status }) {
 
   const showProducts = search.trim() || activeType;
   const inventoryTypes = useMemo(() => {
-    const baseUrl = process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL || 'https://fixkart-main.vercel.app';
+    const baseUrl =
+      process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL ||
+      process.env.EXPO_PUBLIC_API_BASE_URL ||
+      API_CONFIG.baseUrl ||
+      '';
     const normalizePath = (path) => {
       if (!path) return '';
       const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');

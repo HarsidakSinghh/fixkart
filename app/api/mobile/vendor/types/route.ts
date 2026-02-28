@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/vendor-guard";
+import { normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request) {
+  const requestOrigin = new URL(req.url).origin;
   const guard = await requireVendor(req);
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
@@ -58,7 +60,7 @@ export async function GET(req: Request) {
       p.category ||
       "Others";
     if (!map.has(label)) {
-      map.set(label, { label, image: p.image || null });
+      map.set(label, { label, image: normalizeMobileImageUrl(p.image, requestOrigin) || null });
     }
   }
 

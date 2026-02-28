@@ -94,22 +94,32 @@ function normalizeListingSignature(
   ].join("|");
 }
 
-function getAutoImageByType(typeName: string) {
+function getAssetBaseUrl(req: Request) {
+  const configured =
+    process.env.MOBILE_ASSET_BASE_URL ||
+    process.env.NEXT_PUBLIC_ASSET_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "";
+  const fallback = new URL(req.url).origin;
+  return String(configured || fallback).replace(/\/+$/, "");
+}
+
+function getAutoImageByType(typeName: string, assetBaseUrl: string) {
   const key = String(typeName || "").toLowerCase();
   if (key.includes("bolt")) {
-    return "https://fixkart-main.vercel.app/fastening/bolts.webp";
+    return `${assetBaseUrl}/fastening/bolts.webp`;
   }
   if (key.includes("stud")) {
-    return "https://fixkart-main.vercel.app/fastening/studs.jpg";
+    return `${assetBaseUrl}/fastening/studs.jpg`;
   }
   if (key.includes("u-bolt") || key.includes("u bolt")) {
-    return "https://fixkart-main.vercel.app/fastening/u-bolts.jpg";
+    return `${assetBaseUrl}/fastening/u-bolts.jpg`;
   }
   if (key.includes("threaded")) {
-    return "https://fixkart-main.vercel.app/fastening/threaded-rods.jpg";
+    return `${assetBaseUrl}/fastening/threaded-rods.jpg`;
   }
   if (key.includes("anchor")) {
-    return "https://fixkart-main.vercel.app/fastening/anchor.webp";
+    return `${assetBaseUrl}/fastening/anchor.webp`;
   }
   return DEFAULT_IMAGE;
 }
@@ -584,7 +594,7 @@ function parseTableFromOverlay(words: OcrWord[]) {
   return seed;
 }
 
-function inferProductProfile(fileName = "", text = "") {
+function inferProductProfile(fileName = "", text = "", assetBaseUrl = "") {
   const lines = String(text || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -599,7 +609,7 @@ function inferProductProfile(fileName = "", text = "") {
       productBaseName: "Hex bolts",
       category: "Fastening & Joining",
       subCategory: "Bolts",
-      image: "https://fixkart-main.vercel.app/fastening/bolts.webp",
+      image: `${assetBaseUrl}/fastening/bolts.webp`,
       knownType: true,
     };
   }
@@ -608,7 +618,7 @@ function inferProductProfile(fileName = "", text = "") {
       productBaseName: "Machine screw",
       category: "",
       subCategory: "Machine screw",
-      image: "https://fixkart-main.vercel.app/fastening/screws.jpg",
+      image: `${assetBaseUrl}/fastening/screws.jpg`,
       knownType: false,
     };
   }
@@ -617,7 +627,7 @@ function inferProductProfile(fileName = "", text = "") {
       productBaseName: "U-Bolts",
       category: "Fastening & Joining",
       subCategory: "U-Bolts",
-      image: "https://fixkart-main.vercel.app/fastening/u-bolts.jpg",
+      image: `${assetBaseUrl}/fastening/u-bolts.jpg`,
       knownType: true,
     };
   }
@@ -626,7 +636,7 @@ function inferProductProfile(fileName = "", text = "") {
       productBaseName: "Studs",
       category: "Fastening & Joining",
       subCategory: "Studs",
-      image: "https://fixkart-main.vercel.app/fastening/studs.jpg",
+      image: `${assetBaseUrl}/fastening/studs.jpg`,
       knownType: true,
     };
   }
@@ -635,7 +645,7 @@ function inferProductProfile(fileName = "", text = "") {
       productBaseName: "Threaded rods",
       category: "Fastening & Joining",
       subCategory: "Threaded Rods",
-      image: "https://fixkart-main.vercel.app/fastening/threaded-rods.jpg",
+      image: `${assetBaseUrl}/fastening/threaded-rods.jpg`,
       knownType: true,
     };
   }
@@ -644,7 +654,7 @@ function inferProductProfile(fileName = "", text = "") {
       productBaseName: "Wedge anchor",
       category: "Fastening & Joining",
       subCategory: "Wedge anchor",
-      image: "https://fixkart-main.vercel.app/fastening/anchor.webp",
+      image: `${assetBaseUrl}/fastening/anchor.webp`,
       knownType: true,
     };
   }
@@ -653,7 +663,7 @@ function inferProductProfile(fileName = "", text = "") {
     productBaseName: "New Product Type",
     category: "",
     subCategory: "",
-    image: getAutoImageByType(DEFAULT_SUBCATEGORY),
+    image: getAutoImageByType(DEFAULT_SUBCATEGORY, assetBaseUrl),
     knownType: false,
   };
 }
@@ -726,6 +736,7 @@ export async function POST(req: Request) {
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
   }
+  const assetBaseUrl = getAssetBaseUrl(req);
 
   try {
     const body = await req.json();
@@ -770,12 +781,12 @@ export async function POST(req: Request) {
       const gemini = await extractListingsWithGemini(fileDataUrl, fileName);
       parsedPages = gemini.parsedPages;
       for (const row of gemini.seeds) {
-        const profile = inferProductProfile(fileName, row.productName || fileName);
+        const profile = inferProductProfile(fileName, row.productName || fileName, assetBaseUrl);
         preparedSeeds.push({
           productBaseName: profile.productBaseName || row.productName || "New Product Type",
           category: profile.category || "",
           subCategory: profile.subCategory || row.productName || profile.productBaseName || "",
-          image: profile.image || getAutoImageByType(row.productName || profile.productBaseName),
+          image: profile.image || getAutoImageByType(row.productName || profile.productBaseName, assetBaseUrl),
           knownType: !!profile.knownType,
           size: row.size,
           price: Number(row.price),
@@ -837,7 +848,7 @@ export async function POST(req: Request) {
         text = fileName;
       }
 
-      const profile = inferProductProfile(fileName, text);
+      const profile = inferProductProfile(fileName, text, assetBaseUrl);
       const lineSeed = parseDiaLengthRateTable(text);
       const fractionalTable = hasFractionalSizes(text);
       const seed = fractionalTable

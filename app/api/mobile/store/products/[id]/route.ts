@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeMobileImageList, normalizeMobileImageUrl } from "@/lib/mobile-image";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const requestOrigin = new URL(req.url).origin;
   const { id } = await params;
 
   const product = await prisma.product.findUnique({
@@ -31,8 +32,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     subCategory: product.subCategory,
     subSubCategory: product.subSubCategory,
     price: displayPrice,
-    image: normalizeMobileImageUrl(product.image),
-    gallery: normalizeMobileImageList(product.gallery),
+    image: normalizeMobileImageUrl(product.image, requestOrigin),
+    gallery: normalizeMobileImageList(product.gallery, requestOrigin),
     description: description || "No description provided.",
     quantity: product.quantity || 0,
     specs: product.specs || null,
