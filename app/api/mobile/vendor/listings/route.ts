@@ -19,6 +19,7 @@ export async function GET(req: Request) {
       category: true,
       subCategory: true,
       image: true,
+      imagePath: true,
       price: true,
       quantity: true,
       description: true,
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
 
   const withSold = products.map((p) => ({
     ...p,
-    image: normalizeMobileImageUrl(p.image, requestOrigin),
+    image: normalizeMobileImageUrl(String(p.imagePath || p.image || "").trim(), requestOrigin),
     sold: soldMap.get(p.id) || 0,
   }));
   const visibleProducts = withSold.filter((p) => {

@@ -29,6 +29,7 @@ export async function GET(req: Request) {
       name: true,
       title: true,
       image: true,
+      imagePath: true,
     },
   });
 
@@ -60,7 +61,8 @@ export async function GET(req: Request) {
       p.category ||
       "Others";
     if (!map.has(label)) {
-      map.set(label, { label, image: normalizeMobileImageUrl(p.image, requestOrigin) || null });
+      const imageSource = String(p.imagePath || p.image || "").trim();
+      map.set(label, { label, image: normalizeMobileImageUrl(imageSource, requestOrigin) || null });
     }
   }
 

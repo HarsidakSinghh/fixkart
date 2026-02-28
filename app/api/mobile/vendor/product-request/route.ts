@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVendor } from "@/lib/vendor-guard";
 
+function normalizeImagePath(imageUrl: string) {
+  const raw = String(imageUrl || "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("/")) return raw;
+  try {
+    const parsed = new URL(raw);
+    const pathname = String(parsed.pathname || "").trim();
+    return pathname.startsWith("/") ? pathname : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   const guard = await requireVendor(req);
   if (!guard.ok) {
@@ -47,6 +60,7 @@ export async function POST(req: Request) {
     ? imageUrls.map((url) => String(url || "").trim()).filter(Boolean)
     : [];
   const primaryImageUrl = normalizedImageUrls[0] || imageUrl;
+  const normalizedImagePath = normalizeImagePath(primaryImageUrl || "");
 
   if (!base && !primaryImageUrl) {
     return NextResponse.json({ error: "Missing imageUrl for listing" }, { status: 400 });
@@ -96,7 +110,7 @@ export async function POST(req: Request) {
       subCategory,
       subSubCategory: base?.subSubCategory || null,
       image: primaryImageUrl || base?.image,
-      imagePath: base?.imagePath || null,
+      imagePath: normalizedImagePath || base?.imagePath || null,
       gallery: normalizedImageUrls.length
         ? normalizedImageUrls
         : primaryImageUrl

@@ -54,6 +54,7 @@ export async function GET(req: Request) {
       subCategory: true,
       subSubCategory: true,
       image: true,
+      imagePath: true,
       price: true,
       sku: true,
     },
@@ -63,7 +64,7 @@ export async function GET(req: Request) {
 
   const mapped = products.map((p) => ({
     ...p,
-    image: normalizeMobileImageUrl(p.image, requestOrigin),
+    image: normalizeMobileImageUrl(String(p.imagePath || p.image || "").trim(), requestOrigin),
   }));
 
   return NextResponse.json({ products: mapped });

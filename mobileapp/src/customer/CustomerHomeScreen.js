@@ -4,7 +4,6 @@ import { customerColors, customerSpacing } from './CustomerTheme';
 import CustomerHeader from './CustomerHeader';
 import CategoryDrawer from './CategoryDrawer';
 import { getStoreProducts, getStoreTypes, recognizeProductFromImage } from './storeApi';
-import { API_CONFIG } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
@@ -122,9 +121,14 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
   const inventoryTypes = useMemo(() => {
     const baseUrl =
       process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL ||
-      process.env.EXPO_PUBLIC_API_BASE_URL ||
-      API_CONFIG.baseUrl ||
-      '';
+      process.env.EXPO_PUBLIC_CATALOG_ASSET_BASE_URL ||
+      'https://www.thefixkart.com';
+    const normalizePath = (path) => {
+      if (!path) return '';
+      const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
+      const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+      return encodeURI(normalized);
+    };
     const selectedCategories =
       category && category !== 'All'
         ? VENDOR_INVENTORY.filter((entry) => entry.title === category)
@@ -136,7 +140,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         result.push({
           id: `${entry.slug || entry.title}-${item.name}-${index}`,
           label: item.name,
-          image: item.imagePath ? `${baseUrl}/mobile-placeholder.png` : '',
+          image: item.imagePath ? `${baseUrl}${normalizePath(item.imagePath)}` : '',
           category: entry.title,
         });
       });

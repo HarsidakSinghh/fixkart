@@ -22,7 +22,6 @@ import {
   submitBulkVendorListings,
   generateSingleListingDetailsAI,
 } from './vendorApi';
-import { API_CONFIG } from '../config';
 import { VENDOR_INVENTORY } from '../data/vendorInventory';
 
 export default function VendorHomeScreen({ canAdd, status }) {
@@ -649,9 +648,14 @@ export default function VendorHomeScreen({ canAdd, status }) {
   const inventoryTypes = useMemo(() => {
     const baseUrl =
       process.env.EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL ||
-      process.env.EXPO_PUBLIC_API_BASE_URL ||
-      API_CONFIG.baseUrl ||
-      '';
+      process.env.EXPO_PUBLIC_CATALOG_ASSET_BASE_URL ||
+      'https://www.thefixkart.com';
+    const normalizePath = (path) => {
+      if (!path) return '';
+      const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
+      const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+      return encodeURI(normalized);
+    };
     const selectedCategories =
       activeCategory && activeCategory !== 'All'
         ? VENDOR_INVENTORY.filter((cat) => cat.title === activeCategory)
@@ -663,7 +667,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
           id: `${cat.title}-${item.name}`,
           label: item.name,
           category: cat.title,
-          image: item.imagePath ? `${baseUrl}/mobile-placeholder.png` : '',
+          image: item.imagePath ? `${baseUrl}${normalizePath(item.imagePath)}` : '',
         });
       });
     });

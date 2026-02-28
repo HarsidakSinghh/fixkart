@@ -9,6 +9,7 @@
       "env": {
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZnVubnktZWxrLTkyLmNsZXJrLmFjY291bnRzLmRldiQ",
         "EXPO_PUBLIC_API_BASE_URL": "https://fixkart-bay.vercel.app",
+        "EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL": "https://www.thefixkart.com",
         "EXPO_PUBLIC_USE_MOCK": "false",
         "EXPO_PUBLIC_CLERK_JWT_TEMPLATE": "mobile"
       }
@@ -20,6 +21,7 @@
       "env": {
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_ZnVubnktZWxrLTkyLmNsZXJrLmFjY291bnRzLmRldiQ",
         "EXPO_PUBLIC_API_BASE_URL": "https://fixkart-bay.vercel.app",
+        "EXPO_PUBLIC_VENDOR_CATALOG_BASE_URL": "https://www.thefixkart.com",
         "EXPO_PUBLIC_USE_MOCK": "false",
         "EXPO_PUBLIC_CLERK_JWT_TEMPLATE": "mobile"
       }

@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizeMobileImageList, normalizeMobileImageUrl } from "@/lib/mobile-image";
 
+function inferCatalogPathFromText(input: string) {
+  const text = String(input || "").toLowerCase();
+  if (text.includes("u-bolt") || text.includes("u bolt")) return "/fastening/u-bolts.jpg";
+  if (text.includes("threaded")) return "/fastening/threaded-rods.jpg";
+  if (text.includes("anchor")) return "/fastening/anchor.webp";
+  if (text.includes("stud")) return "/fastening/studs.jpg";
+  if (text.includes("screw")) return "/fastening/screws.jpg";
+  if (text.includes("bolt")) return "/fastening/bolts.webp";
+  return "";
+}
+
 export async function GET(req: Request) {
   const requestOrigin = new URL(req.url).origin;
   const { searchParams } = new URL(req.url);
@@ -68,6 +79,21 @@ export async function GET(req: Request) {
     const commissionPercent = Number(specs.commissionPercent || 0);
     const displayPrice =
       commissionPercent > 0 ? Math.round(p.price * (1 + commissionPercent / 100)) : p.price;
+    const imageSource = String(p.imagePath || p.image || "").trim();
+    let image = normalizeMobileImageUrl(imageSource, requestOrigin);
+    if (image.includes("mobile-placeholder")) {
+      const hint = [
+        p.subSubCategory,
+        p.subCategory,
+        p.category,
+        p.title,
+        p.name,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const inferredPath = inferCatalogPathFromText(hint);
+      if (inferredPath) image = normalizeMobileImageUrl(inferredPath, requestOrigin);
+    }
     const description =
       p.description ||
       specs.description ||
@@ -81,7 +107,7 @@ export async function GET(req: Request) {
       subCategory: p.subCategory,
       subSubCategory: p.subSubCategory,
       price: displayPrice,
-      image: normalizeMobileImageUrl(p.image, requestOrigin),
+      image,
       gallery: normalizeMobileImageList(p.gallery, requestOrigin),
       description: description || "No description provided.",
       quantity: p.quantity || 0,

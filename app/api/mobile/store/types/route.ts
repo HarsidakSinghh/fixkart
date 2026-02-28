@@ -67,16 +67,20 @@ export async function GET(req: Request) {
       "Others";
     const resolvedCategory = String(p.category || p.subCategory || "").trim();
     if (!map.has(label)) {
+      const imageSource = String(p.imagePath || p.image || "").trim();
       map.set(label, {
         label,
-        image: normalizeMobileImageUrl(p.image, requestOrigin) || null,
+        image: normalizeMobileImageUrl(imageSource, requestOrigin) || null,
         count: 1,
         category: resolvedCategory,
       });
     } else {
       const entry = map.get(label)!;
       entry.count += 1;
-      if (!entry.image && p.image) entry.image = normalizeMobileImageUrl(p.image, requestOrigin) || null;
+      if (!entry.image && (p.imagePath || p.image)) {
+        const imageSource = String(p.imagePath || p.image || "").trim();
+        entry.image = normalizeMobileImageUrl(imageSource, requestOrigin) || null;
+      }
       if (!entry.category && resolvedCategory) entry.category = resolvedCategory;
     }
   }

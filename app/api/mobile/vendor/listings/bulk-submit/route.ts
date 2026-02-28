@@ -25,6 +25,19 @@ function buildSafeSku(inputSku: string, fallbackBase: string, index: number) {
   return `${base}-${suffix}`;
 }
 
+function normalizeImagePath(imageUrl: string) {
+  const raw = String(imageUrl || "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("/")) return raw;
+  try {
+    const parsed = new URL(raw);
+    const pathname = String(parsed.pathname || "").trim();
+    return pathname.startsWith("/") ? pathname : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   const guard = await requireVendor(req);
   if (!guard.ok) {
@@ -52,6 +65,7 @@ export async function POST(req: Request) {
       const category = String(row?.category || "").trim() || "Fastening & Joining";
       const subCategory = String(row?.subCategory || "").trim() || "";
       const image = String(row?.image || "").trim();
+      const imagePath = normalizeImagePath(image);
       const price = Number(row?.price || 0);
       const stock = Number(row?.stock ?? 0);
       const brand = String(row?.brand || fallbackBrand || "").trim() || null;
@@ -85,6 +99,7 @@ export async function POST(req: Request) {
         category,
         subCategory,
         image,
+        imagePath,
         gallery: [image],
         price,
         quantity: Number.isFinite(stock) && stock >= 0 ? Math.floor(stock) : 0,
