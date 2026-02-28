@@ -125,12 +125,6 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
       process.env.EXPO_PUBLIC_API_BASE_URL ||
       API_CONFIG.baseUrl ||
       '';
-    const normalizePath = (path) => {
-      if (!path) return '';
-      const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
-      const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
-      return encodeURI(normalized);
-    };
     const selectedCategories =
       category && category !== 'All'
         ? VENDOR_INVENTORY.filter((entry) => entry.title === category)
@@ -142,7 +136,7 @@ export default function CustomerHomeScreen({ onOpenProduct, onOpenLogin }) {
         result.push({
           id: `${entry.slug || entry.title}-${item.name}-${index}`,
           label: item.name,
-          image: item.imagePath ? `${baseUrl}${normalizePath(item.imagePath)}` : '',
+          image: item.imagePath ? `${baseUrl}/mobile-placeholder.png` : '',
           category: entry.title,
         });
       });

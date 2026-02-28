@@ -652,12 +652,6 @@ export default function VendorHomeScreen({ canAdd, status }) {
       process.env.EXPO_PUBLIC_API_BASE_URL ||
       API_CONFIG.baseUrl ||
       '';
-    const normalizePath = (path) => {
-      if (!path) return '';
-      const cleaned = path.replace(/\\\\/g, '/').replace(/\\/g, '/');
-      const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
-      return encodeURI(normalized);
-    };
     const selectedCategories =
       activeCategory && activeCategory !== 'All'
         ? VENDOR_INVENTORY.filter((cat) => cat.title === activeCategory)
@@ -669,7 +663,7 @@ export default function VendorHomeScreen({ canAdd, status }) {
           id: `${cat.title}-${item.name}`,
           label: item.name,
           category: cat.title,
-          image: item.imagePath ? `${baseUrl}${normalizePath(item.imagePath)}` : '',
+          image: item.imagePath ? `${baseUrl}/mobile-placeholder.png` : '',
         });
       });
     });
