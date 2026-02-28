@@ -28,6 +28,7 @@ export async function GET(req: Request) {
       name: true,
       title: true,
       image: true,
+      imagePath: true,
       specs: true,
     },
   });
